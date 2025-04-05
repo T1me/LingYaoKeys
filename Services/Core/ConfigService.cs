@@ -3,7 +3,7 @@ using System.Diagnostics;
 using Newtonsoft.Json;
 using WpfApp.Services.Utils;
 
-namespace WpfApp.Services.Config;
+namespace WpfApp.Services.Core;
 
 public class ConfigService
 {

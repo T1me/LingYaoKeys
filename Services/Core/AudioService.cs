@@ -3,7 +3,7 @@ using System.Reflection;
 using NAudio.Wave;
 using WpfApp.Services.Utils;
 
-namespace WpfApp.Services;
+namespace WpfApp.Services.Core;
 
 public class AudioService
 {

@@ -4,7 +4,7 @@ using WpfApp.Services.Core;
 using WpfApp.Services.Utils;
 using WpfApp.Services.Models;
 
-namespace WpfApp.Services.Config;
+namespace WpfApp.Services.Core;
 
 public class ConfigChangedEventArgs : EventArgs
 {

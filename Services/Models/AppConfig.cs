@@ -4,7 +4,7 @@ using System.Windows.Input;
 using WpfApp.Services.Core;
 using WpfApp.Services.Models;
 
-namespace WpfApp.Services.Config;
+namespace WpfApp.Services.Models;
 
 public class LogFileSettings
 {
