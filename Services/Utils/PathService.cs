@@ -146,12 +146,21 @@ public class PathService
     }
     
     /// <summary>
-    /// 获取默认的AppConfig.json路径
+    /// 获取全局配置文件GlobalConfig.json路径
     /// </summary>
-    /// <returns>AppConfig.json的完整路径</returns>
-    public string GetAppConfigPath()
+    /// <returns>GlobalConfig.json的完整路径</returns>
+    public string GetGlobalConfigPath()
     {
-        return Path.Combine(_configPath, "AppConfig.json");
+        return Path.Combine(_configPath, "GlobalConfig.json");
+    }
+    
+    /// <summary>
+    /// 获取按键配置文件KeyConfig.json路径
+    /// </summary>
+    /// <returns>KeyConfig.json的完整路径</returns>
+    public string GetKeyConfigPath()
+    {
+        return Path.Combine(_configPath, "KeyConfig.json");
     }
     
     /// <summary>

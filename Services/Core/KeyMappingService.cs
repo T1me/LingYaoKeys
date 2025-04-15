@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using WpfApp.Services.Models;
-using WpfApp.Services.Config;
 using WpfApp.Services.Utils;
 
 // 按键映射服务

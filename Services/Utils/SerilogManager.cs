@@ -3,7 +3,7 @@ using Serilog.Core;
 using Serilog.Events;
 using System.IO;
 using System.Runtime.CompilerServices;
-using WpfApp.Services.Config;
+using WpfApp.Services.Models;
 
 namespace WpfApp.Services.Utils;
 

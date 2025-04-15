@@ -1,6 +1,5 @@
 ﻿using System.IO;
-using WpfApp.Services;
-using WpfApp.Services.Config;
+using WpfApp.Services.Models;
 using WpfApp.Services.Utils;
 using System.Windows;
 using System.Runtime.InteropServices;
@@ -342,6 +341,10 @@ public partial class App : Application
             splashWindow.UpdateProgress("正在初始化配置服务...", 20);
             AppConfigService.Initialize();
 
+            // 初始化ConfigService
+            ConfigService = new ConfigService();
+            _logger.Debug("ConfigService初始化完成");
+
             // 2. 初始化日志系统
             splashWindow.UpdateProgress("正在初始化日志系统...", 30);
             _logger.SetBaseDirectory(_pathService.LogPath);
@@ -403,7 +406,16 @@ public partial class App : Application
             // 8. 初始化热键服务
             splashWindow.UpdateProgress("正在初始化热键服务...", 95);
             _logger.Debug("初始化热键服务");
-            var hotkeyService = new HotkeyService(mainWindow, LyKeysDriver);
+            
+            // 检查ConfigService是否正确初始化
+            if (ConfigService == null)
+            {
+                _logger.Warning("ConfigService未初始化，正在重新创建");
+                ConfigService = new ConfigService();
+            }
+            
+            var hotkeyService = new HotkeyService(mainWindow, LyKeysDriver, ConfigService);
+            _logger.Debug("HotkeyService初始化完成");
 
             // 注册应用程序退出事件
             RegisterExitHandlers();

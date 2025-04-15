@@ -2,8 +2,8 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Reflection;
 using System.Diagnostics;
-using WpfApp.Services.Config;
 using WpfApp.Services.Utils;
+using WpfApp.Services.Models;
 
 namespace WpfApp.Services.Core;
 

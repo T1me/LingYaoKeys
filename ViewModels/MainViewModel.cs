@@ -4,10 +4,10 @@ using System.Windows.Input;
 using WpfApp.Views;
 using System.Windows.Threading;
 using System.Windows.Media.Animation;
-using WpfApp.Services.Config;
 using WpfApp.Services.Core;
 using WpfApp.Services.Utils;
 using WpfApp.Services.Events;
+using WpfApp.Services.Models;
 
 namespace WpfApp.ViewModels;
 
@@ -177,8 +177,8 @@ public class MainViewModel : ViewModelBase
         mainWindow.DataContext = this;
         _logger.Debug("MainWindow的DataContext已设置为MainViewModel");
 
-        // 初始化HotkeyService，并传递窗口和驱动服务
-        _hotkeyService = new HotkeyService(mainWindow, lyKeysService);
+        // 初始化HotkeyService，并传递窗口、驱动服务和配置服务
+        _hotkeyService = new HotkeyService(mainWindow, lyKeysService, App.ConfigService);
         _logger.Debug("HotkeyService已初始化");
         
         // 先标记初始化完成，避免循环依赖问题

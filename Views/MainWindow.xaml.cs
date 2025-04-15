@@ -7,7 +7,7 @@ using System.IO;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using WpfApp.ViewModels;
-using WpfApp.Services.Config;
+using WpfApp.Services.Core;
 using WpfApp.Services.Utils;
 using Forms = System.Windows.Forms;
 using Drawing = System.Drawing;

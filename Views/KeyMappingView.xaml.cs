@@ -32,6 +32,10 @@ using System.IO;
 using System.Threading.Tasks;
 using IO = System.IO; // 使用IO作为System.IO的别名，避免与Shapes.Path冲突
 using Path = System.Windows.Shapes.Path; // 明确指定Path是指Windows.Shapes.Path
+using Color = System.Windows.Media.Color;
+using TextBox = System.Windows.Controls.TextBox;
+using ColorConverter = System.Windows.Media.ColorConverter;
+using System.Windows.Documents;
 
 // 提供按键映射视图
 namespace WpfApp.Views;
@@ -2825,6 +2829,412 @@ public partial class KeyMappingView : Page
         catch (Exception ex)
         {
             _logger.Error("恢复原始图标时出错", ex);
+        }
+    }
+
+    #region 配置文件管理事件处理
+
+    /// <summary>
+    /// 打开新建配置对话框
+    /// </summary>
+    private void NewConfig_Click(object sender, RoutedEventArgs e)
+    {
+        txtNewConfigName.Text = string.Empty;
+        rbCopyCurrentConfig.IsChecked = true;
+        newConfigPopup.IsOpen = true;
+        txtNewConfigName.Focus();
+    }
+
+    /// <summary>
+    /// 取消新建配置
+    /// </summary>
+    private void CancelNewConfig_Click(object sender, RoutedEventArgs e)
+    {
+        newConfigPopup.IsOpen = false;
+    }
+
+    /// <summary>
+    /// 确认新建配置
+    /// </summary>
+    private void ConfirmNewConfig_Click(object sender, RoutedEventArgs e)
+    {
+        string configName = txtNewConfigName.Text.Trim();
+        
+        if (string.IsNullOrEmpty(configName))
+        {
+            System.Windows.MessageBox.Show("请输入配置文件名称", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 检查名称是否已存在
+        if (((KeyMappingViewModel)DataContext).ConfigFiles.Any(c => c.Name.Equals(configName, StringComparison.OrdinalIgnoreCase)))
+        {
+            System.Windows.MessageBox.Show($"配置名称 \"{configName}\" 已存在，请使用其他名称", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        bool copyFromCurrent = rbCopyCurrentConfig.IsChecked == true;
+
+        // 调用ViewModel中的创建方法
+        ((KeyMappingViewModel)DataContext).CreateNewConfig(configName, copyFromCurrent);
+        newConfigPopup.IsOpen = false;
+    }
+
+    /// <summary>
+    /// 打开重命名配置对话框
+    /// </summary>
+    private void RenameConfig_Click(object sender, RoutedEventArgs e)
+    {
+        var viewModel = (KeyMappingViewModel)DataContext;
+        
+        // 记录当前状态
+        _logger.Debug($"RenameConfig_Click - SelectedConfigFile: {viewModel.SelectedConfigFile?.Name ?? "null"}, ConfigFiles数量: {viewModel.ConfigFiles?.Count ?? 0}");
+        
+        if (viewModel.SelectedConfigFile == null)
+        {
+            _logger.Warning("重命名配置失败：未选择配置文件");
+            System.Windows.MessageBox.Show("请先选择要重命名的配置文件", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        
+        // 检查是否是默认配置
+        if (viewModel.SelectedConfigFile.IsDefault)
+        {
+            _logger.Warning("重命名配置失败：默认配置不允许重命名");
+            System.Windows.MessageBox.Show("默认配置不能重命名", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        txtRenameConfig.Text = viewModel.SelectedConfigFile.Name;
+        renameConfigPopup.IsOpen = true;
+        txtRenameConfig.Focus();
+        txtRenameConfig.SelectAll();
+    }
+
+    /// <summary>
+    /// 取消重命名配置
+    /// </summary>
+    private void CancelRenameConfig_Click(object sender, RoutedEventArgs e)
+    {
+        renameConfigPopup.IsOpen = false;
+    }
+
+    /// <summary>
+    /// 确认重命名配置
+    /// </summary>
+    private void ConfirmRenameConfig_Click(object sender, RoutedEventArgs e)
+    {
+        var viewModel = (KeyMappingViewModel)DataContext;
+        string newName = txtRenameConfig.Text.Trim();
+        
+        // 记录当前状态
+        _logger.Debug($"重命名配置 - 当前名称: {viewModel.SelectedConfigFile?.Name ?? "null"}, 新名称: {newName}");
+        
+        // 验证选中的配置文件存在且不是默认配置
+        if (viewModel.SelectedConfigFile == null)
+        {
+            System.Windows.MessageBox.Show("未选择配置文件，无法重命名", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            renameConfigPopup.IsOpen = false;
+            return;
+        }
+        
+        // 双重检查：确保不能重命名默认配置
+        if (viewModel.SelectedConfigFile.IsDefault)
+        {
+            _logger.Warning("重命名配置失败：默认配置不允许重命名");
+            System.Windows.MessageBox.Show("默认配置不能重命名", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            renameConfigPopup.IsOpen = false;
+            return;
+        }
+        
+        if (string.IsNullOrEmpty(newName))
+        {
+            System.Windows.MessageBox.Show("请输入配置文件名称", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 检查名称是否已存在
+        if (viewModel.ConfigFiles.Any(c => c.Name.Equals(newName, StringComparison.OrdinalIgnoreCase) && c != viewModel.SelectedConfigFile))
+        {
+            System.Windows.MessageBox.Show($"配置名称 \"{newName}\" 已存在，请使用其他名称", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try 
+        {
+            // 保存当前选中项的引用
+            var currentConfig = viewModel.SelectedConfigFile;
+            
+            // 调用ViewModel中的重命名方法
+            viewModel.RenameConfig(newName);
+            
+            // 确保UI更新
+            lstConfigFiles.Items.Refresh();
+            
+            // 记录结果
+            _logger.Debug($"重命名配置完成 - 新名称: {currentConfig?.Name ?? "null"}");
+            
+            // 关闭弹窗
+            renameConfigPopup.IsOpen = false;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"重命名配置失败: {ex.Message}", ex);
+            System.Windows.MessageBox.Show($"重命名配置失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>
+    /// 删除配置文件
+    /// </summary>
+    private void DeleteConfig_Click(object sender, RoutedEventArgs e)
+    {
+        var viewModel = (KeyMappingViewModel)DataContext;
+        
+        // 记录当前状态
+        _logger.Debug($"DeleteConfig_Click - SelectedConfigFile: {viewModel.SelectedConfigFile?.Name ?? "null"}, ConfigFiles数量: {viewModel.ConfigFiles?.Count ?? 0}");
+        
+        if (viewModel.SelectedConfigFile == null)
+        {
+            _logger.Warning("删除配置失败：未选择配置文件");
+            System.Windows.MessageBox.Show("请先选择要删除的配置文件", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 检查是否是默认配置
+        if (viewModel.SelectedConfigFile.IsDefault)
+        {
+            System.Windows.MessageBox.Show("默认配置不能删除", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 确认删除
+        var result = System.Windows.MessageBox.Show($"确定要删除配置 \"{viewModel.SelectedConfigFile.Name}\" 吗？\n此操作不可恢复。", 
+            "确认删除", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        
+        if (result == MessageBoxResult.Yes)
+        {
+            var configName = viewModel.SelectedConfigFile?.Name;
+            viewModel.DeleteConfig();
+            
+            // 删除后的额外检查
+            _logger.Debug($"删除配置后 - SelectedConfigFile: {viewModel.SelectedConfigFile?.Name ?? "null"}, ConfigFiles数量: {viewModel.ConfigFiles?.Count ?? 0}");
+            
+            // 确保ListBox选择状态与ViewModel同步
+            if (lstConfigFiles.SelectedItem != viewModel.SelectedConfigFile && viewModel.SelectedConfigFile != null)
+            {
+                lstConfigFiles.SelectedItem = viewModel.SelectedConfigFile;
+                _logger.Debug($"删除后恢复ListBox选择: {viewModel.SelectedConfigFile.Name}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 打开设置配置快捷键对话框
+    /// </summary>
+    private void SetConfigHotkey_Click(object sender, RoutedEventArgs e)
+    {
+        var viewModel = (KeyMappingViewModel)DataContext;
+        
+        // 记录当前状态
+        _logger.Debug($"SetConfigHotkey_Click - SelectedConfigFile: {viewModel.SelectedConfigFile?.Name ?? "null"}, ConfigFiles数量: {viewModel.ConfigFiles?.Count ?? 0}");
+        
+        if (viewModel.SelectedConfigFile == null)
+        {
+            _logger.Warning("设置快捷键失败：未选择配置文件");
+            System.Windows.MessageBox.Show("请先选择要设置快捷键的配置文件", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 显示快捷键设置对话框
+        viewModel.TempConfigHotkey = viewModel.SelectedConfigFile.ConfigHotkey;
+        setHotkeyPopup.IsOpen = true;
+        txtConfigHotkey.Focus();
+    }
+
+    /// <summary>
+    /// 配置快捷键输入框获得焦点时
+    /// </summary>
+    private void ConfigHotkey_GotFocus(object sender, RoutedEventArgs e)
+    {
+        TextBox textBox = (TextBox)sender;
+        if (string.IsNullOrEmpty(textBox.Text))
+        {
+            textBox.Text = "请按下快捷键";
+            textBox.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#999999"));
+        }
+    }
+
+    /// <summary>
+    /// 配置快捷键输入框失去焦点时
+    /// </summary>
+    private void ConfigHotkey_LostFocus(object sender, RoutedEventArgs e)
+    {
+        TextBox textBox = (TextBox)sender;
+        if (textBox.Text == "请按下快捷键")
+        {
+            textBox.Text = string.Empty;
+            textBox.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333333"));
+        }
+    }
+
+    /// <summary>
+    /// 配置快捷键输入框按键处理
+    /// </summary>
+    private void ConfigHotkey_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        e.Handled = true;
+        var viewModel = (KeyMappingViewModel)DataContext;
+        
+        // 检查是否为ESC键（取消）
+        if (e.Key == Key.Escape)
+        {
+            setHotkeyPopup.IsOpen = false;
+            return;
+        }
+
+        // 检查是否为通用控制键（不可用作单独的快捷键）
+        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
+            e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
+            e.Key == Key.LeftShift || e.Key == Key.RightShift ||
+            e.Key == Key.System)
+        {
+            return;
+        }
+
+        // 检查是否为不允许的按键
+        if (e.Key == Key.Tab || e.Key == Key.Return || e.Key == Key.Space)
+        {
+            System.Windows.MessageBox.Show("Tab、Enter 和 Space 键不能用作配置切换快捷键", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // 尝试将WPF按键转换为LyKeysCode
+        if (!TryConvertToLyKeysCode(e.Key, out LyKeysCode lyKeysCode))
+        {
+            _logger.Warning($"无法将按键 {e.Key} 转换为LyKeysCode");
+            return;
+        }
+
+        // 创建快捷键字符串
+        string hotkeyText = "";
+        
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            hotkeyText += "Ctrl + ";
+        
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
+            hotkeyText += "Alt + ";
+        
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            hotkeyText += "Shift + ";
+        
+        // 获取按键名称 - 使用LyKeysService获取标准描述
+        string keyName = viewModel.LyKeysService.GetKeyDescription(lyKeysCode);
+        
+        hotkeyText += keyName;
+        
+        // 设置临时快捷键
+        viewModel.TempConfigHotkey = hotkeyText;
+        
+        // 确保UI更新
+        txtConfigHotkey.Text = hotkeyText;
+        txtConfigHotkey.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333333"));
+        
+        // 记录调试信息
+        _logger.Debug($"设置配置快捷键: {hotkeyText} (LyKeysCode: {lyKeysCode})");
+    }
+
+    /// <summary>
+    /// 取消配置快捷键设置
+    /// </summary>
+    private void CancelConfigHotkey_Click(object sender, RoutedEventArgs e)
+    {
+        setHotkeyPopup.IsOpen = false;
+    }
+
+    /// <summary>
+    /// 确认配置快捷键设置
+    /// </summary>
+    private void ConfirmConfigHotkey_Click(object sender, RoutedEventArgs e)
+    {
+        var viewModel = (KeyMappingViewModel)DataContext;
+        viewModel.SetConfigHotkey(viewModel.TempConfigHotkey);
+        setHotkeyPopup.IsOpen = false;
+    }
+
+    /// <summary>
+    /// 清除配置快捷键
+    /// </summary>
+    private void ClearConfigHotkey_Click(object sender, RoutedEventArgs e)
+    {
+        var viewModel = (KeyMappingViewModel)DataContext;
+        viewModel.TempConfigHotkey = string.Empty;
+        txtConfigHotkey.Text = string.Empty;
+        txtConfigHotkey.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333333"));
+        _logger.Debug("已清除配置快捷键");
+    }
+
+    /// <summary>
+    /// 显示配置管理帮助
+    /// </summary>
+    private void ConfigHelp_Click(object sender, RoutedEventArgs e)
+    {
+        configHelpPopup.IsOpen = true;
+    }
+
+    #endregion
+
+    /// <summary>
+    /// 配置文件列表选择变更事件
+    /// </summary>
+    private void ConfigFiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var viewModel = (KeyMappingViewModel)DataContext;
+        var listBox = (System.Windows.Controls.ListBox)sender;
+        var selectedItem = listBox.SelectedItem as ConfigFileInfo;
+        
+        _logger.Debug($"配置文件选择变更: {selectedItem?.Name ?? "null"}, ListBox.SelectedIndex: {listBox.SelectedIndex}");
+        
+        // 如果选择被清空，但ViewModel中有有效的选择，尝试恢复选择
+        if (selectedItem == null && viewModel.SelectedConfigFile != null)
+        {
+            _logger.Warning("检测到选择被清空，但ViewModel有有效选择，尝试恢复UI选择状态");
+            // 禁用SelectionChanged事件处理，防止循环
+            listBox.SelectionChanged -= ConfigFiles_SelectionChanged;
+            
+            try
+            {
+                // 尝试恢复选择
+                var indexToSelect = viewModel.ConfigFiles.IndexOf(viewModel.SelectedConfigFile);
+                if (indexToSelect >= 0)
+                {
+                    listBox.SelectedIndex = indexToSelect;
+                    _logger.Debug($"已恢复选择: {viewModel.SelectedConfigFile.Name}, 索引: {indexToSelect}");
+                }
+                else if (viewModel.ConfigFiles.Count > 0)
+                {
+                    // 如果找不到当前选择的项，选择第一个默认配置或第一个配置
+                    var defaultConfig = viewModel.ConfigFiles.FirstOrDefault(c => c.IsDefault);
+                    var configToSelect = defaultConfig ?? viewModel.ConfigFiles[0];
+                    listBox.SelectedItem = configToSelect;
+                    // 同步到ViewModel
+                    viewModel.SelectedConfigFile = configToSelect;
+                    _logger.Debug($"找不到当前ViewModel选择的项，已选择: {configToSelect.Name}");
+                }
+            }
+            finally
+            {
+                // 重新启用SelectionChanged事件处理
+                listBox.SelectionChanged += ConfigFiles_SelectionChanged;
+            }
+            return;
+        }
+        
+        // 正常情况：UI选择有效，确保ViewModel的选中项与UI同步
+        if (selectedItem != null && viewModel.SelectedConfigFile != selectedItem)
+        {
+            _logger.Debug($"手动同步SelectedConfigFile: {selectedItem.Name}");
+            viewModel.SelectedConfigFile = selectedItem;
         }
     }
 }

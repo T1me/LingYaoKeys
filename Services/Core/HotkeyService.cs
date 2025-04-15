@@ -4,7 +4,7 @@ using System.Windows.Input;
 using System.Diagnostics;
 using System.ComponentModel;
 using WpfApp.ViewModels;
-using WpfApp.Services.Config;
+using WpfApp.Services.Core;
 using WpfApp.Services.Utils;
 using WpfApp.Services.Models;
 
@@ -98,11 +98,15 @@ public class HotkeyService
         WindowActive // 窗口激活
     }
 
+    // 核心服务依赖
+    private readonly ConfigService _configService;
+
     // 构造函数
-    public HotkeyService(Window mainWindow, LyKeysService lyKeysService)
+    public HotkeyService(Window mainWindow, LyKeysService lyKeysService, ConfigService configService = null)
     {
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
         _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
+        _configService = configService; // 允许为null，在SaveHotkeyConfig方法中会处理null情况
         _mainViewModel = mainWindow.DataContext as MainViewModel ??
                          throw new ArgumentException("Window.DataContext must be of type MainViewModel",
                              nameof(mainWindow));
@@ -192,14 +196,20 @@ public class HotkeyService
     }
 
     // 注册热键 (简化为一个方法)
-    public bool RegisterHotkey(LyKeysCode keyCode, ModifierKeys modifiers)
+    public bool RegisterHotkey(LyKeysCode keyCode, ModifierKeys modifiers, bool saveToConfig = true)
     {
         try
         {
             _isRegisteringHotkey = true; // 进入热键注册模式
             _hotkeyVirtualKey = GetVirtualKeyFromLyKey(keyCode); // 转换为Windows虚拟键码
             _pendingHotkey = keyCode; // 保存LyKeys按键码
-            SaveHotkeyConfig(keyCode, modifiers); // 保存到配置文件
+            
+            // 根据参数决定是否保存到配置文件
+            if (saveToConfig)
+            {
+                SaveHotkeyConfig(keyCode, modifiers); // 保存到配置文件
+            }
+            
             _isRegisteringHotkey = false; // 退出热键注册模式
             return true;
         }
@@ -214,13 +224,26 @@ public class HotkeyService
     // 保存热键配置 (简化为一个方法)
     private void SaveHotkeyConfig(LyKeysCode keyCode, ModifierKeys modifiers)
     {
-        AppConfigService.UpdateConfig(config =>
+        try 
         {
-            config.startKey = keyCode;
-            config.startMods = modifiers;
-            config.stopKey = keyCode; // 设置相同停止键
-            config.stopMods = modifiers; // 设置相同的修饰键
-        });
+            // 获取当前配置文件的按键数据
+            var keyConfigData = _configService.GetKeyConfigData();
+            
+            // 更新热键设置
+            keyConfigData.startKey = keyCode;
+            keyConfigData.startMods = modifiers;
+            keyConfigData.stopKey = keyCode; // 设置相同停止键
+            keyConfigData.stopMods = modifiers; // 设置相同的修饰键
+            
+            // 保存到当前活动配置文件
+            _configService.SaveKeyConfigData(keyConfigData);
+            
+            _logger.Debug($"已将热键设置保存到当前配置文件: {_configService.CurrentConfig?.Name}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"保存热键配置失败: {ex.Message}", ex);
+        }
     }
 
     // 启动序列控制

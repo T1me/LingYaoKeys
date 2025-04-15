@@ -131,6 +131,60 @@ public class KeyConfig
     }
 }
 
+/// <summary>
+/// 全局配置类，包含UI和调试等全局配置
+/// </summary>
+public class GlobalConfig
+{
+    [JsonIgnore] public AppInfo AppInfo { get; set; } = new();
+    public UIConfig UI { get; set; } = new();
+    public DebugConfig Debug { get; set; } = new();
+    
+    // 通用配置
+    public bool? soundEnabled { get; set; }
+    public bool? IsReduceKeyStuck { get; set; }
+    public double? SoundVolume { get; set; } = 0.8;
+    public bool? AutoSwitchToEnglishIME { get; set; } = true;
+    public bool? isHotkeyControlEnabled { get; set; } = true;
+
+    [JsonIgnore] public string Author { get; set; } = "慕长秋";
+
+    public GlobalConfig()
+    {
+        Debug = new DebugConfig();
+        UI = new UIConfig();
+    }
+}
+
+/// <summary>
+/// 按键配置类，包含按键相关的所有配置
+/// </summary>
+public class KeyConfigData
+{
+    // 按键配置相关属性
+    public LyKeysCode? startKey { get; set; }
+    public ModifierKeys startMods { get; set; }
+    public LyKeysCode? stopKey { get; set; }
+    public ModifierKeys stopMods { get; set; }
+    public List<KeyConfig> keys { get; set; } = new();
+    public int keyMode { get; set; }
+    public int interval { get; set; } = 10;
+    public int? KeyPressInterval { get; set; }
+    
+    // 窗口句柄相关信息
+    public string? TargetWindowClassName { get; set; }
+    public string? TargetWindowProcessName { get; set; }
+    public string? TargetWindowTitle { get; set; }
+    
+    public KeyConfigData()
+    {
+        keys = new List<KeyConfig>();
+    }
+}
+
+/// <summary>
+/// 包含全部配置的类，用于兼容现有代码
+/// </summary>
 public class AppConfig
 {
     [JsonIgnore] public AppInfo AppInfo { get; set; } = new();
@@ -179,6 +233,81 @@ public class AppConfig
         Debug = new DebugConfig();
         UI = new UIConfig();
         keys = new List<KeyConfig>();
+    }
+    
+    /// <summary>
+    /// 从GlobalConfig和KeyConfigData创建AppConfig
+    /// </summary>
+    public static AppConfig FromConfigs(GlobalConfig globalConfig, KeyConfigData keyConfig)
+    {
+        var config = new AppConfig
+        {
+            // 从GlobalConfig复制属性
+            AppInfo = globalConfig.AppInfo,
+            UI = globalConfig.UI,
+            Debug = globalConfig.Debug,
+            soundEnabled = globalConfig.soundEnabled,
+            IsReduceKeyStuck = globalConfig.IsReduceKeyStuck,
+            SoundVolume = globalConfig.SoundVolume,
+            AutoSwitchToEnglishIME = globalConfig.AutoSwitchToEnglishIME,
+            isHotkeyControlEnabled = globalConfig.isHotkeyControlEnabled,
+            Author = globalConfig.Author,
+            
+            // 从KeyConfigData复制属性
+            startKey = keyConfig.startKey,
+            startMods = keyConfig.startMods,
+            stopKey = keyConfig.stopKey,
+            stopMods = keyConfig.stopMods,
+            keys = keyConfig.keys,
+            keyMode = keyConfig.keyMode,
+            interval = keyConfig.interval,
+            KeyPressInterval = keyConfig.KeyPressInterval,
+            TargetWindowClassName = keyConfig.TargetWindowClassName,
+            TargetWindowProcessName = keyConfig.TargetWindowProcessName,
+            TargetWindowTitle = keyConfig.TargetWindowTitle
+        };
+        
+        return config;
+    }
+    
+    /// <summary>
+    /// 将AppConfig转换为GlobalConfig
+    /// </summary>
+    public GlobalConfig ToGlobalConfig()
+    {
+        return new GlobalConfig
+        {
+            AppInfo = this.AppInfo,
+            UI = this.UI,
+            Debug = this.Debug,
+            soundEnabled = this.soundEnabled,
+            IsReduceKeyStuck = this.IsReduceKeyStuck,
+            SoundVolume = this.SoundVolume,
+            AutoSwitchToEnglishIME = this.AutoSwitchToEnglishIME,
+            isHotkeyControlEnabled = this.isHotkeyControlEnabled,
+            Author = this.Author
+        };
+    }
+    
+    /// <summary>
+    /// 将AppConfig转换为KeyConfigData
+    /// </summary>
+    public KeyConfigData ToKeyConfigData()
+    {
+        return new KeyConfigData
+        {
+            startKey = this.startKey,
+            startMods = this.startMods,
+            stopKey = this.stopKey,
+            stopMods = this.stopMods,
+            keys = this.keys,
+            keyMode = this.keyMode,
+            interval = this.interval,
+            KeyPressInterval = this.KeyPressInterval,
+            TargetWindowClassName = this.TargetWindowClassName,
+            TargetWindowProcessName = this.TargetWindowProcessName,
+            TargetWindowTitle = this.TargetWindowTitle
+        };
     }
 }
 

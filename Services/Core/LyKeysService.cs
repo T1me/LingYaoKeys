@@ -1,8 +1,7 @@
 using System.IO;
 using System.Diagnostics;
-using WpfApp.Services.Models;
 using WpfApp.ViewModels;
-using WpfApp.Services.Config;
+using WpfApp.Services.Models;
 using WpfApp.Services.Events;
 using WpfApp.Services.Utils;
 using System.Text;

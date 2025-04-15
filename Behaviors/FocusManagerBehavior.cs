@@ -72,7 +72,24 @@ public static class FocusManagerBehavior
         {
             element.PreviewMouseDown += (s, args) =>
             {
-                var hitTestResult = VisualTreeHelper.HitTest(element, args.GetPosition(element));
+                // 检查点击位置是否在弹出窗口上
+                var hitPoint = args.GetPosition(element);
+                
+                // 如果点击位置超出当前元素的范围，可能点击在弹窗上，不应清除焦点
+                if (hitPoint.X < 0 || hitPoint.Y < 0 || 
+                    hitPoint.X > element.ActualWidth || hitPoint.Y > element.ActualHeight)
+                {
+                    return;
+                }
+                
+                var hitTestResult = VisualTreeHelper.HitTest(element, hitPoint);
+                
+                // 检查点击的是否为弹窗或其子元素
+                if (IsPopupOrChildOfPopup(args.OriginalSource as DependencyObject))
+                {
+                    return;
+                }
+                
                 if (hitTestResult == null || !IsInputControl(hitTestResult.VisualHit as DependencyObject))
                 {
                     Application.Current.Dispatcher.BeginInvoke(new Action(() =>
@@ -181,6 +198,42 @@ public static class FocusManagerBehavior
             element = VisualTreeHelper.GetParent(element);
         }
 
+        return false;
+    }
+    
+    private static bool IsPopupOrChildOfPopup(DependencyObject element)
+    {
+        if (element == null) return false;
+        
+        // 遍历可视树向上查找
+        while (element != null)
+        {
+            // 检查是否是弹出窗口相关类型
+            if (element is System.Windows.Controls.Primitives.Popup || 
+                element is Window window && window != Application.Current.MainWindow)
+                return true;
+            
+            // 检查名称是否包含常见的弹窗关键词
+            if (element is FrameworkElement fe && 
+                (fe.Name?.Contains("Popup") == true || 
+                 fe.Name?.Contains("Dialog") == true ||
+                 fe.Name?.Contains("Config") == true))
+                return true;
+                
+            try
+            {
+                element = VisualTreeHelper.GetParent(element);
+            }
+            catch
+            {
+                // 如果获取父元素失败(例如跨窗口边界)，尝试获取逻辑父元素
+                if (element is FrameworkElement frameworkElement)
+                    element = frameworkElement.Parent;
+                else
+                    break;
+            }
+        }
+        
         return false;
     }
 

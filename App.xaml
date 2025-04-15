@@ -56,6 +56,13 @@
             <Style TargetType="{x:Type FrameworkElement}" BasedOn="{StaticResource HighQualityRenderingStyle}" />
             <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource HighQualityRenderingStyle}" />
             <Style TargetType="{x:Type Control}" BasedOn="{StaticResource HighQualityRenderingStyle}" />
+            
+            <!-- 全局ListBoxItem样式，解决RelativeSource绑定错误 -->
+            <Style TargetType="{x:Type ListBoxItem}">
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <!-- 保持其他样式不变，只设置内容对齐属性 -->
+            </Style>
 
             <!-- 全局阴影效果 -->
             <DropShadowEffect x:Key="DropShadowEffect"

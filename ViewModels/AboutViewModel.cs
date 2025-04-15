@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Diagnostics;
 using WpfApp.Services.Utils;
-using WpfApp.Services.Config;
+using WpfApp.Services.Core;
 
 namespace WpfApp.ViewModels;
 

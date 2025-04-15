@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Extensions.Configuration;
 using WpfApp.Services;
-using WpfApp.Services.Config;
 using WpfApp.Services.Utils;
 using MessageBox = System.Windows.MessageBox;
 using Application = System.Windows.Application;
