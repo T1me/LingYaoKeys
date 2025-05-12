@@ -129,12 +129,12 @@ Adjust analysis depth based on:
 
 ### Coding standards
 - Must follow C# coding standards
-- Must use MVVM mode to ensure separation of view and logic
+- Must use MVVM pattern to ensure separation of view and logic
 - Must use XAML to unify style
 - Must use WPF controls instead of WinForms controls
-- For smaller components, you must use inline functions, but separate complex logic into code-behind or service classes
+- For smaller components, use inline functions, but separate complex logic into code-behind or service classes
 - If necessary, use dependency injection to manage services to reduce coupling between classes
-- The code must be unit tested to ensure its stability
+- Code must be unit tested to ensure stability
 
 ## Project Search Priority
 
@@ -155,17 +155,20 @@ LingYaoKeys/
 │   │   ├── LyKeys.cs             # Key Core Implementation Class
 │   │   ├── LyKeysService.cs      # Key Service Main Class
 │   │   ├── LyKeysCode.cs         # Key Code Definition Class
-│   │   ├── AppConfigService.cs   # Application Configuration Service Class
-│   │   ├── ConfigService.cs      # Configuration Service Class
+│   │   ├── ConfigManager.cs      # Configuration Manager
+│   │   ├── IConfigManager.cs     # Configuration Manager Interface
 │   │   ├── HotkeyService.cs      # Hotkey Service
 │   │   ├── KeyMappingService.cs  # Key Mapping Service
 │   │   ├── InputMethodService.cs # Input Method Service
+│   │   ├── UpdateService.cs      # Update Service
+│   │   ├── AudioService.cs       # Audio Service
 │   │   └── PageCacheService.cs   # Page Cache Service
 │   ├── Models/                    # Service Models
 │   │   ├── AppConfig.cs          # Application Configuration Model Class
 │   │   ├── KeyItem.cs            # Key Item Model Class
 │   │   ├── HoldKeyMode.cs        # Hold Key Mode Model Class
-│   │   └── KeyModeBase.cs        # Key Mode Base Class
+│   │   ├── KeyModeBase.cs        # Key Mode Base Class
+│   │   └── ConfigFileInfo.cs     # Configuration File Information
 │   ├── Utils/                     # Utility Services
 │   │   ├── FocusManagementService.cs # Focus Management Service
 │   │   ├── PathService.cs        # Path Service
@@ -173,11 +176,8 @@ LingYaoKeys/
 │   │   └── TaskManager.cs        # Task Manager
 │   ├── Events/                    # Event Services
 │   │   └── StatusMessageEventArgs.cs # Status Message Event Args
-│   ├── Commands/                  # Command Services
-│   │   └── RelayCommand.cs       # Relay Command
-│   ├── Cache/                     # Cache Services
-│   └── Audio/                     # Audio Services
-│ 
+│   └── Commands/                  # Command Services
+│       └── RelayCommand.cs       # Relay Command
 ├── Converters/                     # Value Converters
 │   ├── InverseBoolConverter.cs          # Boolean Inverse Converter
 │   ├── BoolToColorConverter.cs          # Boolean to Color Converter
@@ -201,13 +201,13 @@ LingYaoKeys/
 │   └── WindowControlStyles.xaml   # Window Control Styles
 ├── Resource/                      # Resource Files
 │   ├── lykeysdll/                 # Core Driver Resources
+│   │   ├── csharp_example/        # C# Example Implementation
+│   │   └── python_example/        # Python Example Implementation
 │   ├── img/                       # Image Resources
 │   ├── icon/                      # Icon Resources
 │   └── sound/                     # Sound Resources
 ├── App.xaml                       # Application Definition
 ├── App.xaml.cs                    # Application Code
-├── MainWindow.xaml                # Main Window XAML
-├── MainWindow.xaml.cs             # Main Window Code
 ├── AppConfig.json                 # Application Configuration File
 ├── WpfApp.csproj                  # Project File
 ├── WpfApp.sln                     # Solution File
