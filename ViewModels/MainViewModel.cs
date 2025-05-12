@@ -24,6 +24,7 @@ public class MainViewModel : ViewModelBase
     private readonly FeedbackViewModel _feedbackViewModel;
     private readonly HotkeyService _hotkeyService;
     private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly IConfigManager _configManager;
     private string _statusMessage = "就绪";
     private System.Windows.Media.Brush _statusMessageColor = System.Windows.Media.Brushes.Black;
     private readonly DispatcherTimer _statusMessageTimer;
@@ -85,7 +86,7 @@ public class MainViewModel : ViewModelBase
     {
         get
         {
-            if (_globalConfig == null) _globalConfig = AppConfigService.GlobalConfig;
+            if (_globalConfig == null) _globalConfig = _configManager.GlobalConfig;
             return _globalConfig;
         }
     }
@@ -94,7 +95,7 @@ public class MainViewModel : ViewModelBase
     {
         get
         {
-            if (_keyConfig == null) _keyConfig = AppConfigService.KeyConfig;
+            if (_keyConfig == null) _keyConfig = _configManager.CurrentKeyConfig;
             return _keyConfig;
         }
     }
@@ -153,8 +154,13 @@ public class MainViewModel : ViewModelBase
         _isInitializing = true;
         _logger.Debug("MainViewModel开始初始化");
         
+        // 参数验证，确保关键依赖项不为null
+        if (lyKeysService == null) throw new ArgumentNullException(nameof(lyKeysService));
+        if (mainWindow == null) throw new ArgumentNullException(nameof(mainWindow));
+        
         _lyKeysService = lyKeysService;
         _mainWindow = mainWindow;
+        _configManager = ConfigManager.Instance;
 
         // 先获取动画资源
         _fadeInStoryboard = mainWindow.FindResource("PageFadeIn") as Storyboard;
@@ -177,7 +183,7 @@ public class MainViewModel : ViewModelBase
         _logger.Debug("MainWindow的DataContext已设置为MainViewModel");
 
         // 初始化HotkeyService，并传递窗口、驱动服务和配置服务
-        _hotkeyService = new HotkeyService(mainWindow, lyKeysService, App.ConfigService);
+        _hotkeyService = new HotkeyService(mainWindow, lyKeysService, _configManager);
         _logger.Debug("HotkeyService已初始化");
         
         // 先标记初始化完成，避免循环依赖问题
@@ -186,7 +192,7 @@ public class MainViewModel : ViewModelBase
         
         // 初始化各个ViewModel
         _keyMappingViewModel =
-            new KeyMappingViewModel(_lyKeysService, App.ConfigService, _hotkeyService, this, App.AudioService);
+            new KeyMappingViewModel(_lyKeysService, _configManager, _hotkeyService, this, App.AudioService);
         _logger.Debug("KeyMappingViewModel已初始化");
         
         _feedbackViewModel = new FeedbackViewModel(this);

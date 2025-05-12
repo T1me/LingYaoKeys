@@ -77,10 +77,6 @@
             <LogicalName>WpfApp.Resource.lykeysdll.lykeys.sys</LogicalName>
             <CopyToOutputDirectory>Never</CopyToOutputDirectory>
         </EmbeddedResource>
-        <EmbeddedResource Include="Resource\lykeysdll\lykeys.cat">
-            <LogicalName>WpfApp.Resource.lykeysdll.lykeys.cat</LogicalName>
-            <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-        </EmbeddedResource>
 
         <!-- 音频文件配置为嵌入式资源 -->
         <EmbeddedResource Include="Resource\sound\**">

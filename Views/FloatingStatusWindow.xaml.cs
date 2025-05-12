@@ -31,13 +31,14 @@ public partial class FloatingStatusWindow : Window
     private DateTime _lastClickTime;
     private const double DOUBLE_CLICK_THRESHOLD = 300; // 双击时间阈值（毫秒）
     private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly IConfigManager _configManager = ConfigManager.Instance;
     private RotateTransform _borderRotateTransform;
     private string _currentStatus;
 
     public FloatingStatusWindow(MainWindow mainWindow)
     {
         InitializeComponent();
-        _config = AppConfigService.GlobalConfig;
+        _config = _configManager.GlobalConfig;
         _mainWindow = mainWindow;
         _logger.Debug("浮窗初始化完成");
 
@@ -61,7 +62,7 @@ public partial class FloatingStatusWindow : Window
             top = SystemParameters.WorkArea.Bottom - Height - 10;
 
             // 保存默认位置
-            AppConfigService.UpdateGlobalConfig(config =>
+            _configManager.UpdateGlobalConfig(config =>
             {
                 config.UI.FloatingWindow.Left = left;
                 config.UI.FloatingWindow.Top = top;
@@ -85,7 +86,7 @@ public partial class FloatingStatusWindow : Window
             Top = SystemParameters.WorkArea.Bottom - Height - 10;
 
             // 保存新位置
-            AppConfigService.UpdateGlobalConfig(config =>
+            _configManager.UpdateGlobalConfig(config =>
             {
                 config.UI.FloatingWindow.Left = Left;
                 config.UI.FloatingWindow.Top = Top;
@@ -345,7 +346,7 @@ public partial class FloatingStatusWindow : Window
             // 如果发生了拖拽，保存新位置
             if (_isDragging)
             {
-                AppConfigService.UpdateGlobalConfig(config =>
+                _configManager.UpdateGlobalConfig(config =>
                 {
                     config.UI.FloatingWindow.Left = Math.Round(Left, 2);
                     config.UI.FloatingWindow.Top = Math.Round(Top, 2);
@@ -432,7 +433,7 @@ public partial class FloatingStatusWindow : Window
         try
         {
             // 保存窗口位置
-            AppConfigService.UpdateGlobalConfig(config =>
+            _configManager.UpdateGlobalConfig(config =>
             {
                 config.UI.FloatingWindow.Left = Left;
                 config.UI.FloatingWindow.Top = Top;

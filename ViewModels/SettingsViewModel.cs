@@ -15,8 +15,8 @@ namespace WpfApp.ViewModels;
 public class SettingsViewModel : ViewModelBase
 {
     private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly IConfigManager _configManager = ConfigManager.Instance;
     private readonly UpdateService _updateService;
-    private readonly ConfigService _configService;
     private bool _isCheckingUpdate;
     private string _updateStatus = "检查更新";
     private string _debugModeStatus = "调试模式关闭";
@@ -40,7 +40,6 @@ public class SettingsViewModel : ViewModelBase
 
     public SettingsViewModel()
     {
-        _configService = new ConfigService();
         _updateService = new UpdateService();
 
         CheckUpdateCommand = new RelayCommand(async () => await CheckForUpdateAsync(), () => !_isCheckingUpdate);
@@ -53,7 +52,7 @@ public class SettingsViewModel : ViewModelBase
 
     private void UpdateDebugModeStatus()
     {
-        var globalConfig = AppConfigService.GlobalConfig;
+        var globalConfig = _configManager.GlobalConfig;
         _debugModeStatus = globalConfig.Debug.IsDebugMode ? "🟢 调试模式：已开启" : "⭕ 调试模式：已关闭";
     }
 
@@ -61,9 +60,9 @@ public class SettingsViewModel : ViewModelBase
     {
         try
         {
-            var currentDebugMode = AppConfigService.GlobalConfig.Debug.IsDebugMode;
+            var currentDebugMode = _configManager.GlobalConfig.Debug.IsDebugMode;
 
-            AppConfigService.UpdateGlobalConfig(config =>
+            _configManager.UpdateGlobalConfig(config =>
             {
                 config.Debug.IsDebugMode = !currentDebugMode;
                 config.Debug.UpdateDebugState();
@@ -202,7 +201,7 @@ public class SettingsViewModel : ViewModelBase
 
             if (dialog.ShowDialog() == true)
             {
-                _configService.ImportConfig(dialog.FileName);
+                _configManager.ImportKeyConfig(dialog.FileName);
                 MessageBox.Show("配置导入成功，需要重启程序才能生效。是否立即重启？",
                     "重启提示",
                     MessageBoxButton.YesNo,
@@ -230,7 +229,7 @@ public class SettingsViewModel : ViewModelBase
 
             if (dialog.ShowDialog() == true)
             {
-                _configService.ExportConfig(dialog.FileName);
+                _configManager.ExportKeyConfig(dialog.FileName);
                 MessageBox.Show("配置导出成功", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }

@@ -28,7 +28,7 @@ public partial class App : Application
     private readonly PathService _pathService = PathService.Instance;
 
     public static LyKeysService LyKeysDriver { get; private set; }
-    public static ConfigService ConfigService { get; private set; }
+    public static ConfigManager ConfigService { get; private set; }
     public static AudioService AudioService { get; private set; }
     
     private bool _isShuttingDown;
@@ -339,21 +339,21 @@ public partial class App : Application
 
             // 1. 初始化配置服务
             splashWindow.UpdateProgress("正在初始化配置服务...", 20);
-            AppConfigService.Initialize();
+            ConfigManager.Instance.Initialize();
 
             // 初始化ConfigService
-            ConfigService = new ConfigService();
+            ConfigService = ConfigManager.Instance;
             _logger.Debug("ConfigService初始化完成");
 
             // 2. 初始化日志系统
             splashWindow.UpdateProgress("正在初始化日志系统...", 30);
             _logger.SetBaseDirectory(_pathService.LogPath);
-            _logger.Initialize(AppConfigService.GlobalConfig.Debug);
+            _logger.Initialize(ConfigManager.Instance.GlobalConfig.Debug);
 
             // 3. 设置配置变更监听
-            AppConfigService.ConfigChanged += (sender, args) =>
+            ConfigManager.Instance.ConfigChanged += (sender, args) =>
             {
-                if (args.Section == "Debug") _logger.UpdateLoggerConfig(args.GlobalConfig.Debug);
+                if (args.ChangeType == ConfigChangeType.Global) _logger.UpdateLoggerConfig(args.GlobalConfigData.Debug);
             };
 
             // 注册全局异常处理
@@ -411,7 +411,7 @@ public partial class App : Application
             if (ConfigService == null)
             {
                 _logger.Warning("ConfigService未初始化，正在重新创建");
-                ConfigService = new ConfigService();
+                ConfigService = ConfigManager.Instance;
             }
             
             var hotkeyService = new HotkeyService(mainWindow, LyKeysDriver, ConfigService);
@@ -469,12 +469,11 @@ public partial class App : Application
             // 使用驱动文件的固定目录
             var driverFile = _pathService.GetDriverFilePath("lykeys.sys");
             var dllFile = _pathService.GetDriverFilePath("lykeysdll.dll");
-            var catFile = _pathService.GetDriverFilePath("lykeys.cat");
             
             _logger.Debug($"驱动文件目录: {_pathService.DriverPath}");
 
             // 检查文件是否已存在，如果不存在则提取
-            bool needsExtraction = !File.Exists(driverFile) || !File.Exists(dllFile) || !File.Exists(catFile);
+            bool needsExtraction = !File.Exists(driverFile) || !File.Exists(dllFile);
             
             if (needsExtraction)
             {
@@ -485,7 +484,6 @@ public partial class App : Application
                 {
                     ExtractEmbeddedResource("WpfApp.Resource.lykeysdll.lykeys.sys", driverFile);
                     ExtractEmbeddedResource("WpfApp.Resource.lykeysdll.lykeysdll.dll", dllFile);
-                    ExtractEmbeddedResource("WpfApp.Resource.lykeysdll.lykeys.cat", catFile);
                 });
                 
                 _logger.Debug("驱动文件提取完成");
@@ -504,7 +502,6 @@ public partial class App : Application
             _logger.Debug($"驱动文件路径:");
             _logger.Debug($"- 驱动文件: {driverFile}");
             _logger.Debug($"- DLL文件: {dllFile}");
-            _logger.Debug($"- CAT文件: {catFile}");
 
             // 返回驱动文件路径
             return driverFile;

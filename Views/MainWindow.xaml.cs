@@ -21,6 +21,7 @@ namespace WpfApp.Views;
 public partial class MainWindow : Window
 {
     private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly IConfigManager _configManager;
     private readonly MainViewModel _viewModel;
     private bool _isClosing;
     private bool _hasShownMinimizeNotification;
@@ -106,6 +107,9 @@ public partial class MainWindow : Window
     {
         try
         {
+            // 初始化 ConfigManager
+            _configManager = ConfigManager.Instance;
+            
             // 先初始化ViewModel
             _viewModel = new MainViewModel(App.LyKeysDriver, this);
             
@@ -450,11 +454,28 @@ public partial class MainWindow : Window
                             if (WindowState == WindowState.Normal)
                             {
                                 _logger.Debug($"保存窗口大小: {ActualWidth}x{ActualHeight}");
-                                AppConfigService.UpdateGlobalConfig(config =>
+                                if (_configManager != null)
                                 {
-                                    config.UI.MainWindow.Width = ActualWidth;
-                                    config.UI.MainWindow.Height = ActualHeight;
-                                });
+                                    try
+                                    {
+                                        _configManager.UpdateGlobalConfig(config =>
+                                        {
+                                            if (config != null && config.UI != null && config.UI.MainWindow != null)
+                                            {
+                                                config.UI.MainWindow.Width = ActualWidth;
+                                                config.UI.MainWindow.Height = ActualHeight;
+                                            }
+                                        });
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _logger.Error("更新配置时发生错误", ex);
+                                    }
+                                }
+                                else
+                                {
+                                    _logger.Warning("无法保存窗口大小：配置管理器为空");
+                                }
                             }
                         });
 

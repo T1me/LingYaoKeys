@@ -9,10 +9,16 @@ namespace WpfApp.ViewModels;
 public class AboutViewModel : ViewModelBase
 {
     private readonly SerilogManager _logger = SerilogManager.Instance;
-    private readonly string _githubUrl = AppConfigService.GlobalConfig.AppInfo.GitHubUrl;
+    private readonly IConfigManager _configManager = ConfigManager.Instance;
+    private readonly string _githubUrl;
     private readonly string _websiteUrl = "https://cassianvale.github.io/LingYaoKeys/";
     private ICommand? _openGitHubCommand;
     private ICommand? _openWebsiteCommand;
+
+    public AboutViewModel()
+    {
+        _githubUrl = _configManager.GlobalConfig.AppInfo.GitHubUrl;
+    }
 
     public ICommand OpenGitHubCommand => _openGitHubCommand ??= new RelayCommand(OpenGitHub);
     public ICommand OpenWebsiteCommand => _openWebsiteCommand ??= new RelayCommand(OpenWebsite);

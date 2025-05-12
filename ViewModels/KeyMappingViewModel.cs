@@ -11,7 +11,6 @@ using System.Runtime.InteropServices;
 using System.Timers;
 using System.Windows.Threading;
 using System.IO;
-using WpfApp.Services.Core;
 
 
 // 定义KeyItemSettings结构用于传递按键设置
@@ -59,7 +58,8 @@ namespace WpfApp.ViewModels
         public const string EMPTY_WINDOW_PLACEHOLDER = "空";
         
         private readonly LyKeysService _lyKeysService;
-        private readonly ConfigService _configService;
+        public LyKeysService LyKeysService => _lyKeysService;
+        private readonly IConfigManager _configManager;
         private LyKeysCode? _currentKey;
         private string _currentKeyText = string.Empty;
         private ObservableCollection<KeyItem> _keyList;
@@ -95,8 +95,8 @@ namespace WpfApp.ViewModels
         private bool _isTargetWindowActive;
         private readonly System.Timers.Timer _activeWindowCheckTimer;
         private const int ACTIVE_WINDOW_CHECK_INTERVAL = 50; // 50ms检查一次活动窗口
-        private int _keyInterval = 5;
-        private int _keyPressInterval = 5;  // 添加缺失的_keyPressInterval字段
+        private int _keyInterval = 10;
+        private int _keyPressInterval = 5;
         
         // 添加坐标属性
         private int? _currentX;
@@ -180,28 +180,16 @@ namespace WpfApp.ViewModels
             // 同步句柄到 HotkeyService
             _hotkeyService.TargetWindowHandle = handle;
 
-            // 使用ConfigService保存到当前配置文件而不是AppConfigService
-            if (_configService != null && _configService.CurrentConfig != null)
+            // 使用统一配置服务保存窗口信息
+            if (!_isInitializing)
             {
-                try
-                {
-                    // 获取当前配置的按键数据
-                    var keyConfigData = _configService.GetKeyConfigData();
-                    
-                    // 更新窗口信息
-                    keyConfigData.TargetWindowClassName = className;
-                    keyConfigData.TargetWindowProcessName = processName;
-                    keyConfigData.TargetWindowTitle = title;
-                    
-                    // 保存到当前活动配置文件
-                    _configService.SaveKeyConfigData(keyConfigData);
-                    
-                    _logger.Debug($"已更新窗口信息并保存到当前配置文件: {_configService.CurrentConfig.Name}");
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error($"保存窗口信息到当前配置文件失败: {ex.Message}", ex);
-                }
+                _configManager.UpdateKeyConfig(keyConfig => {
+                    keyConfig.TargetWindowClassName = className;
+                    keyConfig.TargetWindowProcessName = processName;
+                    keyConfig.TargetWindowTitle = title;
+                });
+                
+                _logger.Debug($"已更新窗口信息并保存到当前配置文件: {_configManager.CurrentConfig?.Name}");
             }
 
             // 启动定时检查
@@ -232,40 +220,16 @@ namespace WpfApp.ViewModels
 
                 _logger.Debug("已清除窗口信息");
 
-                // 使用ConfigService保存到当前配置文件而不是AppConfigService
-                if (_configService != null && _configService.CurrentConfig != null)
+                // 使用统一配置服务保存窗口信息
+                if (!_isInitializing)
                 {
-                    try
-                    {
-                        // 获取当前配置的按键数据
-                        var keyConfigData = _configService.GetKeyConfigData();
-                        
-                        // 清除窗口信息
-                        keyConfigData.TargetWindowClassName = null;
-                        keyConfigData.TargetWindowProcessName = null;
-                        keyConfigData.TargetWindowTitle = null;
-                        
-                        // 保存到当前活动配置文件
-                        _configService.SaveKeyConfigData(keyConfigData);
-                        
-                        _logger.Debug($"已清除窗口信息并保存到当前配置文件: {_configService.CurrentConfig.Name}");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error($"保存窗口信息到当前配置文件失败: {ex.Message}", ex);
-                    }
-                }
-                else
-                {
-                    // 如果ConfigService不可用，使用AppConfigService
-                    AppConfigService.UpdateKeyConfig(config =>
-                    {
-                        config.TargetWindowClassName = null;
-                        config.TargetWindowProcessName = null;
-                        config.TargetWindowTitle = null;
+                    _configManager.UpdateKeyConfig(keyConfig => {
+                        keyConfig.TargetWindowClassName = null;
+                        keyConfig.TargetWindowProcessName = null;
+                        keyConfig.TargetWindowTitle = null;
                     });
                     
-                    _logger.Debug("ConfigService不可用，使用AppConfigService保存窗口信息");
+                    _logger.Debug($"已清除窗口信息并保存到当前配置文件: {_configManager.CurrentConfig?.Name}");
                 }
             }
             catch (Exception ex)
@@ -310,13 +274,8 @@ namespace WpfApp.ViewModels
                     // 更新到驱动服务，让它保持与UI一致
                     _lyKeysService.KeyInterval = value;
 
-                    // 实时保存到当前活动配置文件
-                    if (!_isInitializing)
-                    {
-                        // 按键间隔是键位配置，保存到当前活动配置
-                        SaveKeyConfig();
-                        _logger.Debug($"已将默认按键间隔{value}ms保存到当前活动配置: {_configService.CurrentConfig?.Name}");
-                    }
+                    // 配置将在LostFocus事件中进行保存(失去焦点时保存)
+                    _logger.Debug($"默认按键间隔已更新为{value}ms");
                 }
             }
         }
@@ -505,11 +464,11 @@ namespace WpfApp.ViewModels
         // 单独保存音量设置的方法
         private void SaveSoundVolume(double volume)
         {
+            if (_isInitializing) return;
+            
             try
             {
-                // 音量设置是全局设置，直接保存到GlobalConfig
-                AppConfigService.UpdateGlobalConfig(config => 
-                {
+                _configManager.UpdateGlobalConfig(config => {
                     config.SoundVolume = volume;
                 });
                 _logger.Debug($"音量设置已保存到全局配置: {volume:P0}");
@@ -982,24 +941,12 @@ namespace WpfApp.ViewModels
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
-        public KeyMappingViewModel(LyKeysService lyKeysService, ConfigService configService,
+        public KeyMappingViewModel(LyKeysService lyKeysService, IConfigManager configManager,
             HotkeyService hotkeyService, MainViewModel mainViewModel, AudioService audioService)
         {
             _mainViewModel = mainViewModel;
             _lyKeysService = lyKeysService;
-            
-            // 添加空检查，防止后续NullReferenceException
-            if (configService == null)
-            {
-                _logger.Error("构造函数传入的ConfigService为空");
-                // 创建默认配置服务或使用替代方案
-                _configService = new ConfigService();
-            }
-            else
-            {
-                _configService = configService;
-            }
-            
+            _configManager = configManager;
             _hotkeyService = hotkeyService;
             _audioService = audioService;
 
@@ -1030,48 +977,11 @@ namespace WpfApp.ViewModels
                     // 不需要给只读属性赋值，它会通过get访问器自动获取值
                 }
                 
-                // 初始化配置服务
-                InitializeConfigService();
+                // 注册配置变更事件
+                _configManager.ConfigChanged += OnConfigChanged;
                 
-                // 确保从配置服务加载了按键列表
-                if (KeyList.Count == 0)
-                {
-                    _logger.Debug("KeyList为空，尝试加载KeyConfig");
-                    // 获取当前配置的按键配置
-                    var keyConfig = _configService.GetKeyConfigData();
-                    if (keyConfig?.keys != null && keyConfig.keys.Count > 0)
-                    {
-                        _logger.Debug($"从配置服务加载了{keyConfig.keys.Count}个按键");
-                        
-                        foreach (var key in keyConfig.keys)
-                        {
-                            if (key.Type == KeyItemType.Keyboard && key.Code.HasValue)
-                            {
-                                var item = new KeyItem(key.Code.Value, _lyKeysService)
-                                {
-                                    IsSelected = key.IsSelected,
-                                    KeyInterval = key.KeyInterval
-                                };
-                                KeyList.Add(item);
-                                _logger.Debug($"添加按键: {key.Code.Value}, 选中状态: {key.IsSelected}");
-                            }
-                            else if (key.Type == KeyItemType.Coordinates && key.X.HasValue && key.Y.HasValue)
-                            {
-                                var item = new KeyItem(key.X.Value, key.Y.Value, _lyKeysService)
-                                {
-                                    IsSelected = key.IsSelected,
-                                    KeyInterval = key.KeyInterval
-                                };
-                                KeyList.Add(item);
-                                _logger.Debug($"添加坐标: ({key.X.Value}, {key.Y.Value}), 选中状态: {key.IsSelected}");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        _logger.Warning("配置服务中的按键列表为空");
-                    }
-                }
+                // 加载配置
+                LoadConfiguration();
                 
                 // 标记初始化完成
                 _isInitializing = false;
@@ -1137,209 +1047,26 @@ namespace WpfApp.ViewModels
             {
                 _isInitializing = true;
                 
-                // 获取全局配置和按键配置
-                var globalConfig = AppConfigService.GlobalConfig;
-                var keyConfigData = AppConfigService.KeyConfig;
-
-                // 加载热键设置
-                if (keyConfigData.startKey.HasValue)
-                {
-                    _hotkey = keyConfigData.startKey;
-                    _hotkeyModifiers = keyConfigData.startMods;
-                    UpdateHotkeyText(_hotkey.Value, keyConfigData.startMods);
-                }
-
-                // 加载窗口配置
-                if (!string.IsNullOrEmpty(keyConfigData.TargetWindowProcessName) &&
-                    !string.IsNullOrEmpty(keyConfigData.TargetWindowTitle))
-                {
-                    _selectedWindowProcessName = keyConfigData.TargetWindowProcessName;
-                    _selectedWindowClassName = keyConfigData.TargetWindowClassName ?? string.Empty;
-                    _selectedWindowTitle = keyConfigData.TargetWindowTitle;
-
-                    _logger.Debug($"从配置加载窗口信息 - 进程名: {_selectedWindowProcessName}, " +
-                                  $"标题: {_selectedWindowTitle}, 类名: {_selectedWindowClassName}");
-                }
-
-                // 加载按键列表和选中状态
-                if (keyConfigData.keys != null)
-                {
-                    // 验证并修正配置中的按键项
-                    foreach (var keyItem in keyConfigData.keys)
-                    {
-                        // 验证坐标类型按键配置
-                        if (keyItem.Type == KeyItemType.Coordinates)
-                        {
-                            // 坐标类型必须将Code设为null
-                            keyItem.Code = null;
-                            
-                            // 坐标不能同时为0,0（只针对坐标类型）
-                            if (keyItem.X == 0 && keyItem.Y == 0)
-                            {
-                                _logger.Warning($"跳过无效的坐标配置: ({keyItem.X}, {keyItem.Y})，坐标不能同时为(0,0)");
-                                continue; // 跳过这一项，不添加到KeyList
-                            }
-                        }
-                        // 验证键盘类型按键配置
-                        else if (keyItem.Type == KeyItemType.Keyboard)
-                        {
-                            // 键盘类型的X和Y应设为null
-                            keyItem.X = null;
-                            keyItem.Y = null;
-
-                            // 如果键盘类型但Code为null，则记录警告
-                            if (!keyItem.Code.HasValue)
-                            {
-                                _logger.Warning($"跳过无效的键盘配置: Code为null");
-                            }
-                        }
-                    }
-
-                    KeyList.Clear();
-                    foreach (var keyConfigItem in keyConfigData.keys)
-                    {
-                        KeyItem keyItem;
-                        
-                        // 根据类型创建不同的KeyItem
-                        if (keyConfigItem.Type == KeyItemType.Keyboard && keyConfigItem.Code.HasValue)
-                        {
-                            // 创建键盘按键项
-                            keyItem = new KeyItem(keyConfigItem.Code.Value, _lyKeysService);
-                            
-                            // 同步到LyKeysService的缓存
-                            _lyKeysService.SetKeyIntervalForKey(keyConfigItem.Code.Value, keyConfigItem.KeyInterval);
-                        }
-                        else if (keyConfigItem.Type == KeyItemType.Coordinates)
-                        {
-                            // 创建坐标项
-                            int xValue = keyConfigItem.X ?? 1;
-                            int yValue = keyConfigItem.Y ?? 1;
-                            keyItem = new KeyItem(xValue, yValue, _lyKeysService);
-                            
-                            // 同步到LyKeysService的坐标缓存
-                            _lyKeysService.SetCoordinateInterval(keyConfigItem.X, keyConfigItem.Y, keyConfigItem.KeyInterval);
-                        }
-                        else
-                        {
-                            // 跳过无效的配置项
-                            _logger.Warning($"跳过无效的按键配置: 类型={keyConfigItem.Type}, Code={keyConfigItem.Code}");
-                            continue;
-                        }
-                        
-                        // 设置公共属性
-                        keyItem.IsSelected = keyConfigItem.IsSelected;
-                        keyItem.KeyInterval = keyConfigItem.KeyInterval;
-                        
-                        // 添加事件处理
-                        keyItem.SelectionChanged += (s, isSelected) => 
-                        {
-                            SaveConfig();
-                            UpdateHotkeyServiceKeyList();
-                        };
-                        // 订阅KeyIntervalChanged事件，实时保存配置
-                        keyItem.KeyIntervalChanged += (s, newInterval) =>
-                        {
-                            if (!_isInitializing)
-                            {
-                                if (keyItem.Type == KeyItemType.Keyboard)
-                                {
-                                    // 更新LyKeysService中的按键间隔缓存，仅对键盘按键处理
-                                    _lyKeysService.SetKeyIntervalForKey(keyItem.KeyCode, newInterval);
-                                }
-                                else if (keyItem.Type == KeyItemType.Coordinates)
-                                {
-                                    // 更新LyKeysService中的坐标间隔缓存
-                                    _lyKeysService.SetCoordinateInterval(keyItem.X, keyItem.Y, newInterval);
-                                }
-                                
-                                SaveConfig();
-                                
-                                if (keyItem.Type == KeyItemType.Keyboard)
-                                {
-                                    _logger.Debug($"按键{keyItem.KeyCode}间隔已更新为{newInterval}ms并保存到配置");
-                                }
-                                else
-                                {
-                                    _logger.Debug($"坐标[{keyItem.X},{keyItem.Y}]间隔已更新为{newInterval}ms并保存到配置");
-                                }
-                            }
-                        };
-                        
-                        KeyList.Add(keyItem);
-                    }
-
-                    // 在所有项目加载完成后，为坐标类型的项目设置索引
-                    UpdateCoordinateIndices();
-
-                    // 立即同步选中的按键到服务
-                    var selectedItems = KeyList.Where(k => k.IsSelected).ToList();
-                    if (selectedItems.Any())
-                    {
-                        // 创建统一操作列表
-                        var operations = new List<KeyItemSettings>();
-                        
-                        foreach (var item in selectedItems)
-                        {
-                            if (item.Type == KeyItemType.Keyboard)
-                            {
-                                // 添加键盘操作
-                                operations.Add(KeyItemSettings.CreateKeyboard(item.KeyCode, item.KeyInterval));
-                            }
-                            else if (item.Type == KeyItemType.Coordinates)
-                            {
-                                // 添加坐标操作
-                                operations.Add(KeyItemSettings.CreateCoordinates(item.X, item.Y, item.KeyInterval));
-                            }
-                        }
-                        
-                        // 设置统一操作列表到服务 - 一站式更新，避免多处重复调用
-                        _lyKeysService.SetUnifiedOperationList(operations);
-                        
-                        // 只通知HotkeyService一次
-                        _hotkeyService.SetKeySequence(operations);
-
-                        _logger.Debug($"已加载操作列表 - 总数: {operations.Count}, 键盘按键: {operations.Count(o => o.Type == KeyItemType.Keyboard)}, 坐标操作: {operations.Count(o => o.Type == KeyItemType.Coordinates)}");
-                    }
-                }
-
-                // 加载其他设置
-                // 配置流程说明：
-                // 1. 从AppConfig获取配置值，设置到ViewModel的属性中
-                // 2. ViewModel的属性setter会自动将值同步到LyKeysService服务层
-                // 3. 形成"配置 -> ViewModel -> 服务层"的单向数据流
-                // 加载按键间隔
-                _keyInterval = keyConfigData.interval; // 先直接设置字段，避免触发属性变更事件
-                _lyKeysService.KeyInterval = keyConfigData.interval; 
-                // 加载按键模式
-                SelectedKeyMode = keyConfigData.keyMode;   
-                IsSequenceMode = keyConfigData.keyMode == 0;   
-                // 加载音量设置
-                IsSoundEnabled = globalConfig.soundEnabled ?? true;
-                // 加载降低卡位模式
-                IsReduceKeyStuck = globalConfig.IsReduceKeyStuck ?? true;
-                // 加载浮窗状态
-                IsFloatingWindowEnabled = globalConfig.UI.FloatingWindow.IsEnabled;
-                // 加载自动切换输入法状态
-                AutoSwitchToEnglishIME = globalConfig.AutoSwitchToEnglishIME ?? true;
-                // 加载热键总开关状态
-                IsHotkeyControlEnabled = globalConfig.isHotkeyControlEnabled ?? true;
-
-                // 加载音量大小
-                if (globalConfig.SoundVolume.HasValue)
-                {
-                    _soundVolume = globalConfig.SoundVolume.Value;
-                    _audioService.Volume = _soundVolume;
-                    _logger.Debug($"已加载音量设置: {_soundVolume:P0}");
-                }
-
-                _logger.Debug($"配置加载完成 - 模式: {(IsSequenceMode ? "顺序模式" : "按压模式")}, 降低卡位模式: {IsReduceKeyStuck}");
-
-                _isInitializing = false;
+                // 加载全局配置
+                LoadGlobalConfig(_configManager.GlobalConfig);
+                
+                // 加载按键配置
+                LoadKeyConfig(_configManager.CurrentKeyConfig);
+                
+                // 设置当前选中的配置文件
+                _selectedConfigFile = _configManager.CurrentConfig;
+                OnPropertyChanged(nameof(SelectedConfigFile));
+                OnPropertyChanged(nameof(ConfigFiles));
+                
+                _logger.Debug("配置加载完成");
             }
             catch (Exception ex)
             {
                 _logger.Error("加载配置失败", ex);
                 SetDefaultConfiguration();
+            }
+            finally
+            {
                 _isInitializing = false;
             }
         }
@@ -1352,7 +1079,7 @@ namespace WpfApp.ViewModels
             // 基本配置
             IsSequenceMode = true;                // 默认顺序模式
             _selectedKeyMode = 0;                 // 0=顺序模式
-            _keyInterval = 5;                     // 默认按键间隔
+            _keyInterval = 10;                     // 默认按键间隔
             
             // 功能开关
             IsSoundEnabled = true;                // 默认开启声音
@@ -1480,7 +1207,7 @@ namespace WpfApp.ViewModels
             try
             {
                 // 获取当前配置的按键数据
-                var keyConfigData = _configService.GetKeyConfigData();
+                var keyConfigData = _configManager.CurrentKeyConfig;
                 
                 // 更新热键设置
                 keyConfigData.startKey = keyCode;
@@ -1489,9 +1216,14 @@ namespace WpfApp.ViewModels
                 keyConfigData.stopMods = modifiers; // 保持一致
                 
                 // 保存到当前活动配置文件
-                _configService.SaveKeyConfigData(keyConfigData);
+                _configManager.UpdateKeyConfig(keyConfig => {
+                    keyConfig.startKey = keyCode;
+                    keyConfig.startMods = modifiers;
+                    keyConfig.stopKey = keyCode;
+                    keyConfig.stopMods = modifiers;
+                });
                 
-                _logger.Debug($"已将热键设置保存到当前配置文件: {_configService.CurrentConfig?.Name}");
+                _logger.Debug($"已将热键设置保存到当前配置文件: {_configManager.CurrentConfig?.Name}");
             }
             catch (Exception ex)
             {
@@ -1574,16 +1306,14 @@ namespace WpfApp.ViewModels
                     SaveConfig();
                     UpdateHotkeyServiceKeyList();
                 };
-                // 订阅KeyIntervalChanged事件，实时保存配置
+                // 订阅KeyIntervalChanged事件
                 newKey.KeyIntervalChanged += (s, newInterval) =>
                 {
                     if (!_isInitializing)
                     {
                         // 更新LyKeysService中的按键间隔缓存
                         _lyKeysService.SetKeyIntervalForKey(newKey.KeyCode, newInterval);
-                        
-                        SaveConfig();
-                        _logger.Debug($"按键{newKey.KeyCode}的间隔已更新为{newInterval}ms并保存到配置");
+                        _logger.Debug($"按键{newKey.KeyCode}的间隔已更新为{newInterval}ms");
                     }
                 };
 
@@ -1686,13 +1416,13 @@ namespace WpfApp.ViewModels
                     }
                 }
                 
-                // 一站式更新操作列表
+                // 设置统一操作列表到服务 - 一站式更新，避免多处重复调用
                 _lyKeysService.SetUnifiedOperationList(operations);
                 
-                // 更新HotkeyService
+                // 只通知HotkeyService一次
                 _hotkeyService.SetKeySequence(operations);
-                
-                _logger.Debug($"按键列表已更新 - 总操作数: {operations.Count}, 键盘按键: {operations.Count(o => o.Type == KeyItemType.Keyboard)}, 坐标点: {operations.Count(o => o.Type == KeyItemType.Coordinates)}");
+
+                _logger.Debug($"已加载操作列表 - 总数: {operations.Count}, 键盘按键: {operations.Count(o => o.Type == KeyItemType.Keyboard)}, 坐标操作: {operations.Count(o => o.Type == KeyItemType.Coordinates)}");
             }
             catch (Exception ex)
             {
@@ -1703,10 +1433,12 @@ namespace WpfApp.ViewModels
         // 保存配置
         public void SaveConfig()
         {
+            if (_isInitializing) return;
+            
             try
             {
                 // 日志记录配置保存开始
-                _logger.Debug($"开始保存配置，当前活动配置: {_configService.CurrentConfig?.Name}");
+                _logger.Debug($"开始保存配置，当前活动配置: {_configManager.CurrentConfig?.Name}");
                 
                 // 保存按键相关配置到当前活动配置文件
                 SaveKeyConfig();
@@ -1727,124 +1459,91 @@ namespace WpfApp.ViewModels
         // 保存按键相关配置到当前活动配置文件
         private void SaveKeyConfig()
         {
+            if (_isInitializing) return;
+            
             try
             {
-                // 获取所有按键和它们的状态，根据类型创建不同的配置
-                var keyConfigs = new List<KeyConfig>();
-                
-                foreach (var item in KeyList)
-                {
-                    KeyConfig keyConfig;
+                _configManager.UpdateKeyConfig(config => {
+                    // 获取所有按键和它们的状态，根据类型创建不同的配置
+                    var keyConfigs = new List<KeyConfig>();
                     
-                    if (item.Type == KeyItemType.Keyboard)
+                    foreach (var item in KeyList)
                     {
-                        // 创建键盘按键配置
-                        keyConfig = new KeyConfig(item.KeyCode, item.IsSelected)
-                        {
-                            KeyInterval = item.KeyInterval,
-                            Type = KeyItemType.Keyboard,
-                            X = null,  // 确保键盘类型的X和Y为null
-                            Y = null
-                        };
-                    }
-                    else // KeyItemType.Coordinates
-                    {
-                        // 确保坐标不能同时为0
-                        int? x = item.X;
-                        int? y = item.Y;
+                        KeyConfig itemConfig;
                         
-                        if ((x ?? 0) == 0 && (y ?? 0) == 0)
+                        if (item.Type == KeyItemType.Keyboard)
                         {
-                            _logger.Warning($"修正无效的坐标配置: ({x}, {y}) => (1, 1)");
-                            x = 1;
-                            y = 1;
+                            // 创建键盘按键配置
+                            itemConfig = new KeyConfig(item.KeyCode, item.IsSelected)
+                            {
+                                KeyInterval = item.KeyInterval,
+                                Type = KeyItemType.Keyboard,
+                                X = null,  // 确保键盘类型的X和Y为null
+                                Y = null
+                            };
+                        }
+                        else // KeyItemType.Coordinates
+                        {
+                            // 确保坐标不能同时为0
+                            int? x = item.X;
+                            int? y = item.Y;
+                            
+                            if ((x ?? 0) == 0 && (y ?? 0) == 0)
+                            {
+                                _logger.Warning($"修正无效的坐标配置: ({x}, {y}) => (1, 1)");
+                                x = 1;
+                                y = 1;
+                            }
+                            
+                            // 创建坐标配置
+                            itemConfig = new KeyConfig(x ?? 1, y ?? 1, item.IsSelected)
+                            {
+                                KeyInterval = item.KeyInterval,
+                                Type = KeyItemType.Coordinates,
+                                Code = null  // 确保坐标类型的Code为null
+                            };
                         }
                         
-                        // 创建坐标配置
-                        keyConfig = new KeyConfig(x ?? 1, y ?? 1, item.IsSelected)
-                        {
-                            KeyInterval = item.KeyInterval,
-                            Type = KeyItemType.Coordinates,
-                            Code = null  // 确保坐标类型的Code为null
-                        };
+                        keyConfigs.Add(itemConfig);
                     }
                     
-                    keyConfigs.Add(keyConfig);
-                }
-
-                // 检查热键冲突（仅需检查键盘类型的按键）
-                if (_hotkey.HasValue)
-                {
-                    var keyboardConfigs = keyConfigs.Where(k => k.Type == KeyItemType.Keyboard && k.Code.HasValue);
-                    if (keyboardConfigs.Any(k => k.Code == _hotkey.Value))
+                    // 更新按键配置
+                    config.keys = keyConfigs;
+                    
+                    // 检查并更新热键配置
+                    if (_hotkey.HasValue)
                     {
-                        _mainViewModel.UpdateStatusMessage("热键与按键列表存在冲突，请修改后再保存", true);
-                        return;
+                        config.startKey = _hotkey;
+                        config.startMods = _hotkeyModifiers;
+                        config.stopKey = _hotkey;
+                        config.stopMods = _hotkeyModifiers;
                     }
-                }
-
-                // 创建KeyConfigData对象
-                var configChanged = false;
-                var keyConfigData = _configService.GetKeyConfigData();
+                    
+                    // 检查并更新按键模式
+                    config.keyMode = SelectedKeyMode;
+                    
+                    // 检查并更新按键间隔
+                    config.interval = KeyInterval;
+                    config.KeyPressInterval = KeyPressInterval;
+                    
+                    // 更新窗口句柄信息
+                    bool hasWindowTarget = !string.IsNullOrEmpty(SelectedWindowClassName);
+                    
+                    if (hasWindowTarget)
+                    {
+                        config.TargetWindowClassName = SelectedWindowClassName;
+                        config.TargetWindowProcessName = SelectedWindowProcessName;
+                        config.TargetWindowTitle = SelectedWindowTitle;
+                    }
+                    else
+                    {
+                        config.TargetWindowClassName = null;
+                        config.TargetWindowProcessName = null;
+                        config.TargetWindowTitle = null;
+                    }
+                });
                 
-                // 检查并更新热键配置
-                if (!keyConfigData.startKey.Equals(_hotkey) || keyConfigData.startMods != _hotkeyModifiers)
-                {
-                    keyConfigData.startKey = _hotkey;
-                    keyConfigData.startMods = _hotkeyModifiers;
-                    keyConfigData.stopKey = _hotkey;
-                    keyConfigData.stopMods = _hotkeyModifiers;
-                    configChanged = true;
-                }
-
-                // 检查并更新按键列表
-                if (!AreKeyConfigsEqual(keyConfigData.keys, keyConfigs))
-                {
-                    keyConfigData.keys = keyConfigs;
-                    configChanged = true;
-                }
-
-                // 检查并更新其他设置
-                if (keyConfigData.keyMode != SelectedKeyMode)
-                {
-                    keyConfigData.keyMode = SelectedKeyMode;
-                    configChanged = true;
-                }
-
-                if (keyConfigData.interval != KeyInterval)
-                {
-                    keyConfigData.interval = KeyInterval;
-                    configChanged = true;
-                }
-                
-                if (keyConfigData.KeyPressInterval != KeyPressInterval)
-                {
-                    keyConfigData.KeyPressInterval = KeyPressInterval;
-                    configChanged = true;
-                }
-                
-                // 更新窗口句柄信息
-                bool hasWindowTarget = !string.IsNullOrEmpty(SelectedWindowClassName);
-                
-                if (hasWindowTarget)
-                {
-                    keyConfigData.TargetWindowClassName = SelectedWindowClassName;
-                    keyConfigData.TargetWindowProcessName = SelectedWindowProcessName;
-                    keyConfigData.TargetWindowTitle = SelectedWindowTitle;
-                }
-                else
-                {
-                    keyConfigData.TargetWindowClassName = null;
-                    keyConfigData.TargetWindowProcessName = null;
-                    keyConfigData.TargetWindowTitle = null;
-                }
-                
-                // 保存按键配置到当前活动的配置文件
-                if (configChanged)
-                {
-                    _configService.SaveKeyConfigData(keyConfigData);
-                    _logger.Debug($"按键配置已保存到当前活动配置: {_configService.CurrentConfig?.Name}");
-                }
+                _logger.Debug("按键配置已保存");
             }
             catch (Exception ex)
             {
@@ -1856,55 +1555,20 @@ namespace WpfApp.ViewModels
         // 保存全局设置到GlobalConfig
         private void SaveGlobalConfig()
         {
+            if (_isInitializing) return;
+            
             try
             {
-                bool configChanged = false;
-                
-                // 更新全局配置
-                AppConfigService.UpdateGlobalConfig(globalConfig => {
-                    if (globalConfig.soundEnabled != IsSoundEnabled)
-                    {
-                        globalConfig.soundEnabled = IsSoundEnabled;
-                        configChanged = true;
-                    }
-
-                    if (globalConfig.IsReduceKeyStuck != IsReduceKeyStuck)
-                    {
-                        globalConfig.IsReduceKeyStuck = IsReduceKeyStuck;
-                        configChanged = true;
-                    }
-
-                    if (globalConfig.UI.FloatingWindow.IsEnabled != IsFloatingWindowEnabled)
-                    {
-                        globalConfig.UI.FloatingWindow.IsEnabled = IsFloatingWindowEnabled;
-                        configChanged = true;
-                    }
-
-                    if (globalConfig.AutoSwitchToEnglishIME != AutoSwitchToEnglishIME)
-                    {
-                        globalConfig.AutoSwitchToEnglishIME = AutoSwitchToEnglishIME;
-                        configChanged = true;
-                    }
-
-                    // 检查并更新热键控制开关
-                    if (globalConfig.isHotkeyControlEnabled != IsHotkeyControlEnabled)
-                    {
-                        globalConfig.isHotkeyControlEnabled = IsHotkeyControlEnabled;
-                        configChanged = true;
-                    }
-
-                    // 检查音量是否变化
-                    if (Math.Abs(globalConfig.SoundVolume.GetValueOrDefault(_soundVolume) - _soundVolume) > 0.001)
-                    {
-                        globalConfig.SoundVolume = _soundVolume;
-                        configChanged = true;
-                    }
+                _configManager.UpdateGlobalConfig(globalConfig => {
+                    globalConfig.soundEnabled = IsSoundEnabled;
+                    globalConfig.IsReduceKeyStuck = IsReduceKeyStuck;
+                    globalConfig.UI.FloatingWindow.IsEnabled = IsFloatingWindowEnabled;
+                    globalConfig.AutoSwitchToEnglishIME = AutoSwitchToEnglishIME;
+                    globalConfig.isHotkeyControlEnabled = IsHotkeyControlEnabled;
+                    globalConfig.SoundVolume = SoundVolume;
                 });
                 
-                if (configChanged)
-                {
-                    _logger.Debug("全局配置已保存");
-                }
+                _logger.Debug("全局配置已保存");
             }
             catch (Exception ex)
             {
@@ -2350,11 +2014,10 @@ namespace WpfApp.ViewModels
                                     SelectedWindowTitle = $"{targetWindow.Title} (句柄: {targetWindow.Handle.ToInt64()})";
 
                                     // 更新配置
-                                    AppConfigService.UpdateKeyConfig(config =>
-                                    {
-                                        config.TargetWindowClassName = targetWindow.ClassName;
-                                        config.TargetWindowProcessName = targetWindow.ProcessName;
-                                        config.TargetWindowTitle = targetWindow.Title;
+                                    _configManager.UpdateKeyConfig(keyConfig => {
+                                        keyConfig.TargetWindowClassName = targetWindow.ClassName;
+                                        keyConfig.TargetWindowProcessName = targetWindow.ProcessName;
+                                        keyConfig.TargetWindowTitle = targetWindow.Title;
                                     });
 
                                     _logger.Info(
@@ -2414,6 +2077,12 @@ namespace WpfApp.ViewModels
         {
             _windowCheckTimer?.Dispose();
             _activeWindowCheckTimer?.Dispose();
+            
+            // 解除配置变更事件订阅
+            if (_configManager != null)
+            {
+                _configManager.ConfigChanged -= OnConfigChanged;
+            }
         }
 
         // 添加活动窗口检查方法
@@ -2583,11 +2252,9 @@ namespace WpfApp.ViewModels
                 {
                     if (!_isInitializing)
                     {
-                        // 更新LyKeysService中的坐标间隔缓存
+                        // 更新LyKeysService中的坐标间隔缓存，但不立即保存配置
                         _lyKeysService.SetCoordinateInterval(newCoordinate.X, newCoordinate.Y, newInterval);
-                        
-                        SaveConfig();
-                        _logger.Debug($"坐标[{newCoordinate.X},{newCoordinate.Y}]的间隔已更新为{newInterval}ms并保存到配置");
+                        _logger.Debug($"坐标[{newCoordinate.X},{newCoordinate.Y}]的间隔已更新为{newInterval}ms");
                     }
                 };
                 
@@ -2659,7 +2326,7 @@ namespace WpfApp.ViewModels
         }
 
         // 配置文件管理相关属性
-        public ObservableCollection<ConfigFileInfo> ConfigFiles => _configService.ConfigFiles;
+        public ObservableCollection<ConfigFileInfo> ConfigFiles => _configManager.ConfigFiles;
         
         private ConfigFileInfo _selectedConfigFile;
         public ConfigFileInfo SelectedConfigFile
@@ -2682,20 +2349,6 @@ namespace WpfApp.ViewModels
             }
         }
         
-        private string _tempConfigHotkey = string.Empty;
-        public string TempConfigHotkey
-        {
-            get => _tempConfigHotkey;
-            set => SetProperty(ref _tempConfigHotkey, value);
-        }
-        
-        private bool _isNewConfigPopupOpen;
-        public bool IsNewConfigPopupOpen
-        {
-            get => _isNewConfigPopupOpen;
-            set => SetProperty(ref _isNewConfigPopupOpen, value);
-        }
-        
         // 切换到指定配置
         private void SwitchToConfig(ConfigFileInfo configInfo)
         {
@@ -2708,8 +2361,8 @@ namespace WpfApp.ViewModels
                 // 保存当前配置
                 SaveConfig();
                 
-                // 切换配置 - ConfigFileChanged事件会触发OnConfigFileChanged处理程序并加载配置
-                _configService.SwitchConfig(configInfo);
+                // 使用统一配置服务切换配置
+                _configManager.SwitchConfig(configInfo);
                 
                 // 更新UI
                 _mainViewModel.UpdateStatusMessage($"已切换到配置：{configInfo.Name}", false);
@@ -2721,175 +2374,12 @@ namespace WpfApp.ViewModels
             }
         }
         
-        // 加载配置数据
-        private void LoadConfigData()
-        {
-            try
-            {
-                _isInitializing = true;
-                _logger.Debug("开始加载配置数据");
-                
-                // 获取当前配置的数据
-                var keyConfig = _configService.GetKeyConfigData();
-                _logger.Debug($"已获取配置数据，按键数量：{keyConfig?.keys?.Count ?? 0}");
-                
-                // 添加：加载全局配置
-                LoadGlobalConfig();
-                
-                // 清空现有按键列表
-                KeyList.Clear();
-                
-                // 初始化热键设置
-                _hotkey = keyConfig.startKey;
-                _hotkeyModifiers = keyConfig.startMods;
-                
-                // 添加空值检查，确保传递非空值
-                if (_hotkey.HasValue)
-                {
-                    UpdateHotkeyText(_hotkey.Value, _hotkeyModifiers); // 使用非空值调用UpdateHotkeyText
-                }
-                else
-                {
-                    HotkeyText = "未设置"; // 设置默认文本
-                }
-                
-                _logger.Debug($"已设置热键：{_hotkey}，修饰键：{_hotkeyModifiers}");
-                
-                // 注册热键到HotkeyService
-                if (_hotkey.HasValue)
-                {
-                    _hotkeyService.RegisterHotkey(_hotkey.Value, _hotkeyModifiers, false); // 添加false参数，避免重复保存配置
-                    _logger.Debug($"已注册热键到HotkeyService: {_hotkey.Value}, 修饰键: {_hotkeyModifiers}");
-                }
-                
-                // 设置按键模式
-                SelectedKeyMode = keyConfig.keyMode;
-                _logger.Debug($"已设置按键模式：{keyConfig.keyMode}");
-                
-                // 设置默认间隔
-                KeyInterval = keyConfig.interval;
-                _logger.Debug($"已设置默认间隔：{keyConfig.interval}ms");
-                
-                // 设置按键按下时长
-                KeyPressInterval = keyConfig.KeyPressInterval ?? 5;
-                OnPropertyChanged(nameof(KeyPressInterval));
-                _logger.Debug($"已设置按键按下时长：{KeyPressInterval}ms");
-                
-                // 设置目标窗口信息
-                if (!string.IsNullOrEmpty(keyConfig.TargetWindowClassName))
-                {
-                    SelectedWindowClassName = keyConfig.TargetWindowClassName;
-                    SelectedWindowTitle = keyConfig.TargetWindowTitle ?? "";
-                    SelectedWindowProcessName = keyConfig.TargetWindowProcessName ?? "";
-                    _logger.Debug($"已设置目标窗口信息：{SelectedWindowTitle}");
-                }
-                else
-                {
-                    SelectedWindowClassName = "";
-                    SelectedWindowTitle = EMPTY_WINDOW_PLACEHOLDER;
-                    SelectedWindowProcessName = "";
-                    _logger.Debug("未设置目标窗口信息");
-                }
-                
-                // 加载按键列表
-                int addedCount = 0;
-                if (keyConfig.keys != null)
-                {
-                    foreach (var key in keyConfig.keys)
-                    {
-                        KeyItem item = null;
-                        
-                        if (key.Type == KeyItemType.Keyboard)
-                        {
-                            // 加载键盘按键
-                            if (key.Code.HasValue)
-                            {
-                                item = new KeyItem(key.Code.Value, _lyKeysService)
-                                {
-                                    IsSelected = key.IsSelected,
-                                    KeyInterval = key.KeyInterval
-                                };
-                                KeyList.Add(item);
-                                addedCount++;
-                                _logger.Debug($"添加键盘按键：{key.Code.Value}，选中状态：{key.IsSelected}");
-                            }
-                            else
-                            {
-                                _logger.Warning("跳过无效的键盘按键（Code为null）");
-                            }
-                        }
-                        else
-                        {
-                            // 加载坐标按键
-                            if (key.X.HasValue && key.Y.HasValue)
-                            {
-                                item = new KeyItem(key.X.Value, key.Y.Value, _lyKeysService)
-                                {
-                                    IsSelected = key.IsSelected,
-                                    KeyInterval = key.KeyInterval
-                                };
-                                KeyList.Add(item);
-                                addedCount++;
-                                _logger.Debug($"添加坐标：({key.X.Value}, {key.Y.Value})，选中状态：{key.IsSelected}");
-                            }
-                            else
-                            {
-                                _logger.Warning("跳过无效的坐标（X或Y为null）");
-                            }
-                        }
-                        
-                        // 添加事件处理
-                        if (item != null)
-                        {
-                            item.SelectionChanged += (s, isSelected) => 
-                            {
-                                SaveConfig();
-                                UpdateHotkeyServiceKeyList();
-                            };
-                            
-                            item.KeyIntervalChanged += (s, newInterval) => 
-                            {
-                                if (!_isInitializing)
-                                {
-                                    SaveConfig();
-                                }
-                            };
-                        }
-                    }
-                    
-                    // 更新坐标索引
-                    UpdateCoordinateIndices();
-                }
-                
-                _logger.Debug($"已加载按键列表，总数：{addedCount}");
-                
-                // 如果按键列表为空，记录警告
-                if (KeyList.Count == 0)
-                {
-                    _logger.Warning("加载后的按键列表为空");
-                }
-                
-                // 更新驱动服务状态
-                UpdateKeysServiceStatus();
-                _logger.Debug("已更新驱动服务状态");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("加载配置数据失败", ex);
-                _mainViewModel.UpdateStatusMessage("加载配置数据失败", true);
-            }
-            finally
-            {
-                _isInitializing = false;
-            }
-        }
-        
         // 创建新配置
         public void CreateNewConfig(string configName, bool copyFromCurrent)
         {
             try
             {
-                var newConfig = _configService.CreateNewConfig(configName, copyFromCurrent);
+                var newConfig = _configManager.CreateNewConfig(configName, copyFromCurrent);
                 SelectedConfigFile = newConfig;
                 _mainViewModel.UpdateStatusMessage($"已创建新配置：{newConfig.Name}", false);
             }
@@ -2915,11 +2405,8 @@ namespace WpfApp.ViewModels
                 string oldName = SelectedConfigFile.Name;
                 _logger.Debug($"开始重命名配置：{oldName} -> {newName}");
                 
-                // 调用ConfigService的重命名方法
-                _configService.RenameConfig(SelectedConfigFile, newName);
-                
-                // 更新UI显示
-                OnPropertyChanged(nameof(SelectedConfigFile));
+                // 使用统一配置服务重命名配置
+                _configManager.RenameConfig(SelectedConfigFile, newName);
                 
                 _logger.Debug($"重命名配置成功：{oldName} -> {SelectedConfigFile.Name}");
                 _mainViewModel.UpdateStatusMessage($"已重命名配置：{oldName} -> {SelectedConfigFile.Name}", false);
@@ -2939,29 +2426,16 @@ namespace WpfApp.ViewModels
             {
                 if (SelectedConfigFile == null) return;
                 
-                // 记录当前配置名称和是否为当前选择的配置
+                // 记录当前配置名称
                 var name = SelectedConfigFile.Name;
-                bool isCurrentConfig = (_selectedConfigFile == SelectedConfigFile);
                 
-                _logger.Debug($"开始删除配置：{name}，IsCurrentConfig: {isCurrentConfig}");
+                _logger.Debug($"开始删除配置：{name}");
                 
-                // 先保存一个默认配置的引用，以便删除后重新选择
-                var defaultConfig = ConfigFiles.FirstOrDefault(c => c.IsDefault);
-                
-                // 执行删除操作
-                _configService.DeleteConfig(SelectedConfigFile);
+                // 使用统一配置服务删除配置
+                _configManager.DeleteConfig(SelectedConfigFile);
                 
                 // 提示用户
                 _mainViewModel.UpdateStatusMessage($"已删除配置：{name}", false);
-                
-                // ConfigService.DeleteConfig 会自动切换到默认配置，但我们需要确保UI同步
-                if (isCurrentConfig && defaultConfig != null)
-                {
-                    _logger.Debug($"已删除当前选中的配置，手动设置UI选择为默认配置：{defaultConfig.Name}");
-                    // 确保UI选择与模型同步
-                    _selectedConfigFile = defaultConfig;
-                    OnPropertyChanged(nameof(SelectedConfigFile));
-                }
             }
             catch (Exception ex)
             {
@@ -2977,7 +2451,7 @@ namespace WpfApp.ViewModels
             {
                 if (SelectedConfigFile == null) return;
                 
-                _configService.SetConfigHotkey(SelectedConfigFile, hotkeyText);
+                _configManager.SetConfigHotkey(SelectedConfigFile, hotkeyText);
                 _mainViewModel.UpdateStatusMessage($"已设置配置快捷键", false);
             }
             catch (Exception ex)
@@ -2994,7 +2468,7 @@ namespace WpfApp.ViewModels
             {
                 if (SelectedConfigFile == null) return;
                 
-                _configService.SetConfigHotkey(SelectedConfigFile, string.Empty);
+                _configManager.SetConfigHotkey(SelectedConfigFile, string.Empty);
                 _mainViewModel.UpdateStatusMessage("已清除配置快捷键", false);
             }
             catch (Exception ex)
@@ -3010,7 +2484,7 @@ namespace WpfApp.ViewModels
             try
             {
                 var configName = Path.GetFileNameWithoutExtension(sourceFile);
-                var newConfig = _configService.ImportKeyConfig(sourceFile, configName);
+                var newConfig = _configManager.ImportKeyConfig(sourceFile, configName);
                 SelectedConfigFile = newConfig;
                 _mainViewModel.UpdateStatusMessage($"已导入配置：{newConfig.Name}", false);
             }
@@ -3028,7 +2502,7 @@ namespace WpfApp.ViewModels
             {
                 if (SelectedConfigFile == null) return;
                 
-                _configService.ExportKeyConfig(targetFile, SelectedConfigFile);
+                _configManager.ExportKeyConfig(targetFile, SelectedConfigFile);
                 _mainViewModel.UpdateStatusMessage($"已导出配置到：{targetFile}", false);
             }
             catch (Exception ex)
@@ -3038,88 +2512,62 @@ namespace WpfApp.ViewModels
             }
         }
         
-        // 在构造函数中添加监听配置变更事件
-        private void InitializeConfigService()
+        // 配置变更事件处理
+        private void OnConfigChanged(object sender, ConfigEventArgs e)
         {
-            // 添加空检查，防止NullReferenceException
-            if (_configService == null)
+            try
             {
-                _logger.Error("ConfigService为空，无法初始化配置服务");
-                return;
-            }
-            
-            _configService.ConfigFileChanged += OnConfigFileChanged;
-            _configService.ConfigListChanged += OnConfigListChanged;
-            
-            // 设置初始选中配置
-            _selectedConfigFile = _configService.CurrentConfig;
-            
-            // 添加：加载全局配置
-            LoadGlobalConfig();
-            
-            // 明确触发属性变更事件
-            OnPropertyChanged(nameof(SelectedConfigFile));
-            _logger.Debug($"初始化配置服务完成，当前选中配置：{_selectedConfigFile?.Name ?? "无"}");
-        }
-        
-        // 配置文件变更处理
-        private void OnConfigFileChanged(object sender, ConfigFileInfo configInfo)
-        {
-            if (configInfo != null)
-            {
-                _logger.Debug($"收到配置文件变更事件：{configInfo.Name}");
-                
-                // 更新引用，但避免循环调用
-                bool sameConfig = (_selectedConfigFile != null && _selectedConfigFile.Name == configInfo.Name);
-                _selectedConfigFile = configInfo;
-                
-                // 只有在UI需要更新时通知属性变更
-                if (!sameConfig)
+                _logger.Debug($"接收到配置变更事件: {e.ChangeType}");
+
+                if (e.ChangeType == ConfigChangeType.Global)
                 {
-                    OnPropertyChanged(nameof(SelectedConfigFile));
+                    // 加载全局配置
+                    var config = e.GlobalConfigData;
+                    if (config != null)
+                        LoadGlobalConfig(config);
                 }
-                
-                // 加载配置数据
-                LoadConfigData();
+                else if (e.ChangeType == ConfigChangeType.Key)
+                {
+                    // 加载按键配置
+                    var config = e.KeyConfigData;
+                    if (config != null)
+                        LoadKeyConfig(config);
+                }
+                else if (e.ChangeType == ConfigChangeType.ConfigFile)
+                {
+                    // 配置文件切换
+                    OnConfigFileChanged(e.ConfigFile);
+                }
+                else if (e.ChangeType == ConfigChangeType.ConfigList)
+                {
+                    // 配置文件列表变更
+                    OnConfigListChanged();
+                }
+                else if (e.ChangeType == ConfigChangeType.All)
+                {
+                    // 所有配置变更
+                    var globalConfig = e.GlobalConfigData;
+                    var keyConfig = e.KeyConfigData;
+                    
+                    if (globalConfig != null) 
+                        LoadGlobalConfig(globalConfig);
+                        
+                    if (keyConfig != null) 
+                        LoadKeyConfig(keyConfig);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("处理配置变更事件失败", ex);
             }
         }
         
-        // 配置列表变更处理
-        private void OnConfigListChanged(object sender, EventArgs e)
+        // 加载全局配置
+        private void LoadGlobalConfig(GlobalConfig globalConfig)
         {
-            OnPropertyChanged(nameof(ConfigFiles));
-        }
-        
-        private void UpdateKeysServiceStatus()
-        {
-            if (_lyKeysService == null) return;
-            
-            // 同步选中状态和设置到LyKeysService
-            var selectedKeys = KeyList.Where(k => k.IsSelected && k.Type == KeyItemType.Keyboard).ToList();
-            _lyKeysService.SetKeyList(selectedKeys.Select(k => k.KeyCode).ToList());
-            _lyKeysService.KeyInterval = _keyInterval;
-            _lyKeysService.KeyPressInterval = _keyPressInterval;
-            _lyKeysService.IsHoldMode = !_isSequenceMode;
-            
-            // 更新热键状态显示
-            IsHotkeyEnabled = _isHotkeyEnabled;
-            HotkeyStatus = _hotkeyStatus;
-        }
-
-        /// <summary>
-        /// 键位核心服务
-        /// </summary>
-        public LyKeysService LyKeysService => _lyKeysService;
-
-        // 添加此方法加载全局配置
-        private void LoadGlobalConfig()
-        {
-            try 
+            _isInitializing = true;
+            try
             {
-                _logger.Debug("开始加载全局配置...");
-                var globalConfig = AppConfigService.GlobalConfig;
-                
-                // 从全局配置加载值到ViewModel
                 _isSoundEnabled = globalConfig.soundEnabled ?? true;
                 _isReduceKeyStuck = globalConfig.IsReduceKeyStuck ?? true;
                 _isFloatingWindowEnabled = globalConfig.UI.FloatingWindow.IsEnabled;
@@ -3135,12 +2583,172 @@ namespace WpfApp.ViewModels
                 OnPropertyChanged(nameof(IsHotkeyControlEnabled));
                 OnPropertyChanged(nameof(SoundVolume));
                 
+                // 同步设置到服务
+                SyncConfigToServices();
+                
                 _logger.Debug("已从GlobalConfig加载全局配置");
             }
             catch (Exception ex)
             {
                 _logger.Error("加载全局配置失败", ex);
             }
+            finally
+            {
+                _isInitializing = false;
+            }
+        }
+        
+        // 加载按键配置
+        private void LoadKeyConfig(KeyConfigData keyConfig)
+        {
+            _isInitializing = true;
+            try
+            {
+                if (keyConfig == null)
+                {
+                    _logger.Warning("传入的KeyConfigData为null");
+                    return;
+                }
+                
+                // 加载热键设置
+                if (keyConfig.startKey.HasValue)
+                {
+                    _hotkey = keyConfig.startKey;
+                    _hotkeyModifiers = keyConfig.startMods;
+                    UpdateHotkeyText(_hotkey.Value, keyConfig.startMods);
+                    
+                    // 注册热键
+                    _hotkeyService.RegisterHotkey(_hotkey.Value, _hotkeyModifiers, false);
+                }
+                
+                // 加载按键模式
+                SelectedKeyMode = keyConfig.keyMode;
+                IsSequenceMode = keyConfig.keyMode == 0;
+                
+                // 加载按键间隔
+                KeyInterval = keyConfig.interval;
+                KeyPressInterval = keyConfig.KeyPressInterval ?? 5;
+                
+                // 加载窗口信息
+                if (!string.IsNullOrEmpty(keyConfig.TargetWindowClassName))
+                {
+                    _selectedWindowClassName = keyConfig.TargetWindowClassName;
+                    _selectedWindowTitle = keyConfig.TargetWindowTitle ?? "";
+                    _selectedWindowProcessName = keyConfig.TargetWindowProcessName ?? "";
+                    
+                    // 尝试加载窗口
+                    LoadWindowConfig();
+                }
+                else
+                {
+                    ClearSelectedWindow();
+                }
+                
+                // 加载按键列表
+                LoadKeyList(keyConfig);
+                
+                _logger.Debug("按键配置加载完成");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("加载按键配置失败", ex);
+            }
+            finally
+            {
+                _isInitializing = false;
+            }
+        }
+        
+        // 加载按键列表
+        private void LoadKeyList(KeyConfigData keyConfig)
+        {
+            try
+            {
+                KeyList.Clear();
+                if (keyConfig.keys != null && keyConfig.keys.Count > 0)
+                {
+                    foreach (var key in keyConfig.keys)
+                    {
+                        KeyItem item = null;
+                        
+                        if (key.Type == KeyItemType.Keyboard && key.Code.HasValue)
+                        {
+                            item = new KeyItem(key.Code.Value, _lyKeysService)
+                            {
+                                IsSelected = key.IsSelected,
+                                KeyInterval = key.KeyInterval
+                            };
+                        }
+                        else if (key.Type == KeyItemType.Coordinates && key.X.HasValue && key.Y.HasValue)
+                        {
+                            item = new KeyItem(key.X.Value, key.Y.Value, _lyKeysService)
+                            {
+                                IsSelected = key.IsSelected,
+                                KeyInterval = key.KeyInterval
+                            };
+                        }
+                        
+                        if (item != null)
+                        {
+                            // 添加事件处理
+                            item.SelectionChanged += (s, isSelected) => 
+                            {
+                                SaveConfig();
+                                UpdateHotkeyServiceKeyList();
+                            };
+                            
+                            item.KeyIntervalChanged += (s, newInterval) => 
+                            {
+                                if (!_isInitializing)
+                                {
+                                    SaveConfig();
+                                }
+                            };
+                            
+                            KeyList.Add(item);
+                        }
+                    }
+                    
+                    // 更新坐标索引
+                    UpdateCoordinateIndices();
+                    
+                    _logger.Debug($"已加载按键列表，总数: {KeyList.Count}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("加载按键列表失败", ex);
+            }
+        }
+        
+        // 配置文件变更处理
+        private void OnConfigFileChanged(ConfigFileInfo configInfo)
+        {
+            if (configInfo != null)
+            {
+                _logger.Debug($"收到配置文件变更事件：{configInfo.Name}");
+                
+                // 更新引用
+                _selectedConfigFile = configInfo;
+                OnPropertyChanged(nameof(SelectedConfigFile));
+                
+                // 立即使用统一配置服务的当前按键配置
+                LoadKeyConfig(_configManager.CurrentKeyConfig);
+            }
+        }
+        
+        // 配置列表变更处理
+        private void OnConfigListChanged()
+        {
+            OnPropertyChanged(nameof(ConfigFiles));
+        }
+
+        // 添加TempConfigHotkey属性，用于临时存储配置热键
+        private string _tempConfigHotkey;
+        public string TempConfigHotkey
+        {
+            get => _tempConfigHotkey;
+            set => SetProperty(ref _tempConfigHotkey, value);
         }
     }
 }

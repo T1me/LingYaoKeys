@@ -25,7 +25,7 @@ public class KeyItem : INotifyPropertyChanged
     private readonly LyKeysService _lyKeysService;
     private bool _isSelected = true;
     private LyKeysCode _keyCode;
-    private int _keyInterval = 5;
+    private int _keyInterval;
     private int? _x;
     private int? _y;
     private KeyItemType _type = KeyItemType.Keyboard;

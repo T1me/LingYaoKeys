@@ -21,13 +21,10 @@ using WpfApp.Services.Core;
 using WpfApp.Services.Models;
 using WpfApp.Services.Utils;
 using WpfApp.Behaviors;
-using System.Collections.Specialized;
-using System.Collections.ObjectModel;
 using System.Windows.Media.Animation;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
-using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using IO = System.IO; // 使用IO作为System.IO的别名，避免与Shapes.Path冲突
@@ -46,6 +43,7 @@ namespace WpfApp.Views;
 public partial class KeyMappingView : Page
 {
     private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly IConfigManager _configManager = ConfigManager.Instance;
     private const string KEY_ERROR = "无法识别按键，请检查输入法是否关闭";
     private const string HOTKEY_CONFLICT = "无法设置与热键相同的按键";
     private HotkeyService? _hotkeyService;
@@ -1315,8 +1313,6 @@ public partial class KeyMappingView : Page
             }
             else
             {
-                // 输入的不是有效数字，但由于我们已经在PreviewTextInput事件中验证，
-                // 理论上不应该出现这种情况，除非是空字符串，但我们已经在前面处理了
                 _logger.Debug("输入的不是有效数字");
 
                 // 区分是默认间隔输入框还是按键列表中的间隔输入框
@@ -1338,6 +1334,17 @@ public partial class KeyMappingView : Page
                         if (System.Windows.Application.Current.MainWindow?.DataContext is MainViewModel
                             mainViewModel) mainViewModel.UpdateStatusMessage("请输入有效的数字", true);
                     }
+                }
+            }
+            
+            // 在所有输入框失去焦点时，确保配置已保存
+            if (ViewModel != null && !string.IsNullOrEmpty(textBox.Text))
+            {
+                // 仅对间隔输入框执行配置保存
+                if (textBox.Name == "txtKeyInterval" || textBox.DataContext is KeyItem)
+                {
+                    ViewModel.SaveConfig();
+                    _logger.Debug("输入框失去焦点，已保存配置");
                 }
             }
         }

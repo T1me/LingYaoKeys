@@ -779,7 +779,7 @@
                                          PreviewTextInput="NumberValidationTextBox"
                                          GotFocus="NumberInput_GotFocus"
                                          LostFocus="NumberInput_LostFocus"
-                                         Text="{Binding KeyInterval, Converter={StaticResource IntToStringConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                         Text="{Binding KeyInterval, Converter={StaticResource IntToStringConverter}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                             </DockPanel>
 
                             <TextBox x:Name="KeyInputBox"
@@ -887,7 +887,7 @@
                                          PreviewTextInput="NumberValidationTextBox"
                                          GotFocus="NumberInput_GotFocus"
                                          LostFocus="NumberInput_LostFocus"
-                                         Text="{Binding KeyInterval, Converter={StaticResource IntToStringConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                         Text="{Binding KeyInterval, Converter={StaticResource IntToStringConverter}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                             </DockPanel>
 
                             <!-- X坐标输入框 -->
@@ -1098,7 +1098,7 @@
                                                      PreviewTextInput="NumberValidationTextBox"
                                                      GotFocus="NumberInput_GotFocus"
                                                      LostFocus="NumberInput_LostFocus"
-                                                     Text="{Binding KeyInterval, Converter={StaticResource IntToStringConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                     Text="{Binding KeyInterval, Converter={StaticResource IntToStringConverter}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                                             <TextBlock Margin="0,0,0,0"
                                                        VerticalAlignment="Center"
                                                        FontSize="12"

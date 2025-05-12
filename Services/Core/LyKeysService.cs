@@ -24,6 +24,7 @@ namespace WpfApp.Services.Core
         #region 私有字段
         private LyKeys? _lyKeys;
         private readonly SerilogManager _logger;
+        private readonly IConfigManager _configManager;
         private bool _isInitialized;
         private bool _isEnabled;
         private bool _isHoldMode;
@@ -244,6 +245,7 @@ namespace WpfApp.Services.Core
         public LyKeysService()
         {
             _logger = SerilogManager.Instance;
+            _configManager = ConfigManager.Instance;
             _isInitialized = false;
             _isEnabled = false;
             _isHoldMode = false;
@@ -256,7 +258,7 @@ namespace WpfApp.Services.Core
             // 从配置中读取是否自动切换输入法
             try
             {
-                var globalConfig = AppConfigService.GlobalConfig;
+                var globalConfig = _configManager.GlobalConfig;
                 _autoSwitchIME = globalConfig.AutoSwitchToEnglishIME ?? true;
                 _logger.Debug($"LyKeysService构造函数：输入法自动切换设置为 {(_autoSwitchIME ? "开启" : "关闭")}");
                 
@@ -723,7 +725,7 @@ namespace WpfApp.Services.Core
                 if (keyMappingViewModel == null || keyMappingViewModel.IsInitializing)
                 {
                     // 只在调试模式下输出日志
-                    if (AppConfigService.GlobalConfig.Debug.IsDebugMode)
+                    if (_configManager.GlobalConfig.Debug.IsDebugMode)
                     {
                         _logger.Debug($"[GetKeyItem] KeyMappingViewModel未初始化，跳过获取KeyItem: {keyCode}");
                     }
@@ -1637,7 +1639,7 @@ namespace WpfApp.Services.Core
             if (_keyIntervals.TryGetValue(keyCode, out int interval))
             {
                 // 只在调试模式记录此日志，减少冗余日志
-                if (AppConfigService.GlobalConfig.Debug.IsDebugMode && !IsInitializing())
+                if (_configManager.GlobalConfig.Debug.IsDebugMode && !IsInitializing())
                 {
                     _logger.Debug($"从缓存中获取按键{keyCode}的间隔: {interval}ms");
                 }
