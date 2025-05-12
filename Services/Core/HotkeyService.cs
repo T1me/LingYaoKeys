@@ -193,46 +193,48 @@ public class HotkeyService
         }
     }
 
-    // 注册热键 (简化为一个方法)
+    // 注册热键
     public bool RegisterHotkey(LyKeysCode keyCode, ModifierKeys modifiers, bool saveToConfig = true)
     {
         try
         {
             _isRegisteringHotkey = true; // 进入热键注册模式
-            _hotkeyVirtualKey = GetVirtualKeyFromLyKey(keyCode); // 转换为Windows虚拟键码
-            _pendingHotkey = keyCode; // 保存LyKeys按键码
+            
+            // 更新内部状态
+            _hotkeyVirtualKey = GetVirtualKeyFromLyKey(keyCode);
+            _pendingHotkey = keyCode;
             
             // 根据参数决定是否保存到配置文件
             if (saveToConfig)
             {
-                SaveHotkeyConfig(keyCode, modifiers); // 保存到配置文件
+                SaveHotkeyConfig(keyCode, modifiers);
             }
             
-            _isRegisteringHotkey = false; // 退出热键注册模式
+            _isRegisteringHotkey = false;
             return true;
         }
         catch (Exception ex)
         {
             _logger.Error("注册热键失败", ex);
-            _isRegisteringHotkey = false; // 确保异常情况下也能退出注册模式
+            _isRegisteringHotkey = false;
             return false;
         }
     }
 
-    // 保存热键配置 (简化为一个方法)
+    // 保存热键配置
     private void SaveHotkeyConfig(LyKeysCode keyCode, ModifierKeys modifiers)
     {
         try 
         {
+            // 直接调用配置管理器保存热键配置
             _configManager.UpdateKeyConfig(keyConfig => {
-                // 更新热键设置
                 keyConfig.startKey = keyCode;
                 keyConfig.startMods = modifiers;
-                keyConfig.stopKey = keyCode; // 设置相同停止键
-                keyConfig.stopMods = modifiers; // 设置相同的修饰键
+                keyConfig.stopKey = keyCode;
+                keyConfig.stopMods = modifiers;
             });
             
-            _logger.Debug($"已将热键设置保存到当前配置文件: {_configManager.CurrentConfig?.Name}");
+            _logger.Debug($"已保存热键配置: {keyCode}");
         }
         catch (Exception ex)
         {

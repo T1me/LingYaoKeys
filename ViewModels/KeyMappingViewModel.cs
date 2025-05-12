@@ -1200,40 +1200,15 @@ namespace WpfApp.ViewModels
                 return false;
             }
 
+            // 更新内部状态
             _hotkey = keyCode;
             _hotkeyModifiers = modifiers;
             UpdateHotkeyText(keyCode, modifiers);
 
-            try
-            {
-                // 获取当前配置的按键数据
-                var keyConfigData = _configManager.CurrentKeyConfig;
-                
-                // 更新热键设置
-                keyConfigData.startKey = keyCode;
-                keyConfigData.startMods = modifiers;
-                keyConfigData.stopKey = keyCode; // 保持一致
-                keyConfigData.stopMods = modifiers; // 保持一致
-                
-                // 保存到当前活动配置文件
-                _configManager.UpdateKeyConfig(keyConfig => {
-                    keyConfig.startKey = keyCode;
-                    keyConfig.startMods = modifiers;
-                    keyConfig.stopKey = keyCode;
-                    keyConfig.stopMods = modifiers;
-                });
-                
-                _logger.Debug($"已将热键设置保存到当前配置文件: {_configManager.CurrentConfig?.Name}");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"保存热键设置失败: {ex.Message}", ex);
-            }
+            _logger.Debug($"设置热键: {keyCode}, 修饰键: {modifiers}");
 
-            _logger.Debug($"已设置热键: {keyCode}, 修饰键: {modifiers}");
-
-            // 注册热键
-            if (_hotkeyService.RegisterHotkey(keyCode, modifiers, false))
+            // 直接让HotkeyService处理热键注册与保存配置
+            if (_hotkeyService.RegisterHotkey(keyCode, modifiers, true))
             {
                 _logger.Debug("热键注册成功");
                 _mainViewModel.UpdateStatusMessage("热键设置成功", false);
@@ -2334,10 +2309,8 @@ namespace WpfApp.ViewModels
             get => _selectedConfigFile;
             set
             {
-                // 防止null值覆盖当前选择
                 if (value == null)
                 {
-                    _logger.Warning("尝试将SelectedConfigFile设置为null，已阻止此操作");
                     return;
                 }
                 
@@ -2352,14 +2325,27 @@ namespace WpfApp.ViewModels
         // 切换到指定配置
         private void SwitchToConfig(ConfigFileInfo configInfo)
         {
+            SwitchToConfig(configInfo, true);
+        }
+
+        // 切换到指定配置的重载方法，允许控制是否保存当前配置
+        private void SwitchToConfig(ConfigFileInfo configInfo, bool saveCurrentConfig)
+        {
             try
             {
                 if (configInfo == null) return;
                 
-                _logger.Debug($"切换到配置：{configInfo.Name}");
+                _logger.Debug($"切换到配置：{configInfo.Name}, 是否保存当前配置: {saveCurrentConfig}");
                 
-                // 保存当前配置
+                // 根据参数决定是否保存当前配置
+                if (saveCurrentConfig)
+                {
                 SaveConfig();
+                }
+                else
+                {
+                    _logger.Debug("跳过保存当前配置");
+                }
                 
                 // 使用统一配置服务切换配置
                 _configManager.SwitchConfig(configInfo);
@@ -2438,8 +2424,26 @@ namespace WpfApp.ViewModels
                 
                 _logger.Debug($"开始删除配置：{name}");
                 
-                // 使用统一配置服务删除配置
-                _configManager.DeleteConfig(SelectedConfigFile);
+                // 保存当前需要删除的配置引用
+                var configToDelete = SelectedConfigFile;
+                
+                // 预先获取将要切换到的新配置（默认配置或第一个配置）
+                var newConfig = _configManager.ConfigFiles.FirstOrDefault(c => c != configToDelete && c.IsDefault) ?? 
+                                _configManager.ConfigFiles.FirstOrDefault(c => c != configToDelete);
+                        
+                if (newConfig == null)
+                {
+                    _logger.Warning("没有可用的备选配置，无法删除当前配置");
+                    _mainViewModel.UpdateStatusMessage("没有备选配置，无法删除", true);
+                    return;
+                }
+                
+                // 先切换到新配置，避免在删除操作中触发切换
+                // 注意：这里使用特殊的重载以避免保存当前配置
+                SwitchToConfig(newConfig, false);
+                
+                // 执行删除操作
+                _configManager.DeleteConfig(configToDelete);
                 
                 // 刷新UI选中项，确保显示当前活动配置
                 _selectedConfigFile = _configManager.CurrentConfig;

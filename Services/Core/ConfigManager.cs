@@ -18,6 +18,7 @@ namespace WpfApp.Services.Core
         private static ConfigManager _instance;
         private static readonly object _instanceLock = new object();
         
+        // 使用单一的简单对象锁替代ReaderWriterLockSlim
         private readonly object _configLock = new object();
         private readonly SerilogManager _logger = SerilogManager.Instance;
         private readonly PathService _pathService = PathService.Instance;
@@ -31,6 +32,11 @@ namespace WpfApp.Services.Core
         private KeyConfigData _currentKeyConfig;
         private ObservableCollection<ConfigFileInfo> _configFiles;
         private ConfigFileInfo _currentConfig;
+        
+        // 脏标记，用于标识配置是否已修改
+        private bool _isGlobalConfigDirty = false;
+        private bool _isKeyConfigDirty = false;
+        private bool _isConfigIndexDirty = false;
         
         /// <summary>
         /// 配置变更事件
@@ -89,10 +95,10 @@ namespace WpfApp.Services.Core
         /// 初始化配置管理器
         /// </summary>
         public void Initialize()
-        {
-            lock (_configLock)
             {
                 try
+            {
+                lock (_configLock)
                 {
                     _logger.Debug("开始初始化配置管理器");
                     
@@ -110,6 +116,7 @@ namespace WpfApp.Services.Core
                     
                     _logger.Debug("配置管理器初始化完成");
                 }
+                }
                 catch (Exception ex)
                 {
                     _logger.Error("初始化配置管理器失败", ex);
@@ -119,6 +126,11 @@ namespace WpfApp.Services.Core
                     _currentKeyConfig = CreateDefaultKeyConfig();
                     
                     // 保存默认配置
+                _isGlobalConfigDirty = true;
+                _isKeyConfigDirty = true;
+                
+                lock (_configLock)
+                {
                     SaveGlobalConfig();
                     SaveCurrentKeyConfig();
                 }
@@ -168,6 +180,7 @@ namespace WpfApp.Services.Core
                             if (_configFiles.Count > 0)
                             {
                                 _configFiles[0].IsDefault = true;
+                                _isConfigIndexDirty = true;
                             }
                             else
                             {
@@ -182,7 +195,10 @@ namespace WpfApp.Services.Core
                 _currentConfig = _configFiles.FirstOrDefault(c => c.IsDefault) ?? _configFiles.FirstOrDefault();
                 
                 // 保存配置索引
+                if (_isConfigIndexDirty)
+                {
                 SaveConfigIndex();
+                }
                 
                 _logger.Debug($"配置文件列表初始化完成，当前配置：{_currentConfig?.Name ?? "无"}");
             }
@@ -212,6 +228,9 @@ namespace WpfApp.Services.Core
             _configFiles.Add(defaultConfig);
             _currentConfig = defaultConfig;
             
+            // 标记索引为脏
+            _isConfigIndexDirty = true;
+            
             // 保存配置索引
             SaveConfigIndex();
             
@@ -223,11 +242,18 @@ namespace WpfApp.Services.Core
         /// </summary>
         private void SaveConfigIndex()
         {
+            // 如果索引没有变更，不需要保存
+            if (!_isConfigIndexDirty)
+            {
+                return;
+            }
+            
             try
             {
                 var indexPath = Path.Combine(_configDir, CONFIG_INDEX_FILE);
                 var json = JsonConvert.SerializeObject(_configFiles, Formatting.Indented);
                 File.WriteAllText(indexPath, json);
+                _isConfigIndexDirty = false; // 重置脏标记
                 _logger.Debug("配置文件索引已保存");
             }
             catch (Exception ex)
@@ -252,6 +278,7 @@ namespace WpfApp.Services.Core
                 else
                 {
                     _globalConfig = CreateDefaultGlobalConfig();
+                    _isGlobalConfigDirty = true;
                     SaveGlobalConfig();
                     _logger.Debug("全局配置不存在，已创建默认配置");
                 }
@@ -260,6 +287,7 @@ namespace WpfApp.Services.Core
             {
                 _logger.Error("加载全局配置失败", ex);
                 _globalConfig = CreateDefaultGlobalConfig();
+                _isGlobalConfigDirty = true;
                 SaveGlobalConfig();
             }
         }
@@ -281,6 +309,7 @@ namespace WpfApp.Services.Core
                     {
                         var defaultConfig = CreateDefaultKeyConfig();
                         _currentKeyConfig.keys = defaultConfig.keys;
+                        _isKeyConfigDirty = true;
                     }
                     
                     _logger.Debug($"已加载按键配置: {_currentConfig.Name}, 按键数量: {_currentKeyConfig.keys.Count}");
@@ -288,6 +317,7 @@ namespace WpfApp.Services.Core
                 else
                 {
                     _currentKeyConfig = CreateDefaultKeyConfig();
+                    _isKeyConfigDirty = true;
                     SaveCurrentKeyConfig();
                     _logger.Debug("按键配置不存在，已创建默认配置");
                 }
@@ -296,6 +326,7 @@ namespace WpfApp.Services.Core
             {
                 _logger.Error("加载按键配置失败", ex);
                 _currentKeyConfig = CreateDefaultKeyConfig();
+                _isKeyConfigDirty = true;
                 SaveCurrentKeyConfig();
             }
         }
@@ -305,10 +336,17 @@ namespace WpfApp.Services.Core
         /// </summary>
         private void SaveGlobalConfig()
         {
+            // 如果全局配置没有变更，不需要保存
+            if (!_isGlobalConfigDirty)
+            {
+                return;
+            }
+            
             try
             {
                 var json = JsonConvert.SerializeObject(_globalConfig, Formatting.Indented);
                 File.WriteAllText(_globalConfigPath, json);
+                _isGlobalConfigDirty = false; // 重置脏标记
                 _logger.Debug("全局配置已保存");
             }
             catch (Exception ex)
@@ -322,6 +360,12 @@ namespace WpfApp.Services.Core
         /// </summary>
         private void SaveCurrentKeyConfig()
         {
+            // 如果按键配置没有变更，不需要保存
+            if (!_isKeyConfigDirty)
+            {
+                return;
+            }
+            
             try
             {
                 if (_currentConfig != null)
@@ -331,6 +375,10 @@ namespace WpfApp.Services.Core
                     
                     // 更新最后编辑时间
                     _currentConfig.LastEditTime = DateTime.Now;
+                    _isConfigIndexDirty = true;
+                    _isKeyConfigDirty = false; // 重置脏标记
+                    
+                    // 保存配置索引
                     SaveConfigIndex();
                     
                     _logger.Debug($"按键配置已保存: {_currentConfig.Name}");
@@ -444,24 +492,26 @@ namespace WpfApp.Services.Core
         /// 更新全局配置
         /// </summary>
         public void UpdateGlobalConfig(Action<GlobalConfig> updateAction)
-        {
-            lock (_configLock)
             {
                 try
+            {
+                lock (_configLock)
                 {
                     if (_globalConfig == null) return;
                     
                     updateAction(_globalConfig);
+                    _isGlobalConfigDirty = true;
                     SaveGlobalConfig();
                     
                     RaiseConfigChanged(ConfigChangeType.Global, _globalConfig);
+                }
+                
                     _logger.Debug("全局配置已更新");
                 }
                 catch (Exception ex)
                 {
                     _logger.Error("更新全局配置失败", ex);
                     throw;
-                }
             }
         }
         
@@ -469,24 +519,26 @@ namespace WpfApp.Services.Core
         /// 更新当前按键配置
         /// </summary>
         public void UpdateKeyConfig(Action<KeyConfigData> updateAction)
-        {
-            lock (_configLock)
             {
                 try
+            {
+                lock (_configLock)
                 {
                     if (_currentKeyConfig == null) return;
                     
                     updateAction(_currentKeyConfig);
+                    _isKeyConfigDirty = true;
                     SaveCurrentKeyConfig();
                     
                     RaiseConfigChanged(ConfigChangeType.Key, null, _currentKeyConfig);
+                }
+                
                     _logger.Debug("按键配置已更新");
                 }
                 catch (Exception ex)
                 {
                     _logger.Error("更新按键配置失败", ex);
                     throw;
-                }
             }
         }
         
@@ -497,11 +549,17 @@ namespace WpfApp.Services.Core
         {
             if (configInfo == null || _currentConfig == configInfo) return;
             
-            lock (_configLock)
-            {
                 try
+            {
+                lock (_configLock)
                 {
                     _logger.Debug($"切换配置: {_currentConfig?.Name} -> {configInfo.Name}");
+                    
+                    // 保存当前配置
+                    if (_isKeyConfigDirty)
+                    {
+                        SaveCurrentKeyConfig();
+                    }
                     
                     // 设置当前配置
                     _currentConfig = configInfo;
@@ -512,11 +570,11 @@ namespace WpfApp.Services.Core
                     // 触发配置变更事件
                     RaiseConfigChanged(ConfigChangeType.ConfigFile, null, _currentKeyConfig, configInfo);
                 }
+                }
                 catch (Exception ex)
                 {
                     _logger.Error($"切换配置失败: {configInfo.Name}", ex);
                     throw;
-                }
             }
         }
         
@@ -524,10 +582,10 @@ namespace WpfApp.Services.Core
         /// 创建新配置文件
         /// </summary>
         public ConfigFileInfo CreateNewConfig(string configName, bool copyFromCurrent = true)
-        {
-            lock (_configLock)
             {
                 try
+            {
+                lock (_configLock)
                 {
                     // 验证配置名称
                     var validName = ValidateConfigName(configName);
@@ -558,6 +616,9 @@ namespace WpfApp.Services.Core
                     // 添加到配置列表
                     _configFiles.Add(newConfig);
                     
+                    // 标记索引为脏
+                    _isConfigIndexDirty = true;
+                    
                     // 保存配置索引
                     SaveConfigIndex();
                     
@@ -568,11 +629,11 @@ namespace WpfApp.Services.Core
                     
                     return newConfig;
                 }
+                }
                 catch (Exception ex)
                 {
                     _logger.Error($"创建新配置失败: {configName}", ex);
                     throw;
-                }
             }
         }
         
@@ -583,9 +644,9 @@ namespace WpfApp.Services.Core
         {
             if (configInfo == null) return;
             
-            lock (_configLock)
-            {
                 try
+            {
+                lock (_configLock)
                 {
                     // 验证配置名称
                     newName = ValidateConfigName(newName, configInfo);
@@ -622,6 +683,9 @@ namespace WpfApp.Services.Core
                     configInfo.FilePath = newFilePath;
                     configInfo.UpdateEditTime(); // 更新编辑时间
                     
+                    // 标记索引为脏
+                    _isConfigIndexDirty = true;
+                    
                     // 保存索引
                     SaveConfigIndex();
                     
@@ -630,11 +694,11 @@ namespace WpfApp.Services.Core
                     
                     _logger.Debug($"重命名配置: {configInfo.Name}, 路径: {configInfo.FilePath}");
                 }
+                }
                 catch (Exception ex)
                 {
                     _logger.Error($"重命名配置失败: {configInfo.Name} -> {newName}", ex);
                     throw;
-                }
             }
         }
         
@@ -645,9 +709,9 @@ namespace WpfApp.Services.Core
         {
             if (configInfo == null) return;
             
-            lock (_configLock)
-            {
                 try
+            {
+                lock (_configLock)
                 {
                     // 不能删除默认配置
                     if (configInfo.IsDefault)
@@ -665,18 +729,20 @@ namespace WpfApp.Services.Core
                     // 从配置列表中移除配置信息
                     _configFiles.Remove(configInfo);
                     
+                    // 标记索引为脏
+                    _isConfigIndexDirty = true;
+                    
                     // 如果删除的是当前配置，需要先确定新的当前配置
                     if (isCurrentConfig)
                     {
                         newCurrentConfig = _configFiles.FirstOrDefault(c => c.IsDefault) ?? _configFiles.FirstOrDefault();
+                        
+                        // 直接设置字段，避免触发不必要的事件
                         _currentConfig = newCurrentConfig;
                     }
                     
                     // 先保存配置索引文件，确保配置列表已更新
                     SaveConfigIndex();
-                    
-                    // 触发配置列表变更事件
-                    RaiseConfigChanged(ConfigChangeType.ConfigList, null, null, configInfo);
                     
                     // 最后才删除物理文件，避免在事件处理过程中触发自动创建
                     if (File.Exists(fileToDelete))
@@ -685,20 +751,29 @@ namespace WpfApp.Services.Core
                         _logger.Debug($"物理文件已删除: {fileToDelete}");
                     }
                     
-                    // 如果切换了当前配置，现在加载新配置并触发事件
+                    // 在所有操作完成后，才触发事件通知
                     if (isCurrentConfig && newCurrentConfig != null)
                     {
+                        // 加载新配置的按键配置
                         LoadCurrentKeyConfig();
+                        
+                        // 触发配置变更事件
+                        _logger.Debug($"删除配置完成: {configInfo.Name}，当前配置已切换到: {newCurrentConfig.Name}");
+                        
+                        // 首先触发配置文件变更事件
                         RaiseConfigChanged(ConfigChangeType.ConfigFile, null, _currentKeyConfig, _currentConfig);
                     }
                     
+                    // 然后触发配置列表变更事件
+                    RaiseConfigChanged(ConfigChangeType.ConfigList, null, null, configInfo);
+                    
                     _logger.Debug($"删除配置完成: {configInfo.Name}");
+                }
                 }
                 catch (Exception ex)
                 {
                     _logger.Error($"删除配置失败: {configInfo.Name}", ex);
                     throw;
-                }
             }
         }
         
@@ -709,12 +784,15 @@ namespace WpfApp.Services.Core
         {
             if (configInfo == null) return;
             
-            lock (_configLock)
-            {
                 try
+            {
+                lock (_configLock)
                 {
                     // 更新快捷键
                     configInfo.ConfigHotkey = hotkeyText;
+                    
+                    // 标记索引为脏
+                    _isConfigIndexDirty = true;
                     
                     // 保存索引
                     SaveConfigIndex();
@@ -724,11 +802,11 @@ namespace WpfApp.Services.Core
                     
                     _logger.Debug($"设置配置快捷键: {configInfo.Name} -> {hotkeyText}");
                 }
+                }
                 catch (Exception ex)
                 {
                     _logger.Error($"设置配置快捷键失败: {configInfo.Name} -> {hotkeyText}", ex);
                     throw;
-                }
             }
         }
         
@@ -736,10 +814,10 @@ namespace WpfApp.Services.Core
         /// 导入配置文件
         /// </summary>
         public ConfigFileInfo ImportKeyConfig(string sourceFile, string configName = null)
-        {
-            lock (_configLock)
             {
                 try
+            {
+                lock (_configLock)
                 {
                     // 检查源文件是否存在
                     if (!File.Exists(sourceFile))
@@ -771,6 +849,9 @@ namespace WpfApp.Services.Core
                     // 添加到配置列表
                     _configFiles.Add(newConfig);
                     
+                    // 标记索引为脏
+                    _isConfigIndexDirty = true;
+                    
                     // 保存配置索引
                     SaveConfigIndex();
                     
@@ -781,11 +862,11 @@ namespace WpfApp.Services.Core
                     
                     return newConfig;
                 }
+                }
                 catch (Exception ex)
                 {
                     _logger.Error($"导入配置失败: {sourceFile}", ex);
                     throw;
-                }
             }
         }
         
@@ -794,12 +875,12 @@ namespace WpfApp.Services.Core
         /// </summary>
         public void ExportKeyConfig(string targetFile, ConfigFileInfo configInfo = null)
         {
+            try
+        {
             lock (_configLock)
             {
                 configInfo ??= _currentConfig;
                 
-                try
-                {
                     if (configInfo != null && File.Exists(configInfo.FilePath))
                     {
                         File.Copy(configInfo.FilePath, targetFile, true);
@@ -809,12 +890,12 @@ namespace WpfApp.Services.Core
                     {
                         throw new FileNotFoundException("配置文件不存在");
                     }
+                    }
                 }
                 catch (Exception ex)
                 {
                     _logger.Error($"导出配置失败: {configInfo?.Name}", ex);
                     throw;
-                }
             }
         }
         
@@ -822,25 +903,36 @@ namespace WpfApp.Services.Core
         /// 清理资源
         /// </summary>
         public void Cleanup()
-        {
-            lock (_configLock)
             {
                 try
+            {
+                lock (_configLock)
                 {
                     // 保存配置
+                    if (_isGlobalConfigDirty)
+                    {
                     SaveGlobalConfig();
+                    }
+                    
+                    if (_isKeyConfigDirty)
+                    {
                     SaveCurrentKeyConfig();
+                    }
+                    
+                    if (_isConfigIndexDirty)
+                    {
                     SaveConfigIndex();
+                    }
                     
                     // 清理事件
                     ConfigChanged = null;
                     
                     _logger.Debug("配置管理器资源已清理");
                 }
+                }
                 catch (Exception ex)
                 {
                     _logger.Error("清理配置管理器资源失败", ex);
-                }
             }
         }
         

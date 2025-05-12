@@ -3044,6 +3044,14 @@ public partial class KeyMappingView : Page
                     _logger.Debug($"删除后手动同步ListBox选择: {viewModel.SelectedConfigFile.Name}");
                 }
             }
+            catch (Exception ex)
+            {
+                _logger.Error("删除配置时发生异常", ex);
+                System.Windows.MessageBox.Show($"删除配置失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                
+                // 刷新列表状态
+                lstConfigFiles.Items.Refresh();
+            }
             finally
             {
                 // 重新启用SelectionChanged事件
@@ -3053,7 +3061,20 @@ public partial class KeyMappingView : Page
                 System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
                     System.Windows.Threading.DispatcherPriority.Background,
                     new Action(() => {
-                        _logger.Debug($"延迟检查 - SelectedConfigFile: {viewModel.SelectedConfigFile?.Name ?? "null"}, UI选择项: {lstConfigFiles.SelectedItem?.GetType().GetProperty("Name")?.GetValue(lstConfigFiles.SelectedItem)}");
+                        // 确保选中项与ViewModel保持一致
+                        if (viewModel.SelectedConfigFile != null && lstConfigFiles.SelectedItem != viewModel.SelectedConfigFile)
+                        {
+                            lstConfigFiles.SelectionChanged -= ConfigFiles_SelectionChanged; // 暂时禁用事件
+                            try
+                            {
+                                lstConfigFiles.SelectedItem = viewModel.SelectedConfigFile;
+                                _logger.Debug($"延迟检查 - 手动同步ListBox选择: {viewModel.SelectedConfigFile.Name}");
+                            }
+                            finally
+                            {
+                                lstConfigFiles.SelectionChanged += ConfigFiles_SelectionChanged; // 重新启用事件
+                            }
+                        }
                     }));
             }
         }
