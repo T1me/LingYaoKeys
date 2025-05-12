@@ -9,7 +9,7 @@ namespace WpfApp.ViewModels;
 public class AboutViewModel : ViewModelBase
 {
     private readonly SerilogManager _logger = SerilogManager.Instance;
-    private readonly string _githubUrl = AppConfigService.Config.AppInfo.GitHubUrl;
+    private readonly string _githubUrl = AppConfigService.GlobalConfig.AppInfo.GitHubUrl;
     private readonly string _websiteUrl = "https://cassianvale.github.io/LingYaoKeys/";
     private ICommand? _openGitHubCommand;
     private ICommand? _openWebsiteCommand;

@@ -131,13 +131,13 @@ public class HotkeyService
     // 加载初始状态
     private void LoadInitialState()
     {
-        var config = AppConfigService.Config;
+        var keyConfig = AppConfigService.KeyConfig;
 
         // 加载按键列表
-        if (config.keys?.Count > 0)
+        if (keyConfig.keys?.Count > 0)
         {
             // 获取所有选中的按键和坐标
-            var selectedItems = config.keys.Where(k => k.IsSelected).ToList();
+            var selectedItems = keyConfig.keys.Where(k => k.IsSelected).ToList();
 
             if (selectedItems.Count > 0)
             {
@@ -166,7 +166,7 @@ public class HotkeyService
         }
 
         // 直接设置模式，不触发事件
-        _lyKeysService.IsHoldMode = config.keyMode != 0;
+        _lyKeysService.IsHoldMode = keyConfig.keyMode != 0;
     }
 
     // 释放资源

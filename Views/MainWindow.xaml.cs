@@ -337,7 +337,7 @@ public partial class MainWindow : Window
                 if (_trayIcon != null)
                     _trayIcon.ShowBalloonTip(
                         1000, // 显示时间（毫秒）
-                        _viewModel.Config.AppInfo.Title, // 从ViewModel获取标题
+                        _viewModel.GlobalConfig.AppInfo.Title, // 从ViewModel获取标题
                         "程序已最小化到系统托盘\n双击托盘图标或浮窗可重新打开窗口！", // 提示内容
                         ToolTipIcon.Info // 提示图标
                     );
@@ -450,7 +450,7 @@ public partial class MainWindow : Window
                             if (WindowState == WindowState.Normal)
                             {
                                 _logger.Debug($"保存窗口大小: {ActualWidth}x{ActualHeight}");
-                                AppConfigService.UpdateConfig(config =>
+                                AppConfigService.UpdateGlobalConfig(config =>
                                 {
                                     config.UI.MainWindow.Width = ActualWidth;
                                     config.UI.MainWindow.Height = ActualHeight;

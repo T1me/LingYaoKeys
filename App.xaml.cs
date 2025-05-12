@@ -348,12 +348,12 @@ public partial class App : Application
             // 2. 初始化日志系统
             splashWindow.UpdateProgress("正在初始化日志系统...", 30);
             _logger.SetBaseDirectory(_pathService.LogPath);
-            _logger.Initialize(AppConfigService.Config.Debug);
+            _logger.Initialize(AppConfigService.GlobalConfig.Debug);
 
             // 3. 设置配置变更监听
             AppConfigService.ConfigChanged += (sender, args) =>
             {
-                if (args.Section == "Debug") _logger.UpdateLoggerConfig(args.Config.Debug);
+                if (args.Section == "Debug") _logger.UpdateLoggerConfig(args.GlobalConfig.Debug);
             };
 
             // 注册全局异常处理

@@ -256,12 +256,12 @@ namespace WpfApp.Services.Core
             // 从配置中读取是否自动切换输入法
             try
             {
-                var config = AppConfigService.Config;
-                _autoSwitchIME = config.AutoSwitchToEnglishIME ?? true;
+                var globalConfig = AppConfigService.GlobalConfig;
+                _autoSwitchIME = globalConfig.AutoSwitchToEnglishIME ?? true;
                 _logger.Debug($"LyKeysService构造函数：输入法自动切换设置为 {(_autoSwitchIME ? "开启" : "关闭")}");
                 
                 // 读取降低卡位配置
-                _isReduceKeyStuck = config.IsReduceKeyStuck ?? false;
+                _isReduceKeyStuck = globalConfig.IsReduceKeyStuck ?? false;
                 // 根据降低卡位状态设置按键按下时长
                 _keyPressInterval = _isReduceKeyStuck ? DEFAULT_KEY_PRESS_INTERVAL : 0;
                 _logger.Debug($"LyKeysService构造函数：降低卡位功能设置为 {(_isReduceKeyStuck ? "开启" : "关闭")}，按键按下时长：{_keyPressInterval}ms");
@@ -723,7 +723,7 @@ namespace WpfApp.Services.Core
                 if (keyMappingViewModel == null || keyMappingViewModel.IsInitializing)
                 {
                     // 只在调试模式下输出日志
-                    if (AppConfigService.Config.Debug.IsDebugMode)
+                    if (AppConfigService.GlobalConfig.Debug.IsDebugMode)
                     {
                         _logger.Debug($"[GetKeyItem] KeyMappingViewModel未初始化，跳过获取KeyItem: {keyCode}");
                     }
@@ -1637,7 +1637,7 @@ namespace WpfApp.Services.Core
             if (_keyIntervals.TryGetValue(keyCode, out int interval))
             {
                 // 只在调试模式记录此日志，减少冗余日志
-                if (AppConfigService.Config.Debug.IsDebugMode && !IsInitializing())
+                if (AppConfigService.GlobalConfig.Debug.IsDebugMode && !IsInitializing())
                 {
                     _logger.Debug($"从缓存中获取按键{keyCode}的间隔: {interval}ms");
                 }

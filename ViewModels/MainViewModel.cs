@@ -13,7 +13,8 @@ namespace WpfApp.ViewModels;
 
 public class MainViewModel : ViewModelBase
 {
-    private AppConfig? _config;
+    private GlobalConfig? _globalConfig;
+    private KeyConfigData? _keyConfig;
     private bool _isDisposed;
     private readonly object _disposeLock = new();
     private Page? _currentPage;
@@ -34,6 +35,7 @@ public class MainViewModel : ViewModelBase
     private readonly Storyboard? _fadeInStoryboard;
     private readonly Storyboard? _fadeOutStoryboard;
     private bool _isInitializing = true;
+    private bool _isNavExpanded = true;
 
     // 状态消息颜色
     private static readonly System.Windows.Media.Brush STATUS_COLOR_NORMAL = System.Windows.Media.Brushes.Black;
@@ -64,22 +66,10 @@ public class MainViewModel : ViewModelBase
     }
 
     // 导航栏状态相关属性
-    private bool _isNavExpanded = true;
-
     public bool IsNavExpanded
     {
         get => _isNavExpanded;
-        set
-        {
-            if (_isNavExpanded != value)
-            {
-                _isNavExpanded = value;
-                OnPropertyChanged(nameof(IsNavExpanded));
-                OnPropertyChanged(nameof(NavColumnWidth));
-                OnPropertyChanged(nameof(NavTextVisibility));
-                OnPropertyChanged(nameof(NavToggleIcon));
-            }
-        }
+        set => SetProperty(ref _isNavExpanded, value);
     }
 
     // 导航栏列宽度
@@ -91,18 +81,27 @@ public class MainViewModel : ViewModelBase
     // 导航切换按钮图标
     public string NavToggleIcon => IsNavExpanded ? "\uE700" : "\uE701";
 
-    public AppConfig Config
+    public GlobalConfig GlobalConfig
     {
         get
         {
-            if (_config == null) _config = AppConfigService.Config;
-            return _config;
+            if (_globalConfig == null) _globalConfig = AppConfigService.GlobalConfig;
+            return _globalConfig;
         }
     }
 
-    public string WindowTitle => Config.AppInfo.Title;
-    public string VersionInfo => $"v{Config.AppInfo.Version}";
-    public string AuthorInfo => $"By: {Config.Author} | {VersionInfo}";
+    public KeyConfigData KeyConfig
+    {
+        get
+        {
+            if (_keyConfig == null) _keyConfig = AppConfigService.KeyConfig;
+            return _keyConfig;
+        }
+    }
+
+    public string WindowTitle => GlobalConfig.AppInfo.Title;
+    public string VersionInfo => $"v{GlobalConfig.AppInfo.Version}";
+    public string AuthorInfo => $"By: {GlobalConfig.Author} | {VersionInfo}";
 
     public Page? CurrentPage
     {
@@ -139,8 +138,8 @@ public class MainViewModel : ViewModelBase
     // 定义页面配置类，用于配置页面的特性
     private class PageConfig
     {
-        public bool UseCaching { get; set; } = true;          // 是否使用缓存
-        public bool LogCreation { get; set; } = true;         // 是否记录创建日志
+        public bool UseCaching { get; set; } = true;           // 是否使用缓存
+        public bool LogCreation { get; set; } = true;          // 是否记录创建日志
         public bool IsFrequentlyAccessed { get; set; } = false; // 是否为频繁访问的页面
         public Func<Page> CreatePageFunc { get; set; }        // 创建页面的函数
     }

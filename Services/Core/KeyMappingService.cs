@@ -264,7 +264,7 @@ public class KeyMappingService
         return _hotkey.HasValue && keyCode.Equals(_hotkey.Value);
     }
 
-    public void LoadConfiguration(AppConfig config)
+    public void LoadConfiguration(KeyConfigData config)
     {
         if (config.keys == null) return;
 
@@ -309,7 +309,7 @@ public class KeyMappingService
         UpdateHotkeyServiceKeyList();
     }
 
-    public void SaveConfiguration(AppConfig config)
+    public void SaveConfiguration(KeyConfigData config)
     {
         // 保存为相同的启动和停止热键
         config.startKey = _hotkey;

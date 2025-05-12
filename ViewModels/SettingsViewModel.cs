@@ -53,17 +53,17 @@ public class SettingsViewModel : ViewModelBase
 
     private void UpdateDebugModeStatus()
     {
-        var config = AppConfigService.Config;
-        _debugModeStatus = config.Debug.IsDebugMode ? "🟢 调试模式：已开启" : "⭕ 调试模式：已关闭";
+        var globalConfig = AppConfigService.GlobalConfig;
+        _debugModeStatus = globalConfig.Debug.IsDebugMode ? "🟢 调试模式：已开启" : "⭕ 调试模式：已关闭";
     }
 
     private void ToggleDebugMode()
     {
         try
         {
-            var currentDebugMode = AppConfigService.Config.Debug.IsDebugMode;
+            var currentDebugMode = AppConfigService.GlobalConfig.Debug.IsDebugMode;
 
-            AppConfigService.UpdateConfig(config =>
+            AppConfigService.UpdateGlobalConfig(config =>
             {
                 config.Debug.IsDebugMode = !currentDebugMode;
                 config.Debug.UpdateDebugState();
@@ -120,12 +120,17 @@ public class SettingsViewModel : ViewModelBase
             var updateInfo = await _updateService.CheckForUpdateAsync();
             if (updateInfo != null)
             {
-                var dialog = new Views.UpdateDialog(
-                    updateInfo.LatestVersion,
-                    updateInfo.CurrentVersion,
-                    updateInfo.DownloadUrl);
-
-                if (dialog.ShowDialog() == true) _updateService.OpenDownloadPage(updateInfo.DownloadUrl);
+                var result = MessageBox.Show(
+                    $"发现新版本：{updateInfo.LatestVersion}\n当前版本：{updateInfo.CurrentVersion}\n是否前往下载页面？",
+                    "发现新版本",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+                
+                if (result == MessageBoxResult.Yes)
+                {
+                    _updateService.OpenDownloadPage(updateInfo.DownloadUrl);
+                }
+                
                 UpdateStatus = "有新版本";
             }
             else

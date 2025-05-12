@@ -8,12 +8,14 @@ namespace WpfApp.Services.Core;
 public class ConfigChangedEventArgs : EventArgs
 {
     public string Section { get; }
-    public AppConfig Config { get; }
+    public GlobalConfig? GlobalConfig { get; }
+    public KeyConfigData? KeyConfig { get; }
 
-    public ConfigChangedEventArgs(string section, AppConfig config)
+    public ConfigChangedEventArgs(string section, GlobalConfig? globalConfig = null, KeyConfigData? keyConfig = null)
     {
         Section = section;
-        Config = config;
+        GlobalConfig = globalConfig;
+        KeyConfig = keyConfig;
     }
 }
 
@@ -24,25 +26,10 @@ public class AppConfigService
 
     private static string _globalConfigPath;
     private static string _keyConfigPath;
-    private static AppConfig? _config;
     private static GlobalConfig? _globalConfig;
     private static KeyConfigData? _keyConfig;
     private static readonly object _lockObject = new();
     public static event EventHandler<ConfigChangedEventArgs>? ConfigChanged;
-
-    public static AppConfig Config
-    {
-        get
-        {
-            if (_config == null)
-                lock (_lockObject)
-                {
-                    if (_config == null) LoadConfig();
-                }
-
-            return _config ?? CreateDefaultConfig();
-        }
-    }
 
     public static GlobalConfig GlobalConfig
     {
@@ -94,7 +81,6 @@ public class AppConfigService
                 // 不存在配置文件，创建默认配置
                 _globalConfig = CreateDefaultGlobalConfig();
                 _keyConfig = CreateDefaultKeyConfig();
-                _config = AppConfig.FromConfigs(_globalConfig, _keyConfig);
                 SaveConfigs();
                 System.Diagnostics.Debug.WriteLine("已创建新的默认配置文件");
             }
@@ -127,7 +113,6 @@ public class AppConfigService
                 // 不存在任何配置，创建默认配置
                 _globalConfig = CreateDefaultGlobalConfig();
                 _keyConfig = CreateDefaultKeyConfig();
-                _config = AppConfig.FromConfigs(_globalConfig, _keyConfig);
                 SaveConfigs();
             }
 
@@ -139,7 +124,6 @@ public class AppConfigService
             System.Diagnostics.Debug.WriteLine($"加载配置失败: {ex.Message}");
             _globalConfig = CreateDefaultGlobalConfig();
             _keyConfig = CreateDefaultKeyConfig();
-            _config = AppConfig.FromConfigs(_globalConfig, _keyConfig);
             SaveConfigs();
         }
     }
@@ -173,9 +157,6 @@ public class AppConfigService
                 _keyConfig.keys = defaultConfig.keys;
             }
             
-            // 合并生成完整配置供应用程序使用
-            _config = AppConfig.FromConfigs(_globalConfig!, _keyConfig!);
-            
             System.Diagnostics.Debug.WriteLine($"已加载分离配置文件: 全局配置和按键配置");
         }
         catch (Exception ex)
@@ -183,16 +164,6 @@ public class AppConfigService
             System.Diagnostics.Debug.WriteLine($"加载分离配置文件失败: {ex.Message}");
             throw;
         }
-    }
-
-    private static AppConfig CreateDefaultConfig()
-    {
-        System.Diagnostics.Debug.WriteLine("创建新的默认配置");
-        _globalConfig = CreateDefaultGlobalConfig();
-        _keyConfig = CreateDefaultKeyConfig();
-        _config = AppConfig.FromConfigs(_globalConfig, _keyConfig);
-        SaveConfigs();
-        return _config;
     }
 
     private static GlobalConfig CreateDefaultGlobalConfig()
@@ -237,7 +208,7 @@ public class AppConfigService
                     "窗口初始化完成*"
                 }
             },
-            soundEnabled = true,
+            soundEnabled = false,
             IsReduceKeyStuck = true,
             SoundVolume = 0.8,
             AutoSwitchToEnglishIME = true,
@@ -271,7 +242,7 @@ public class AppConfigService
 
     private static void ValidateConfig()
     {
-        if (_config == null || _globalConfig == null || _keyConfig == null) return;
+        if (_globalConfig == null || _keyConfig == null) return;
 
         var configChanged = false;
 
@@ -324,36 +295,10 @@ public class AppConfigService
         if (configChanged)
         {
             _logger.Debug("配置已更新并验证");
-            // 更新合并的配置
-            _config = AppConfig.FromConfigs(_globalConfig, _keyConfig);
             SaveConfigs();
         }
     }
 
-    // 优化保存配置方法
-    public static void SaveConfig()
-    {
-        try
-        {
-            lock (_lockObject)
-            {
-                if (_config == null) return;
-
-                // 将当前AppConfig拆分为GlobalConfig和KeyConfig
-                _globalConfig = _config.ToGlobalConfig();
-                _keyConfig = _config.ToKeyConfigData();
-                
-                // 保存拆分的配置文件
-                SaveConfigs();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"保存配置文件失败: {ex.Message}");
-            throw; // 重新抛出异常，让调用者知道保存失败
-        }
-    }
-    
     // 保存分离的配置文件
     private static void SaveConfigs()
     {
@@ -379,11 +324,8 @@ public class AppConfigService
                 var keyJson = JsonConvert.SerializeObject(_keyConfig, jsonSettings);
                 File.WriteAllText(_keyConfigPath, keyJson);
                 
-                // 更新合并的配置对象
-                _config = AppConfig.FromConfigs(_globalConfig, _keyConfig);
-                
                 // 触发配置更改事件
-                ConfigChanged?.Invoke(null, new ConfigChangedEventArgs("AppConfig", _config));
+                ConfigChanged?.Invoke(null, new ConfigChangedEventArgs("All", _globalConfig, _keyConfig));
                 
                 System.Diagnostics.Debug.WriteLine($"配置已更新并保存: 全局配置和按键配置 (路径: {_keyConfigPath})");
             }
@@ -395,33 +337,7 @@ public class AppConfigService
         }
     }
 
-    // 添加更新配置方法
-    public static void UpdateConfig(Action<AppConfig> updateAction)
-    {
-        try
-        {
-            lock (_lockObject)
-            {
-                if (_config == null) return;
-
-                updateAction(_config);
-                
-                // 将更新后的AppConfig拆分并保存
-                _globalConfig = _config.ToGlobalConfig();
-                _keyConfig = _config.ToKeyConfigData();
-                
-                ValidateConfig(); // 验证更新后的配置
-                SaveConfigs(); // 保存并触发事件
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"更新配置失败: {ex.Message}");
-            throw;
-        }
-    }
-    
-    // 更新全局配置
+    // 添加更新全局配置方法
     public static void UpdateGlobalConfig(Action<GlobalConfig> updateAction)
     {
         try
@@ -432,11 +348,11 @@ public class AppConfigService
 
                 updateAction(_globalConfig);
                 
-                // 更新合并的配置
-                _config = AppConfig.FromConfigs(_globalConfig, _keyConfig!);
-                
                 ValidateConfig(); // 验证更新后的配置
                 SaveConfigs(); // 保存并触发事件
+                
+                // 仅触发全局配置变更事件
+                ConfigChanged?.Invoke(null, new ConfigChangedEventArgs("GlobalConfig", _globalConfig));
             }
         }
         catch (Exception ex)
@@ -457,11 +373,11 @@ public class AppConfigService
 
                 updateAction(_keyConfig);
                 
-                // 更新合并的配置
-                _config = AppConfig.FromConfigs(_globalConfig!, _keyConfig);
-                
                 ValidateConfig(); // 验证更新后的配置
                 SaveConfigs(); // 保存并触发事件
+                
+                // 仅触发按键配置变更事件
+                ConfigChanged?.Invoke(null, new ConfigChangedEventArgs("KeyConfig", null, _keyConfig));
             }
         }
         catch (Exception ex)
@@ -477,7 +393,6 @@ public class AppConfigService
         lock (_lockObject)
         {
             ConfigChanged = null;
-            _config = null;
             _globalConfig = null;
             _keyConfig = null;
         }

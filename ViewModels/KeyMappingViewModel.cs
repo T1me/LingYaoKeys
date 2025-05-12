@@ -258,7 +258,7 @@ namespace WpfApp.ViewModels
                 else
                 {
                     // 如果ConfigService不可用，使用AppConfigService
-                    AppConfigService.UpdateConfig(config =>
+                    AppConfigService.UpdateKeyConfig(config =>
                     {
                         config.TargetWindowClassName = null;
                         config.TargetWindowProcessName = null;
@@ -1136,56 +1136,59 @@ namespace WpfApp.ViewModels
             try
             {
                 _isInitializing = true;
-                var config = AppConfigService.Config;
+                
+                // 获取全局配置和按键配置
+                var globalConfig = AppConfigService.GlobalConfig;
+                var keyConfigData = AppConfigService.KeyConfig;
 
                 // 加载热键设置
-                if (config.startKey.HasValue)
+                if (keyConfigData.startKey.HasValue)
                 {
-                    _hotkey = config.startKey;
-                    _hotkeyModifiers = config.startMods;
-                    UpdateHotkeyText(_hotkey.Value, config.startMods);
+                    _hotkey = keyConfigData.startKey;
+                    _hotkeyModifiers = keyConfigData.startMods;
+                    UpdateHotkeyText(_hotkey.Value, keyConfigData.startMods);
                 }
 
                 // 加载窗口配置
-                if (!string.IsNullOrEmpty(config.TargetWindowProcessName) &&
-                    !string.IsNullOrEmpty(config.TargetWindowTitle))
+                if (!string.IsNullOrEmpty(keyConfigData.TargetWindowProcessName) &&
+                    !string.IsNullOrEmpty(keyConfigData.TargetWindowTitle))
                 {
-                    _selectedWindowProcessName = config.TargetWindowProcessName;
-                    _selectedWindowClassName = config.TargetWindowClassName ?? string.Empty;
-                    _selectedWindowTitle = config.TargetWindowTitle;
+                    _selectedWindowProcessName = keyConfigData.TargetWindowProcessName;
+                    _selectedWindowClassName = keyConfigData.TargetWindowClassName ?? string.Empty;
+                    _selectedWindowTitle = keyConfigData.TargetWindowTitle;
 
                     _logger.Debug($"从配置加载窗口信息 - 进程名: {_selectedWindowProcessName}, " +
                                   $"标题: {_selectedWindowTitle}, 类名: {_selectedWindowClassName}");
                 }
 
                 // 加载按键列表和选中状态
-                if (config.keys != null)
+                if (keyConfigData.keys != null)
                 {
                     // 验证并修正配置中的按键项
-                    foreach (var keyConfig in config.keys)
+                    foreach (var keyItem in keyConfigData.keys)
                     {
                         // 验证坐标类型按键配置
-                        if (keyConfig.Type == KeyItemType.Coordinates)
+                        if (keyItem.Type == KeyItemType.Coordinates)
                         {
                             // 坐标类型必须将Code设为null
-                            keyConfig.Code = null;
+                            keyItem.Code = null;
                             
                             // 坐标不能同时为0,0（只针对坐标类型）
-                            if (keyConfig.X == 0 && keyConfig.Y == 0)
+                            if (keyItem.X == 0 && keyItem.Y == 0)
                             {
-                                _logger.Warning($"跳过无效的坐标配置: ({keyConfig.X}, {keyConfig.Y})，坐标不能同时为(0,0)");
+                                _logger.Warning($"跳过无效的坐标配置: ({keyItem.X}, {keyItem.Y})，坐标不能同时为(0,0)");
                                 continue; // 跳过这一项，不添加到KeyList
                             }
                         }
                         // 验证键盘类型按键配置
-                        else if (keyConfig.Type == KeyItemType.Keyboard)
+                        else if (keyItem.Type == KeyItemType.Keyboard)
                         {
                             // 键盘类型的X和Y应设为null
-                            keyConfig.X = null;
-                            keyConfig.Y = null;
+                            keyItem.X = null;
+                            keyItem.Y = null;
 
                             // 如果键盘类型但Code为null，则记录警告
-                            if (!keyConfig.Code.HasValue)
+                            if (!keyItem.Code.HasValue)
                             {
                                 _logger.Warning($"跳过无效的键盘配置: Code为null");
                             }
@@ -1193,39 +1196,39 @@ namespace WpfApp.ViewModels
                     }
 
                     KeyList.Clear();
-                    foreach (var keyConfig in config.keys)
+                    foreach (var keyConfigItem in keyConfigData.keys)
                     {
                         KeyItem keyItem;
                         
                         // 根据类型创建不同的KeyItem
-                        if (keyConfig.Type == KeyItemType.Keyboard && keyConfig.Code.HasValue)
+                        if (keyConfigItem.Type == KeyItemType.Keyboard && keyConfigItem.Code.HasValue)
                         {
                             // 创建键盘按键项
-                            keyItem = new KeyItem(keyConfig.Code.Value, _lyKeysService);
+                            keyItem = new KeyItem(keyConfigItem.Code.Value, _lyKeysService);
                             
                             // 同步到LyKeysService的缓存
-                            _lyKeysService.SetKeyIntervalForKey(keyConfig.Code.Value, keyConfig.KeyInterval);
+                            _lyKeysService.SetKeyIntervalForKey(keyConfigItem.Code.Value, keyConfigItem.KeyInterval);
                         }
-                        else if (keyConfig.Type == KeyItemType.Coordinates)
+                        else if (keyConfigItem.Type == KeyItemType.Coordinates)
                         {
                             // 创建坐标项
-                            int xValue = keyConfig.X ?? 1;
-                            int yValue = keyConfig.Y ?? 1;
+                            int xValue = keyConfigItem.X ?? 1;
+                            int yValue = keyConfigItem.Y ?? 1;
                             keyItem = new KeyItem(xValue, yValue, _lyKeysService);
                             
                             // 同步到LyKeysService的坐标缓存
-                            _lyKeysService.SetCoordinateInterval(keyConfig.X, keyConfig.Y, keyConfig.KeyInterval);
+                            _lyKeysService.SetCoordinateInterval(keyConfigItem.X, keyConfigItem.Y, keyConfigItem.KeyInterval);
                         }
                         else
                         {
                             // 跳过无效的配置项
-                            _logger.Warning($"跳过无效的按键配置: 类型={keyConfig.Type}, Code={keyConfig.Code}");
+                            _logger.Warning($"跳过无效的按键配置: 类型={keyConfigItem.Type}, Code={keyConfigItem.Code}");
                             continue;
                         }
                         
                         // 设置公共属性
-                        keyItem.IsSelected = keyConfig.IsSelected;
-                        keyItem.KeyInterval = keyConfig.KeyInterval;
+                        keyItem.IsSelected = keyConfigItem.IsSelected;
+                        keyItem.KeyInterval = keyConfigItem.KeyInterval;
                         
                         // 添加事件处理
                         keyItem.SelectionChanged += (s, isSelected) => 
@@ -1305,26 +1308,26 @@ namespace WpfApp.ViewModels
                 // 2. ViewModel的属性setter会自动将值同步到LyKeysService服务层
                 // 3. 形成"配置 -> ViewModel -> 服务层"的单向数据流
                 // 加载按键间隔
-                _keyInterval = config.interval; // 先直接设置字段，避免触发属性变更事件
-                _lyKeysService.KeyInterval = config.interval; 
+                _keyInterval = keyConfigData.interval; // 先直接设置字段，避免触发属性变更事件
+                _lyKeysService.KeyInterval = keyConfigData.interval; 
                 // 加载按键模式
-                SelectedKeyMode = config.keyMode;   
-                IsSequenceMode = config.keyMode == 0;   
+                SelectedKeyMode = keyConfigData.keyMode;   
+                IsSequenceMode = keyConfigData.keyMode == 0;   
                 // 加载音量设置
-                IsSoundEnabled = config.soundEnabled ?? true;
+                IsSoundEnabled = globalConfig.soundEnabled ?? true;
                 // 加载降低卡位模式
-                IsReduceKeyStuck = config.IsReduceKeyStuck ?? true;
+                IsReduceKeyStuck = globalConfig.IsReduceKeyStuck ?? true;
                 // 加载浮窗状态
-                IsFloatingWindowEnabled = config.UI.FloatingWindow.IsEnabled;
+                IsFloatingWindowEnabled = globalConfig.UI.FloatingWindow.IsEnabled;
                 // 加载自动切换输入法状态
-                AutoSwitchToEnglishIME = config.AutoSwitchToEnglishIME ?? true;
+                AutoSwitchToEnglishIME = globalConfig.AutoSwitchToEnglishIME ?? true;
                 // 加载热键总开关状态
-                IsHotkeyControlEnabled = config.isHotkeyControlEnabled ?? true;
+                IsHotkeyControlEnabled = globalConfig.isHotkeyControlEnabled ?? true;
 
                 // 加载音量大小
-                if (config.SoundVolume.HasValue)
+                if (globalConfig.SoundVolume.HasValue)
                 {
-                    _soundVolume = config.SoundVolume.Value;
+                    _soundVolume = globalConfig.SoundVolume.Value;
                     _audioService.Volume = _soundVolume;
                     _logger.Debug($"已加载音量设置: {_soundVolume:P0}");
                 }
@@ -2347,7 +2350,7 @@ namespace WpfApp.ViewModels
                                     SelectedWindowTitle = $"{targetWindow.Title} (句柄: {targetWindow.Handle.ToInt64()})";
 
                                     // 更新配置
-                                    AppConfigService.UpdateConfig(config =>
+                                    AppConfigService.UpdateKeyConfig(config =>
                                     {
                                         config.TargetWindowClassName = targetWindow.ClassName;
                                         config.TargetWindowProcessName = targetWindow.ProcessName;
@@ -2730,6 +2733,9 @@ namespace WpfApp.ViewModels
                 var keyConfig = _configService.GetKeyConfigData();
                 _logger.Debug($"已获取配置数据，按键数量：{keyConfig?.keys?.Count ?? 0}");
                 
+                // 添加：加载全局配置
+                LoadGlobalConfig();
+                
                 // 清空现有按键列表
                 KeyList.Clear();
                 
@@ -3047,6 +3053,10 @@ namespace WpfApp.ViewModels
             
             // 设置初始选中配置
             _selectedConfigFile = _configService.CurrentConfig;
+            
+            // 添加：加载全局配置
+            LoadGlobalConfig();
+            
             // 明确触发属性变更事件
             OnPropertyChanged(nameof(SelectedConfigFile));
             _logger.Debug($"初始化配置服务完成，当前选中配置：{_selectedConfigFile?.Name ?? "无"}");
@@ -3100,5 +3110,37 @@ namespace WpfApp.ViewModels
         /// 键位核心服务
         /// </summary>
         public LyKeysService LyKeysService => _lyKeysService;
+
+        // 添加此方法加载全局配置
+        private void LoadGlobalConfig()
+        {
+            try 
+            {
+                _logger.Debug("开始加载全局配置...");
+                var globalConfig = AppConfigService.GlobalConfig;
+                
+                // 从全局配置加载值到ViewModel
+                _isSoundEnabled = globalConfig.soundEnabled ?? true;
+                _isReduceKeyStuck = globalConfig.IsReduceKeyStuck ?? true;
+                _isFloatingWindowEnabled = globalConfig.UI.FloatingWindow.IsEnabled;
+                _autoSwitchToEnglishIME = globalConfig.AutoSwitchToEnglishIME ?? true;
+                _isHotkeyControlEnabled = globalConfig.isHotkeyControlEnabled ?? true;
+                _soundVolume = globalConfig.SoundVolume ?? 0.8;
+                
+                // 通知UI更新这些属性
+                OnPropertyChanged(nameof(IsSoundEnabled));
+                OnPropertyChanged(nameof(IsReduceKeyStuck));
+                OnPropertyChanged(nameof(IsFloatingWindowEnabled));
+                OnPropertyChanged(nameof(AutoSwitchToEnglishIME));
+                OnPropertyChanged(nameof(IsHotkeyControlEnabled));
+                OnPropertyChanged(nameof(SoundVolume));
+                
+                _logger.Debug("已从GlobalConfig加载全局配置");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("加载全局配置失败", ex);
+            }
+        }
     }
 }
