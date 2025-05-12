@@ -3022,16 +3022,39 @@ public partial class KeyMappingView : Page
         if (result == MessageBoxResult.Yes)
         {
             var configName = viewModel.SelectedConfigFile?.Name;
-            viewModel.DeleteConfig();
             
-            // 删除后的额外检查
-            _logger.Debug($"删除配置后 - SelectedConfigFile: {viewModel.SelectedConfigFile?.Name ?? "null"}, ConfigFiles数量: {viewModel.ConfigFiles?.Count ?? 0}");
+            // 删除前暂时禁用ListBox的SelectionChanged事件，避免引发额外操作
+            lstConfigFiles.SelectionChanged -= ConfigFiles_SelectionChanged;
             
-            // 确保ListBox选择状态与ViewModel同步
-            if (lstConfigFiles.SelectedItem != viewModel.SelectedConfigFile && viewModel.SelectedConfigFile != null)
+            try
             {
-                lstConfigFiles.SelectedItem = viewModel.SelectedConfigFile;
-                _logger.Debug($"删除后恢复ListBox选择: {viewModel.SelectedConfigFile.Name}");
+                // 执行删除操作
+                viewModel.DeleteConfig();
+                
+                // 删除后的额外检查和刷新
+                _logger.Debug($"删除配置后 - SelectedConfigFile: {viewModel.SelectedConfigFile?.Name ?? "null"}, ConfigFiles数量: {viewModel.ConfigFiles?.Count ?? 0}");
+                
+                // 刷新ListBox
+                lstConfigFiles.Items.Refresh();
+                
+                // 确保ListBox选择项与ViewModel同步
+                if (viewModel.SelectedConfigFile != null)
+                {
+                    lstConfigFiles.SelectedItem = viewModel.SelectedConfigFile;
+                    _logger.Debug($"删除后手动同步ListBox选择: {viewModel.SelectedConfigFile.Name}");
+                }
+            }
+            finally
+            {
+                // 重新启用SelectionChanged事件
+                lstConfigFiles.SelectionChanged += ConfigFiles_SelectionChanged;
+                
+                // 添加一个短延迟再检查一次，确保UI完全刷新
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
+                    System.Windows.Threading.DispatcherPriority.Background,
+                    new Action(() => {
+                        _logger.Debug($"延迟检查 - SelectedConfigFile: {viewModel.SelectedConfigFile?.Name ?? "null"}, UI选择项: {lstConfigFiles.SelectedItem?.GetType().GetProperty("Name")?.GetValue(lstConfigFiles.SelectedItem)}");
+                    }));
             }
         }
     }

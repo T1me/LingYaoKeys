@@ -655,36 +655,44 @@ namespace WpfApp.Services.Core
                         throw new InvalidOperationException("无法删除默认配置");
                     }
                     
-                    // 移除文件
-                    if (File.Exists(configInfo.FilePath))
-                    {
-                        File.Delete(configInfo.FilePath);
-                    }
+                    // 首先保存目标配置文件的路径用于后续删除
+                    string fileToDelete = configInfo.FilePath;
                     
-                    // 移除配置信息
+                    // 判断删除的是否是当前配置
+                    bool isCurrentConfig = (_currentConfig == configInfo);
+                    ConfigFileInfo newCurrentConfig = null;
+                    
+                    // 从配置列表中移除配置信息
                     _configFiles.Remove(configInfo);
                     
-                    // 如果删除的是当前配置，切换到默认配置
-                    bool isCurrentConfig = (_currentConfig == configInfo);
+                    // 如果删除的是当前配置，需要先确定新的当前配置
                     if (isCurrentConfig)
                     {
-                        _currentConfig = _configFiles.FirstOrDefault(c => c.IsDefault) ?? _configFiles.FirstOrDefault();
-                        LoadCurrentKeyConfig();
+                        newCurrentConfig = _configFiles.FirstOrDefault(c => c.IsDefault) ?? _configFiles.FirstOrDefault();
+                        _currentConfig = newCurrentConfig;
                     }
                     
-                    // 保存索引
+                    // 先保存配置索引文件，确保配置列表已更新
                     SaveConfigIndex();
                     
-                    // 触发配置变更事件
+                    // 触发配置列表变更事件
                     RaiseConfigChanged(ConfigChangeType.ConfigList, null, null, configInfo);
                     
-                    // 如果切换了当前配置，再触发一次配置文件变更事件
-                    if (isCurrentConfig && _currentConfig != null)
+                    // 最后才删除物理文件，避免在事件处理过程中触发自动创建
+                    if (File.Exists(fileToDelete))
                     {
+                        File.Delete(fileToDelete);
+                        _logger.Debug($"物理文件已删除: {fileToDelete}");
+                    }
+                    
+                    // 如果切换了当前配置，现在加载新配置并触发事件
+                    if (isCurrentConfig && newCurrentConfig != null)
+                    {
+                        LoadCurrentKeyConfig();
                         RaiseConfigChanged(ConfigChangeType.ConfigFile, null, _currentKeyConfig, _currentConfig);
                     }
                     
-                    _logger.Debug($"删除配置: {configInfo.Name}");
+                    _logger.Debug($"删除配置完成: {configInfo.Name}");
                 }
                 catch (Exception ex)
                 {

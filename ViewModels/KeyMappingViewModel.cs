@@ -2426,6 +2426,13 @@ namespace WpfApp.ViewModels
             {
                 if (SelectedConfigFile == null) return;
                 
+                // 检查是否为默认配置
+                if (SelectedConfigFile.IsDefault)
+                {
+                    _mainViewModel.UpdateStatusMessage("无法删除默认配置", true);
+                    return;
+                }
+                
                 // 记录当前配置名称
                 var name = SelectedConfigFile.Name;
                 
@@ -2434,6 +2441,11 @@ namespace WpfApp.ViewModels
                 // 使用统一配置服务删除配置
                 _configManager.DeleteConfig(SelectedConfigFile);
                 
+                // 刷新UI选中项，确保显示当前活动配置
+                _selectedConfigFile = _configManager.CurrentConfig;
+                OnPropertyChanged(nameof(SelectedConfigFile));
+                OnPropertyChanged(nameof(ConfigFiles));
+                
                 // 提示用户
                 _mainViewModel.UpdateStatusMessage($"已删除配置：{name}", false);
             }
@@ -2441,6 +2453,11 @@ namespace WpfApp.ViewModels
             {
                 _logger.Error("删除配置失败", ex);
                 _mainViewModel.UpdateStatusMessage($"删除配置失败: {ex.Message}", true);
+                
+                // 刷新UI状态，确保与后端状态一致
+                _selectedConfigFile = _configManager.CurrentConfig;
+                OnPropertyChanged(nameof(SelectedConfigFile));
+                OnPropertyChanged(nameof(ConfigFiles));
             }
         }
         
