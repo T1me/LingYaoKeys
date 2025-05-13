@@ -281,7 +281,7 @@
                              Margin="0,0,0,10"
                              ItemsSource="{Binding ConfigFiles}"
                              ItemContainerStyle="{StaticResource ConfigListBoxItemStyle}"
-                             SelectedItem="{Binding SelectedConfigFile, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, NotifyOnSourceUpdated=True, NotifyOnTargetUpdated=True}"
+                             SelectedItem="{Binding SelectedConfigFile, Mode=OneWay}"
                              SelectionChanged="ConfigFiles_SelectionChanged"
                              IsSynchronizedWithCurrentItem="True">
                         <ListBox.ItemTemplate>

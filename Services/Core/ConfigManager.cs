@@ -561,11 +561,32 @@ namespace WpfApp.Services.Core
                         SaveCurrentKeyConfig();
                     }
                     
+                    // 设置当前配置为默认配置
+                    foreach (var config in _configFiles)
+                    {
+                        // 清除所有配置的默认标记
+                        if (config.IsDefault)
+                        {
+                            config.IsDefault = false;
+                            _logger.Debug($"清除配置的默认标记: {config.Name}");
+                        }
+                    }
+                    
+                    // 设置新选择的配置为默认配置
+                    configInfo.IsDefault = true;
+                    _logger.Debug($"设置配置为默认: {configInfo.Name}");
+                    
+                    // 标记配置索引为脏
+                    _isConfigIndexDirty = true;
+                    
                     // 设置当前配置
                     _currentConfig = configInfo;
                     
                     // 加载新配置的按键配置
                     LoadCurrentKeyConfig();
+                    
+                    // 保存配置索引，确保默认配置设置被保存
+                    SaveConfigIndex();
                     
                     // 触发配置变更事件
                     RaiseConfigChanged(ConfigChangeType.ConfigFile, null, _currentKeyConfig, configInfo);

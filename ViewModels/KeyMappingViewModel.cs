@@ -1053,8 +1053,29 @@ namespace WpfApp.ViewModels
                 // 加载按键配置
                 LoadKeyConfig(_configManager.CurrentKeyConfig);
                 
-                // 设置当前选中的配置文件
-                _selectedConfigFile = _configManager.CurrentConfig;
+                // 查找并设置当前选中的配置文件（优先使用标记为默认的配置）
+                var defaultConfig = _configManager.ConfigFiles.FirstOrDefault(c => c.IsDefault);
+                if (defaultConfig != null)
+                {
+                    _logger.Debug($"找到默认配置：{defaultConfig.Name}，确保UI选择该配置");
+                }
+                else if (_configManager.ConfigFiles.Count > 0)
+                {
+                    defaultConfig = _configManager.ConfigFiles[0];
+                    _logger.Debug($"未找到默认配置，使用第一个配置：{defaultConfig.Name}");
+                }
+                
+                if (defaultConfig != null)
+                {
+                    _selectedConfigFile = defaultConfig;
+                    _logger.Debug($"初始化阶段设置SelectedConfigFile为：{defaultConfig.Name}");
+                }
+                else
+                {
+                    _logger.Warning("未找到任何可用配置");
+                }
+                
+                // 通知UI更新
                 OnPropertyChanged(nameof(SelectedConfigFile));
                 OnPropertyChanged(nameof(ConfigFiles));
                 
@@ -2317,7 +2338,16 @@ namespace WpfApp.ViewModels
                 if (SetProperty(ref _selectedConfigFile, value))
                 {
                     _logger.Debug($"SelectedConfigFile已设置：{value.Name}");
-                    SwitchToConfig(value);
+                    
+                    // 在初始化阶段不执行切换，避免覆盖已加载的配置
+                    if (!_isInitializing)
+                    {
+                        SwitchToConfig(value);
+                    }
+                    else
+                    {
+                        _logger.Debug($"初始化阶段，跳过配置切换操作");
+                    }
                 }
             }
         }

@@ -556,7 +556,7 @@ public partial class KeyMappingView : Page
             // 取消旧ViewModel的事件订阅
             if (e.OldValue is KeyMappingViewModel oldViewModel)
             {
-                // 取消KeyList的变化通知订阅
+                // 取消订阅键盘列表变化通知
                 if (oldViewModel.KeyList != null)
                 {
                     oldViewModel.KeyList.CollectionChanged -= KeyList_CollectionChanged;
@@ -582,6 +582,27 @@ public partial class KeyMappingView : Page
                 
                 // 订阅坐标索引更新事件
                 newViewModel.CoordinateIndicesNeedUpdate += ViewModel_CoordinateIndicesNeedUpdate;
+                
+                // 添加初始化完成后的UI同步
+                if (!newViewModel.IsInitializing && lstConfigFiles != null)
+                {
+                    // 确保列表框选择与ViewModel的当前配置一致
+                    var configToSelect = newViewModel.SelectedConfigFile;
+                    if (configToSelect != null && lstConfigFiles.SelectedItem != configToSelect)
+                    {
+                        // 暂时禁用选择变更事件以避免循环
+                        lstConfigFiles.SelectionChanged -= ConfigFiles_SelectionChanged;
+                        try
+                        {
+                            lstConfigFiles.SelectedItem = configToSelect;
+                            _logger.Debug($"初始化后同步UI选择到ViewModel的选中配置: {configToSelect.Name}");
+                        }
+                        finally
+                        {
+                            lstConfigFiles.SelectionChanged += ConfigFiles_SelectionChanged;
+                        }
+                    }
+                }
             }
         }
         catch (Exception ex)
@@ -3246,6 +3267,13 @@ public partial class KeyMappingView : Page
         
         _logger.Debug($"配置文件选择变更: {selectedItem?.Name ?? "null"}, ListBox.SelectedIndex: {listBox.SelectedIndex}");
         
+        // 如果正在初始化，不进行任何操作，避免干扰初始化流程
+        if (viewModel.IsInitializing)
+        {
+            _logger.Debug("视图模型正在初始化中，跳过配置切换");
+            return;
+        }
+        
         // 如果选择被清空，但ViewModel中有有效的选择，尝试恢复选择
         if (selectedItem == null && viewModel.SelectedConfigFile != null)
         {
@@ -3282,10 +3310,23 @@ public partial class KeyMappingView : Page
         }
         
         // 正常情况：UI选择有效，确保ViewModel的选中项与UI同步
-        if (selectedItem != null && viewModel.SelectedConfigFile != selectedItem)
+        if (selectedItem != null && !object.ReferenceEquals(viewModel.SelectedConfigFile, selectedItem))
         {
             _logger.Debug($"手动同步SelectedConfigFile: {selectedItem.Name}");
-            viewModel.SelectedConfigFile = selectedItem;
+            
+            // 禁用当前事件处理程序，避免UI更新导致循环
+            listBox.SelectionChanged -= ConfigFiles_SelectionChanged;
+            
+            try
+            {
+                // 显式设置ViewModel的选中配置
+                viewModel.SelectedConfigFile = selectedItem;
+            }
+            finally
+            {
+                // 恢复事件处理程序
+                listBox.SelectionChanged += ConfigFiles_SelectionChanged;
+            }
         }
     }
 }
