@@ -13,7 +13,7 @@ hero:
       link: /guide/index
     - theme: alt
       text: 下载最新版本
-      link: https://github.com/Cassianvale/LingYaoKeys/releases/latest
+      link: https://github.com/ZyphrZero/LingYaoKeys/releases/latest
     - theme: alt
       text: 常见问题
       link: /faq

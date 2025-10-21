@@ -4,8 +4,8 @@
 
 ### Download
 You can download the latest version from:
-- [Latest Version Download](https://github.com/Cassianvale/LingYaoKeys/releases/latest)
-- [View All Versions](https://github.com/Cassianvale/LingYaoKeys/releases)
+- [Latest Version Download](https://github.com/ZyphrZero/LingYaoKeys/releases/latest)
+- [View All Versions](https://github.com/ZyphrZero/LingYaoKeys/releases)
 
 ## Usage Tutorial
 

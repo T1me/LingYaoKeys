@@ -4,8 +4,8 @@
 
 ### 下载
 您可以从以下位置下载最新版本：
-- [最新版本下载](https://github.com/Cassianvale/LingYaoKeys/releases/latest)
-- [查看所有版本](https://github.com/Cassianvale/LingYaoKeys/releases)
+- [最新版本下载](https://github.com/ZyphrZero/LingYaoKeys/releases/latest)
+- [查看所有版本](https://github.com/ZyphrZero/LingYaoKeys/releases)
 
 ## 使用教程
 

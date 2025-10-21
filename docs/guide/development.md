@@ -81,7 +81,7 @@ LingYaoKeys/
 ### 开发环境
 ```bash
 # 克隆项目
-git clone https://github.com/Cassianvale/LingYaoKeys.git
+git clone https://github.com/ZyphrZero/LingYaoKeys.git
 
 # 打开解决方案
 start LingYaoKeys.sln

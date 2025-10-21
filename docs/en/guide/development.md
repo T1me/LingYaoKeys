@@ -81,7 +81,7 @@ LingYaoKeys/
 ### Development Environment
 ```bash
 # Clone the project
-git clone https://github.com/Cassianvale/LingYaoKeys.git
+git clone https://github.com/ZyphrZero/LingYaoKeys.git
 
 # Open solution
 start LingYaoKeys.sln

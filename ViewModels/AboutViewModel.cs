@@ -7,7 +7,7 @@ namespace WpfApp.ViewModels;
 public class AboutViewModel : ViewModelBase
 {
     private readonly string _githubUrl;
-    private readonly string _websiteUrl = "https://cassianvale.github.io/LingYaoKeys/";
+    private readonly string _websiteUrl = "https://zyphrZero.github.io/LingYaoKeys/";
 
     public ICommand OpenGitHubCommand { get; }
     public ICommand OpenWebsiteCommand { get; }

@@ -3,24 +3,24 @@
 
 # LingYaoKeys
 
-<img src="https://github.com/Cassianvale/LingYaoKeys/raw/main/Resource/img/app.png" width="120px" alt="LingYaoKeys Logo"/>
+<img src="https://github.com/ZyphrZero/LingYaoKeys/raw/main/Resource/img/app.png" width="120px" alt="LingYaoKeys Logo"/>
 
 ✨ **An Elegant and Flexible Open-Source Keyboard Tool Based on .NET8.0+WPF** ✨
 
-📚 [Documentation](https://cassianvale.github.io/LingYaoKeys/)
+📚 [Documentation](https://zyphrZero.github.io/LingYaoKeys/)
 
 <div>
     <img alt="platform" src="https://img.shields.io/badge/platform-Windows-blueviolet">
-    <img alt="commit" src="https://img.shields.io/github/commit-activity/m/Cassianvale/LingYaoKeys?color=blue">
-    <img alt="release" src="https://img.shields.io/github/v/release/Cassianvale/LingYaoKeys?include_prereleases&style=flat">
+    <img alt="commit" src="https://img.shields.io/github/commit-activity/m/ZyphrZero/LingYaoKeys?color=blue">
+    <img alt="release" src="https://img.shields.io/github/v/release/ZyphrZero/LingYaoKeys?include_prereleases&style=flat">
     <br>
-    <img alt="last-commit" src="https://img.shields.io/github/last-commit/Cassianvale/LingYaoKeys">
-    <img alt="issues" src="https://img.shields.io/github/issues/Cassianvale/LingYaoKeys">
-    <img alt="license" src="https://img.shields.io/github/license/Cassianvale/LingYaoKeys">
+    <img alt="last-commit" src="https://img.shields.io/github/last-commit/ZyphrZero/LingYaoKeys">
+    <img alt="issues" src="https://img.shields.io/github/issues/ZyphrZero/LingYaoKeys">
+    <img alt="license" src="https://img.shields.io/github/license/ZyphrZero/LingYaoKeys">
 </div>
 <div>
-    <a href="https://github.com/Cassianvale/LingYaoKeys"><img alt="stars" src="https://img.shields.io/github/stars/Cassianvale/LingYaoKeys?style=social"></a>
-    <a href="https://github.com/Cassianvale/LingYaoKeys/releases/latest"><img alt="downloads" src="https://img.shields.io/github/downloads/Cassianvale/LingYaoKeys/total?style=social"></a>
+    <a href="https://github.com/ZyphrZero/LingYaoKeys"><img alt="stars" src="https://img.shields.io/github/stars/ZyphrZero/LingYaoKeys?style=social"></a>
+    <a href="https://github.com/ZyphrZero/LingYaoKeys/releases/latest"><img alt="downloads" src="https://img.shields.io/github/downloads/ZyphrZero/LingYaoKeys/total?style=social"></a>
 </div>
 <br>
 
@@ -98,7 +98,7 @@ Join QQ Group: <a target="_blank" href="https://qm.qq.com/cgi-bin/qm/qr?k=Iv4Rlu
 
 <div align="center">
 
-📥 **[Latest Version Download](https://github.com/Cassianvale/LingYaoKeys/releases/latest)** | 🗂️ **[All Versions](https://github.com/Cassianvale/LingYaoKeys/releases)**
+📥 **[Latest Version Download](https://github.com/ZyphrZero/LingYaoKeys/releases/latest)** | 🗂️ **[All Versions](https://github.com/ZyphrZero/LingYaoKeys/releases)**
 
 </div>
 
@@ -108,7 +108,7 @@ Join QQ Group: <a target="_blank" href="https://qm.qq.com/cgi-bin/qm/qr?k=Iv4Rlu
 
 <div align="center">
 
-**[View Tutorial Documentation](https://cassianvale.github.io/LingYaoKeys/guide/tutorial)**
+**[View Tutorial Documentation](https://zyphrZero.github.io/LingYaoKeys/guide/tutorial)**
 
 </div>
 
@@ -130,7 +130,7 @@ Join QQ Group: <a target="_blank" href="https://qm.qq.com/cgi-bin/qm/qr?k=Iv4Rlu
 ## 🖼️ Project Showcase
 
 <div align="center">
-<img src="https://github.com/Cassianvale/LingYaoKeys/raw/main/Resource/img/screenshots.gif" width="700px" alt="LingYaoKeys Interface"/>
+<img src="https://github.com/ZyphrZero/LingYaoKeys/raw/main/Resource/img/screenshots.gif" width="700px" alt="LingYaoKeys Interface"/>
 </div>
 
 ## 📃 Common Issues
@@ -140,7 +140,7 @@ Join QQ Group: <a target="_blank" href="https://qm.qq.com/cgi-bin/qm/qr?k=Iv4Rlu
 <br>
 Since this project uses Microsoft's latest <code>.Net Core 8.0</code>, some users may need to download the runtime:
 <br><br>
-<img src="https://github.com/Cassianvale/LingYaoKeys/raw/main/Resource/img/download_core.png" height="250px" alt="Download .NET Core Runtime"/>
+<img src="https://github.com/ZyphrZero/LingYaoKeys/raw/main/Resource/img/download_core.png" height="250px" alt="Download .NET Core Runtime"/>
 </details>
 
 <details>
@@ -153,8 +153,8 @@ If you experience suboptimal key speed performance, try disabling the "Reduce St
 
 - This project is my first attempt at developing with `C#`, `WPF`, and `Cursor AI` technology stack during my spare time
 - The project is in its early development stage with new features being continuously added
-- If you have any suggestions for the software, feel free to raise them in [Issues](https://github.com/Cassianvale/LingYaoKeys/issues)
-- If you're interested in the project, welcome to join the discussion or submit a [Pull Request](https://github.com/Cassianvale/LingYaoKeys/pulls)
+- If you have any suggestions for the software, feel free to raise them in [Issues](https://github.com/ZyphrZero/LingYaoKeys/issues)
+- If you're interested in the project, welcome to join the discussion or submit a [Pull Request](https://github.com/ZyphrZero/LingYaoKeys/pulls)
 
 ## ⚙️ Development Related
 
@@ -173,7 +173,7 @@ dotnet run
 
 ### Driver File Description
 
-[Driver Interface & Debug Guide](https://cassianvale.github.io/LingYaoKeys/driver/)
+[Driver Interface & Debug Guide](https://zyphrZero.github.io/LingYaoKeys/driver/)
 
 | File | Description |
 |------|-------------|
@@ -205,7 +205,7 @@ dotnet run
 
 ♥ The driver signature was self-funded. If you like this project, your support would be a great encouragement to me ♥
 
-<img src="https://github.com/Cassianvale/LingYaoKeys/raw/main/Resource/img/wechat_qr.png" width="200px" alt="WeChat QR Code"/>
+<img src="https://github.com/ZyphrZero/LingYaoKeys/raw/main/Resource/img/wechat_qr.png" width="200px" alt="WeChat QR Code"/>
 </div>
 
 ## 📢 Disclaimer
@@ -224,5 +224,5 @@ dotnet run
 
 LingYaoKeys is licensed under [GNU General Public License v3.0](LICENSE)
 
-Copyright © 2025 by Cassianvale.
+Copyright © 2025 by ZyphrZero.
 </div>

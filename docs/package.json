@@ -12,7 +12,7 @@
     "灵曜按键",
     "文档"
   ],
-  "author": "Cassianvale",
+  "author": "ZyphrZero",
   "license": "GPL-3.0",
   "devDependencies": {
     "vitepress": "^1.6.3"

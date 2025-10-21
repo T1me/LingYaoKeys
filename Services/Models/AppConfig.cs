@@ -190,7 +190,7 @@ public class AppInfo
 
     [JsonIgnore] public string Version => Assembly.GetName().Version?.ToString() ?? "1.0.0";
     
-    [JsonIgnore] public string GitHubUrl { get; } = "https://github.com/Cassianvale/LingYaoKeys";
+    [JsonIgnore] public string GitHubUrl { get; } = "https://github.com/ZyphrZero/LingYaoKeys";
 }
 
 public class UIConfig

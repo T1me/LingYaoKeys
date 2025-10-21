@@ -3,24 +3,24 @@
 
 # LingYaoKeys - 灵曜按键
 
-<img src="https://github.com/Cassianvale/LingYaoKeys/raw/main/Resource/img/app.png" width="120px" alt="LingYaoKeys Logo"/>
+<img src="https://github.com/ZyphrZero/LingYaoKeys/raw/main/Resource/img/app.png" width="120px" alt="LingYaoKeys Logo"/>
 
 ✨ **基于.NET8.0+WPF开发的灵动、优雅的开源按键工具** ✨
 
-📚 [官方文档](https://cassianvale.github.io/LingYaoKeys/)
+📚 [官方文档](https://zyphrZero.github.io/LingYaoKeys/)
 
 <div>
     <img alt="platform" src="https://img.shields.io/badge/platform-Windows-blueviolet">
-    <img alt="commit" src="https://img.shields.io/github/commit-activity/m/Cassianvale/LingYaoKeys?color=blue">
-    <img alt="release" src="https://img.shields.io/github/v/release/Cassianvale/LingYaoKeys?include_prereleases&style=flat">
+    <img alt="commit" src="https://img.shields.io/github/commit-activity/m/ZyphrZero/LingYaoKeys?color=blue">
+    <img alt="release" src="https://img.shields.io/github/v/release/ZyphrZero/LingYaoKeys?include_prereleases&style=flat">
     <br>
-    <img alt="last-commit" src="https://img.shields.io/github/last-commit/Cassianvale/LingYaoKeys">
-    <img alt="issues" src="https://img.shields.io/github/issues/Cassianvale/LingYaoKeys">
-    <img alt="license" src="https://img.shields.io/github/license/Cassianvale/LingYaoKeys">
+    <img alt="last-commit" src="https://img.shields.io/github/last-commit/ZyphrZero/LingYaoKeys">
+    <img alt="issues" src="https://img.shields.io/github/issues/ZyphrZero/LingYaoKeys">
+    <img alt="license" src="https://img.shields.io/github/license/ZyphrZero/LingYaoKeys">
 </div>
 <div>
-    <a href="https://github.com/Cassianvale/LingYaoKeys"><img alt="stars" src="https://img.shields.io/github/stars/Cassianvale/LingYaoKeys?style=social"></a>
-    <a href="https://github.com/Cassianvale/LingYaoKeys/releases/latest"><img alt="downloads" src="https://img.shields.io/github/downloads/Cassianvale/LingYaoKeys/total?style=social"></a>
+    <a href="https://github.com/ZyphrZero/LingYaoKeys"><img alt="stars" src="https://img.shields.io/github/stars/ZyphrZero/LingYaoKeys?style=social"></a>
+    <a href="https://github.com/ZyphrZero/LingYaoKeys/releases/latest"><img alt="downloads" src="https://img.shields.io/github/downloads/ZyphrZero/LingYaoKeys/total?style=social"></a>
 </div>
 <br>
 
@@ -97,7 +97,7 @@
 
 <div align="center">
 
-📥 **[最新版本下载](https://github.com/Cassianvale/LingYaoKeys/releases/latest)** | 🗂️ **[所有版本](https://github.com/Cassianvale/LingYaoKeys/releases)**
+📥 **[最新版本下载](https://github.com/ZyphrZero/LingYaoKeys/releases/latest)** | 🗂️ **[所有版本](https://github.com/ZyphrZero/LingYaoKeys/releases)**
 
 </div>
 
@@ -107,14 +107,14 @@
 
 <div align="center">
 
-**[进入教程文档](https://cassianvale.github.io/LingYaoKeys/guide/tutorial)**
+**[进入教程文档](https://zyphrZero.github.io/LingYaoKeys/guide/tutorial)**
 
 </div>
 
 ## 🖼️ 项目展示
 
 <div align="center">
-<img src="https://github.com/Cassianvale/LingYaoKeys/raw/main/Resource/img/screenshots.gif" width="700px" alt="LingYaoKeys 界面展示"/>
+<img src="https://github.com/ZyphrZero/LingYaoKeys/raw/main/Resource/img/screenshots.gif" width="700px" alt="LingYaoKeys 界面展示"/>
 </div>
 
 ## 📃 常见问题
@@ -124,7 +124,7 @@
 <br>
 由于本项目使用了微软最新的 <code>.Net Core 8.0</code>，部分用户可能需要下载运行环境：
 <br><br>
-<img src="https://github.com/Cassianvale/LingYaoKeys/raw/main/Resource/img/download_core.png" height="250px" alt="下载.NET Core运行环境"/>
+<img src="https://github.com/ZyphrZero/LingYaoKeys/raw/main/Resource/img/download_core.png" height="250px" alt="下载.NET Core运行环境"/>
 </details>
 
 <details>
@@ -137,8 +137,8 @@
 
 - 该项目是本人利用工作之余首次尝试使用`C#`和`WPF`以及`Cursor AI`技术栈进行开发的实践项目
 - 目前项目处于开发初期，新功能正在持续添加中
-- 如果你对软件有任何功能与建议，欢迎在 [Issues](https://github.com/Cassianvale/LingYaoKeys/issues) 中提出
-- 如果对项目感兴趣，欢迎参与讨论或提交 [Pull Request](https://github.com/Cassianvale/LingYaoKeys/pulls)
+- 如果你对软件有任何功能与建议，欢迎在 [Issues](https://github.com/ZyphrZero/LingYaoKeys/issues) 中提出
+- 如果对项目感兴趣，欢迎参与讨论或提交 [Pull Request](https://github.com/ZyphrZero/LingYaoKeys/pulls)
 
 ## ⚙️ 开发相关
 
@@ -157,7 +157,7 @@ dotnet run
 
 ### 驱动文件说明
 
-[驱动接口&调试说明文档](https://cassianvale.github.io/LingYaoKeys/driver/)
+[驱动接口&调试说明文档](https://zyphrZero.github.io/LingYaoKeys/driver/)
 
 | 文件 | 说明 |
 |------|------|
@@ -189,7 +189,7 @@ dotnet run
 
 ♥ 驱动签名为自费购买，如果您喜欢这个项目可以支持一下作者，这将是对我极大的鼓励 ♥
 
-<img src="https://github.com/Cassianvale/LingYaoKeys/raw/main/Resource/img/wechat_qr.png" width="200px" alt="微信赞赏码"/>  
+<img src="https://github.com/ZyphrZero/LingYaoKeys/raw/main/Resource/img/wechat_qr.png" width="200px" alt="微信赞赏码"/>  
 </div>
 
 ## 📢 免责声明
@@ -208,5 +208,5 @@ dotnet run
 
 LingYaoKeys 使用 [GNU General Public License v3.0](LICENSE) 开源许可证
 
-Copyright © 2025 by Cassianvale.  
+Copyright © 2025 by ZyphrZero.  
 </div>
