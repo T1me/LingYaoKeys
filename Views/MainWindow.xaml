@@ -228,33 +228,6 @@
                                         <RadioButton Style="{StaticResource NavButtonStyle}"
                                                      GroupName="NavGroup"
                                                      Command="{Binding NavigateCommand}"
-                                                     CommandParameter="Feedback"
-                                                     Click="NavButton_Click">
-                                            <StackPanel Orientation="Horizontal">
-                                                <svgc:SvgViewbox Source="/Resource/svg/feedback.svg"
-                                                                 Width="20"
-                                                                 Height="20"
-                                                                 Margin="3,0,0,0"
-                                                                 Stretch="Uniform">
-                                                    <svgc:SvgViewbox.Resources>
-                                                        <Style TargetType="Path">
-                                                            <Setter Property="Fill"
-                                                                    Value="{Binding RelativeSource={RelativeSource AncestorType=RadioButton}, Path=Foreground}" />
-                                                        </Style>
-                                                    </svgc:SvgViewbox.Resources>
-                                                </svgc:SvgViewbox>
-                                                <TextBlock Text="问题反馈"
-                                                           FontSize="14"
-                                                           FontWeight="SemiBold"
-                                                           Margin="15,0,0,0"
-                                                           VerticalAlignment="Center"
-                                                           Visibility="{Binding NavTextVisibility}" />
-                                            </StackPanel>
-                                        </RadioButton>
-
-                                        <RadioButton Style="{StaticResource NavButtonStyle}"
-                                                     GroupName="NavGroup"
-                                                     Command="{Binding NavigateCommand}"
                                                      CommandParameter="About"
                                                      Click="NavButton_Click">
                                             <StackPanel Orientation="Horizontal">

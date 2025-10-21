@@ -1,9 +1,6 @@
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
 namespace WpfApp.ViewModels;
 
-public class FloatingStatusViewModel : INotifyPropertyChanged
+public class FloatingStatusViewModel : ViewModelBase
 {
     private string _statusText = "已停止";
     private bool _isExecuting = false;
@@ -69,12 +66,5 @@ public class FloatingStatusViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(IsExecuting));
             OnPropertyChanged(nameof(StatusText)); // 通知状态文本更新
         }
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

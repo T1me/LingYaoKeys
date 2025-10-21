@@ -21,10 +21,7 @@ public class MainViewModel : ViewModelBase
     private readonly LyKeysService _lyKeysService;
     private readonly Window _mainWindow;
     private readonly KeyMappingViewModel _keyMappingViewModel;
-    private readonly FeedbackViewModel _feedbackViewModel;
     private readonly HotkeyService _hotkeyService;
-    private readonly SerilogManager _logger = SerilogManager.Instance;
-    private readonly IConfigManager _configManager;
     private string _statusMessage = "就绪";
     private System.Windows.Media.Brush _statusMessageColor = System.Windows.Media.Brushes.Black;
     private readonly DispatcherTimer _statusMessageTimer;
@@ -86,7 +83,7 @@ public class MainViewModel : ViewModelBase
     {
         get
         {
-            if (_globalConfig == null) _globalConfig = _configManager.GlobalConfig;
+            if (_globalConfig == null) _globalConfig = ConfigManager.GlobalConfig;
             return _globalConfig;
         }
     }
@@ -95,7 +92,7 @@ public class MainViewModel : ViewModelBase
     {
         get
         {
-            if (_keyConfig == null) _keyConfig = _configManager.CurrentKeyConfig;
+            if (_keyConfig == null) _keyConfig = ConfigManager.CurrentKeyConfig;
             return _keyConfig;
         }
     }
@@ -152,7 +149,7 @@ public class MainViewModel : ViewModelBase
     public MainViewModel(LyKeysService lyKeysService, Window mainWindow)
     {
         _isInitializing = true;
-        _logger.Debug("MainViewModel开始初始化");
+        Logger.Debug("MainViewModel开始初始化");
         
         // 参数验证，确保关键依赖项不为null
         if (lyKeysService == null) throw new ArgumentNullException(nameof(lyKeysService));
@@ -160,7 +157,6 @@ public class MainViewModel : ViewModelBase
         
         _lyKeysService = lyKeysService;
         _mainWindow = mainWindow;
-        _configManager = ConfigManager.Instance;
 
         // 先获取动画资源
         _fadeInStoryboard = mainWindow.FindResource("PageFadeIn") as Storyboard;
@@ -180,22 +176,21 @@ public class MainViewModel : ViewModelBase
 
         // 设置DataContext
         mainWindow.DataContext = this;
-        _logger.Debug("MainWindow的DataContext已设置为MainViewModel");
+        Logger.Debug("MainWindow的DataContext已设置为MainViewModel");
 
         // 初始化HotkeyService，并传递窗口、驱动服务和配置服务
-        _hotkeyService = new HotkeyService(mainWindow, lyKeysService, _configManager);
-        _logger.Debug("HotkeyService已初始化");
+        _hotkeyService = new HotkeyService(mainWindow, lyKeysService, ConfigManager);
+        Logger.Debug("HotkeyService已初始化");
         
         // 先标记初始化完成，避免循环依赖问题
         _isInitializing = false;
-        _logger.Debug("MainViewModel基础初始化完成，_isInitializing = false");
+        Logger.Debug("MainViewModel基础初始化完成，_isInitializing = false");
         
         // 初始化各个ViewModel
         _keyMappingViewModel =
-            new KeyMappingViewModel(_lyKeysService, _configManager, _hotkeyService, this, App.AudioService);
-        _logger.Debug("KeyMappingViewModel已初始化");
-        
-        _feedbackViewModel = new FeedbackViewModel(this);
+            new KeyMappingViewModel(_lyKeysService, _hotkeyService, this, App.AudioService);
+        Logger.Debug("KeyMappingViewModel已初始化");
+
         _aboutViewModel = new AboutViewModel();
 
         NavigateCommand = new RelayCommand<string>(Navigate);
@@ -231,20 +226,7 @@ public class MainViewModel : ViewModelBase
                     return page;
                 }
             },
-            
-            // Feedback 页面：使用缓存，记录创建日志，非频繁访问
-            ["Feedback"] = new PageConfig
-            {
-                UseCaching = true,
-                LogCreation = true,
-                IsFrequentlyAccessed = false,
-                CreatePageFunc = () => {
-                    var page = new FeedbackView();
-                    page.DataContext = _feedbackViewModel;
-                    return page;
-                }
-            },
-            
+
             // Settings 页面：使用缓存，记录创建日志，非频繁访问
             ["Settings"] = new PageConfig
             {
@@ -260,7 +242,7 @@ public class MainViewModel : ViewModelBase
         };
 
         // 最后设置默认页面
-        _logger.Debug("MainViewModel完全初始化完成，准备导航到默认页面");
+        Logger.Debug("MainViewModel完全初始化完成，准备导航到默认页面");
         Navigate("FrontKeys");
     }
 
@@ -276,16 +258,16 @@ public class MainViewModel : ViewModelBase
         {
             if (string.IsNullOrEmpty(parameter))
             {
-                _logger.Debug("导航参数为空");
+                Logger.Debug("导航参数为空");
                 return;
             }
 
-            _logger.Debug($"开始导航到页面: {parameter}");
+            Logger.Debug($"开始导航到页面: {parameter}");
 
             // 如果当前页面是 KeyMappingView 并且正在执行按键操作，先停止它
             if (CurrentPage?.DataContext is KeyMappingViewModel keyMappingVM && keyMappingVM.IsExecuting)
             {
-                _logger.Debug("检测到按键正在执行，正在停止...");
+                Logger.Debug("检测到按键正在执行，正在停止...");
                 keyMappingVM.StopKeyMapping();
             }
 
@@ -297,13 +279,13 @@ public class MainViewModel : ViewModelBase
             }
             catch (Exception ex)
             {
-                _logger.Error($"获取页面失败: {parameter}", ex);
+                Logger.Error($"获取页面失败: {parameter}", ex);
                 return;
             }
 
             if (newPage != null)
             {
-                _logger.Debug($"成功创建页面: {parameter}");
+                Logger.Debug($"成功创建页面: {parameter}");
                 var oldPage = CurrentPage;
 
                 try
@@ -311,7 +293,7 @@ public class MainViewModel : ViewModelBase
                     // 如果有旧页面，先播放淡出动画
                     if (oldPage != null && _fadeOutStoryboard != null)
                     {
-                        _logger.Debug("开始播放页面切换动画");
+                        Logger.Debug("开始播放页面切换动画");
                         // 获取或创建动画
                         var fadeOut = GetOrCreateFadeOutAnimation(parameter);
                         var fadeIn = GetOrCreateFadeInAnimation(parameter);
@@ -324,11 +306,11 @@ public class MainViewModel : ViewModelBase
                                 CurrentPage = newPage;
                                 // 播放淡入动画
                                 fadeIn.Begin(newPage);
-                                _logger.Debug($"页面切换动画完成: {parameter}");
+                                Logger.Debug($"页面切换动画完成: {parameter}");
                             }
                             catch (Exception ex)
                             {
-                                _logger.Error($"页面切换动画完成回调失败: {parameter}", ex);
+                                Logger.Error($"页面切换动画完成回调失败: {parameter}", ex);
                             }
                         };
                         fadeOut.Begin(oldPage);
@@ -336,36 +318,36 @@ public class MainViewModel : ViewModelBase
                     else
                     {
                         // 没有旧页面，直接切换并播放淡入动画
-                        _logger.Debug("直接切换页面（无动画）");
+                        Logger.Debug("直接切换页面（无动画）");
                         CurrentPage = newPage;
                         GetOrCreateFadeInAnimation(parameter).Begin(newPage);
                     }
 
-                    _logger.Debug($"页面切换完成: {parameter}");
+                    Logger.Debug($"页面切换完成: {parameter}");
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error($"页面切换过程失败: {parameter}", ex);
+                    Logger.Error($"页面切换过程失败: {parameter}", ex);
                     // 如果动画失败，尝试直接切换
                     try
                     {
                         CurrentPage = newPage;
-                        _logger.Debug("已尝试直接切换页面（跳过动画）");
+                        Logger.Debug("已尝试直接切换页面（跳过动画）");
                     }
                     catch (Exception innerEx)
                     {
-                        _logger.Error("直接切换页面也失败", innerEx);
+                        Logger.Error("直接切换页面也失败", innerEx);
                     }
                 }
             }
             else
             {
-                _logger.Error($"创建页面失败: {parameter}");
+                Logger.Error($"创建页面失败: {parameter}");
             }
         }
         catch (Exception ex)
         {
-            _logger.Error($"Navigate 方法执行失败: {parameter}", ex);
+            Logger.Error($"Navigate 方法执行失败: {parameter}", ex);
         }
     }
 
@@ -376,25 +358,25 @@ public class MainViewModel : ViewModelBase
             // 1. 检查页面配置是否存在
             if (!_pageConfigs.TryGetValue(parameter, out var pageConfig))
             {
-                _logger.Error($"未知的页面类型: {parameter}");
+                Logger.Error($"未知的页面类型: {parameter}");
                 return null;
             }
 
             // 2. 记录创建日志（如果需要）
             if (pageConfig.LogCreation)
             {
-                _logger.Debug($"尝试获取或创建页面: {parameter}");
+                Logger.Debug($"尝试获取或创建页面: {parameter}");
             }
 
             // 特殊处理About页面 - 即使启用了缓存，也强制刷新
             if (parameter == "About")
             {
-                _logger.Debug("About页面需要特殊处理：强制刷新");
+                Logger.Debug("About页面需要特殊处理：强制刷新");
                 
                 // 如果已存在于缓存中，先移除
                 if (_pageCache.ContainsKey(parameter))
                 {
-                    _logger.Debug("从缓存中移除旧的About页面实例");
+                    Logger.Debug("从缓存中移除旧的About页面实例");
                     _pageCache.Remove(parameter);
                 }
                 
@@ -402,7 +384,7 @@ public class MainViewModel : ViewModelBase
                 var freshPage = pageConfig.CreatePageFunc();
                 if (pageConfig.LogCreation)
                 {
-                    _logger.Debug($"创建了新的About页面实例");
+                    Logger.Debug($"创建了新的About页面实例");
                 }
                 
                 // 设置初始不透明度为0，为动画做准备
@@ -420,7 +402,7 @@ public class MainViewModel : ViewModelBase
                 var freshPage = pageConfig.CreatePageFunc();
                 if (pageConfig.LogCreation)
                 {
-                    _logger.Debug($"创建了新的页面实例: {parameter}");
+                    Logger.Debug($"创建了新的页面实例: {parameter}");
                 }
                 return freshPage;
             }
@@ -430,7 +412,7 @@ public class MainViewModel : ViewModelBase
             {
                 if (pageConfig.LogCreation && !pageConfig.IsFrequentlyAccessed)
                 {
-                    _logger.Debug($"从缓存中获取页面: {parameter}");
+                    Logger.Debug($"从缓存中获取页面: {parameter}");
                 }
                 return cachedPage;
             }
@@ -443,7 +425,7 @@ public class MainViewModel : ViewModelBase
             }
             catch (Exception ex)
             {
-                _logger.Error($"创建页面时发生异常: {parameter}", ex);
+                Logger.Error($"创建页面时发生异常: {parameter}", ex);
                 throw;
             }
 
@@ -459,19 +441,19 @@ public class MainViewModel : ViewModelBase
                 // 记录创建成功日志（如果需要）
                 if (pageConfig.LogCreation && !pageConfig.IsFrequentlyAccessed)
                 {
-                    _logger.Debug($"页面创建成功: {parameter}");
+                    Logger.Debug($"页面创建成功: {parameter}");
                 }
             }
             else
             {
-                _logger.Error($"页面创建失败: {parameter}");
+                Logger.Error($"页面创建失败: {parameter}");
             }
 
             return createdPage;
         }
         catch (Exception ex)
         {
-            _logger.Error($"GetOrCreatePage 方法执行失败: {parameter}", ex);
+            Logger.Error($"GetOrCreatePage 方法执行失败: {parameter}", ex);
             throw;
         }
     }
@@ -503,12 +485,12 @@ public class MainViewModel : ViewModelBase
                                     var page = GetOrCreatePage(pageName);
                                     if (page != null)
                                     {
-                                        _logger.Debug($"已预加载页面: {pageName}");
+                                        Logger.Debug($"已预加载页面: {pageName}");
                                     }
                                 }
                                 catch (Exception ex)
                                 {
-                                    _logger.Error($"预加载页面 {pageName} 失败", ex);
+                                    Logger.Error($"预加载页面 {pageName} 失败", ex);
                                 }
                             }, System.Windows.Threading.DispatcherPriority.Background);
                         }
@@ -516,13 +498,13 @@ public class MainViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error("预加载页面失败", ex);
+                    Logger.Error("预加载页面失败", ex);
                 }
             });
         }
         catch (Exception ex)
         {
-            _logger.Error("启动预加载任务失败", ex);
+            Logger.Error("启动预加载任务失败", ex);
         }
     }
 
@@ -546,16 +528,16 @@ public class MainViewModel : ViewModelBase
 
     public void Cleanup()
     {
-        _logger.Debug("开始清理资源...");
-        _logger.Debug("开始保存应用程序配置...");
+        Logger.Debug("开始清理资源...");
+        Logger.Debug("开始保存应用程序配置...");
 
         _keyMappingViewModel.SaveConfig(); // 保存配置
-        _logger.Debug("配置保存完成");
-        _logger.Debug("--------------------------------");
+        Logger.Debug("配置保存完成");
+        Logger.Debug("--------------------------------");
 
         _hotkeyService?.Dispose();
         _statusMessageTimer.Stop(); // 停止定时器
-        _logger.Debug("资源清理完成");
+        Logger.Debug("资源清理完成");
 
         // 清理动画缓存
         _fadeInCache.Clear();
@@ -579,9 +561,9 @@ public class MainViewModel : ViewModelBase
 
             // 如果是错误消息，记录到日志
             if (e.IsError)
-                _logger.Error($"驱动状态错误: {e.Message}");
+                Logger.Error($"驱动状态错误: {e.Message}");
             else
-                _logger.Debug($"驱动状态更新: {e.Message}");
+                Logger.Debug($"驱动状态更新: {e.Message}");
         });
     }
 
@@ -605,7 +587,7 @@ public class MainViewModel : ViewModelBase
             }
             catch (Exception ex)
             {
-                _logger.Error("更新状态消息失败", ex);
+                Logger.Error("更新状态消息失败", ex);
             }
         });
     }

@@ -2,20 +2,14 @@ using System;
 using System.Windows.Input;
 using System.Threading.Tasks;
 using System.Windows;
-using Microsoft.Extensions.Configuration;
-using WpfApp.Services;
-using WpfApp.Services.Utils;
+using WpfApp.Services.Core;
 using MessageBox = System.Windows.MessageBox;
 using Application = System.Windows.Application;
-using System.Net.Http;
-using WpfApp.Services.Core;
 
 namespace WpfApp.ViewModels;
 
 public class SettingsViewModel : ViewModelBase
 {
-    private readonly SerilogManager _logger = SerilogManager.Instance;
-    private readonly IConfigManager _configManager = ConfigManager.Instance;
     private readonly UpdateService _updateService;
     private bool _isCheckingUpdate;
     private string _updateStatus = "检查更新";
@@ -42,201 +36,162 @@ public class SettingsViewModel : ViewModelBase
     {
         _updateService = new UpdateService();
 
-        CheckUpdateCommand = new RelayCommand(async () => await CheckForUpdateAsync(), () => !_isCheckingUpdate);
-        ImportConfigCommand = new RelayCommand(ImportConfig);
-        ExportConfigCommand = new RelayCommand(ExportConfig);
-        ToggleDebugModeCommand = new RelayCommand(ToggleDebugMode);
+        // 使用统一的命令初始化模式
+        CheckUpdateCommand = CreateCommand(async () => await CheckForUpdateAsync(), () => !_isCheckingUpdate);
+        ImportConfigCommand = CreateCommand(ImportConfig);
+        ExportConfigCommand = CreateCommand(ExportConfig);
+        ToggleDebugModeCommand = CreateCommand(ToggleDebugMode);
 
         UpdateDebugModeStatus();
     }
 
     private void UpdateDebugModeStatus()
     {
-        var globalConfig = _configManager.GlobalConfig;
+        var globalConfig = ConfigManager.GlobalConfig;
         _debugModeStatus = globalConfig.Debug.IsDebugMode ? "🟢 调试模式：已开启" : "⭕ 调试模式：已关闭";
     }
 
     private void ToggleDebugMode()
     {
-        try
-        {
-            var currentDebugMode = _configManager.GlobalConfig.Debug.IsDebugMode;
-
-            _configManager.UpdateGlobalConfig(config =>
+        ExceptionHandler.Execute(
+            () =>
             {
-                config.Debug.IsDebugMode = !currentDebugMode;
-                config.Debug.UpdateDebugState();
-            });
+                var currentDebugMode = ConfigManager.GlobalConfig.Debug.IsDebugMode;
 
-            UpdateDebugModeStatus();
+                ConfigManager.UpdateGlobalConfig(config =>
+                {
+                    config.Debug.IsDebugMode = !currentDebugMode;
+                    config.Debug.UpdateDebugState();
+                });
 
-            var result = MessageBox.Show(
-                "调试模式设置已更改，需要重启程序才能生效。是否立即重启？",
-                "重启提示",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                UpdateDebugModeStatus();
 
-            if (result == MessageBoxResult.Yes) RestartApplication();
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("切换调试模式失败", ex);
-            MessageBox.Show($"切换调试模式失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+                var result = MessageBox.Show(
+                    "调试模式设置已更改，需要重启程序才能生效。是否立即重启？",
+                    "重启提示",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes) RestartApplication();
+            },
+            "切换调试模式");
     }
 
     private void RestartApplication()
     {
-        try
-        {
-            var appPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
-                          ?? throw new InvalidOperationException("无法获取应用程序路径");
-
-            var startInfo = new System.Diagnostics.ProcessStartInfo
+        ExceptionHandler.Execute(
+            () =>
             {
-                FileName = appPath,
-                UseShellExecute = true,
-                Verb = "runas"
-            };
+                var appPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
+                              ?? throw new InvalidOperationException("无法获取应用程序路径");
 
-            System.Diagnostics.Process.Start(startInfo);
-            Application.Current.Shutdown();
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("重启应用程序失败", ex);
-            MessageBox.Show($"重启应用程序失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = appPath,
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+
+                System.Diagnostics.Process.Start(startInfo);
+                Application.Current.Shutdown();
+            },
+            "重启应用程序");
     }
 
     private async Task CheckForUpdateAsync()
     {
-        try
-        {
-            _isCheckingUpdate = true;
-            UpdateStatus = "正在检查...";
+        await ExceptionHandler.ExecuteAsync(
+            async () =>
+            {
+                _isCheckingUpdate = true;
+                UpdateStatus = "正在检查...";
 
-            var updateInfo = await _updateService.CheckForUpdateAsync();
-            if (updateInfo != null)
-            {
-                var result = MessageBox.Show(
-                    $"发现新版本：{updateInfo.LatestVersion}\n当前版本：{updateInfo.CurrentVersion}\n是否前往下载页面？",
-                    "发现新版本",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Information);
-                
-                if (result == MessageBoxResult.Yes)
+                var updateInfo = await _updateService.CheckForUpdateAsync();
+                if (updateInfo != null)
                 {
-                    _updateService.OpenDownloadPage(updateInfo.DownloadUrl);
+                    var result = MessageBox.Show(
+                        $"发现新版本：{updateInfo.LatestVersion}\n当前版本：{updateInfo.CurrentVersion}\n是否前往下载页面？",
+                        "发现新版本",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Information);
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        _updateService.OpenDownloadPage(updateInfo.DownloadUrl);
+                    }
+
+                    UpdateStatus = "有新版本";
                 }
-                
-                UpdateStatus = "有新版本";
-            }
-            else
+                else
+                {
+                    MessageBox.Show(
+                        "当前已是最新版本",
+                        "检查更新",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    UpdateStatus = "已是最新";
+                }
+            },
+            "检查更新",
+            customHandler: ex =>
             {
-                MessageBox.Show(
-                    "当前已是最新版本",
-                    "检查更新",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                UpdateStatus = "已是最新";
-            }
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.Error("检查更新失败：网络连接问题", ex);
-            MessageBox.Show(
-                "无法连接到更新服务器，请检查网络连接",
-                "网络错误",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            UpdateStatus = "网络错误";
-        }
-        catch (TaskCanceledException)
-        {
-            _logger.Error("检查更新失败：请求超时");
-            MessageBox.Show(
-                "更新服务器响应超时，请稍后重试",
-                "超时错误",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            UpdateStatus = "请求超时";
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.Error("检查更新失败：服务异常", ex);
-            MessageBox.Show(
-                $"更新服务异常：{ex.Message}",
-                "服务错误",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            UpdateStatus = "服务异常";
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("检查更新失败：未知错误", ex);
-            MessageBox.Show(
-                $"检查更新失败：{ex.Message}",
-                "错误",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-            UpdateStatus = "检查失败";
-        }
-        finally
-        {
-            _isCheckingUpdate = false;
-        }
+                // 根据异常类型设置不同的状态
+                UpdateStatus = ex switch
+                {
+                    System.Net.Http.HttpRequestException => "网络错误",
+                    TaskCanceledException => "请求超时",
+                    InvalidOperationException => "服务异常",
+                    _ => "检查失败"
+                };
+                _isCheckingUpdate = false;
+            });
+
+        _isCheckingUpdate = false;
     }
 
     private void ImportConfig()
     {
-        try
-        {
-            var dialog = new Microsoft.Win32.OpenFileDialog
+        ExceptionHandler.Execute(
+            () =>
             {
-                Title = "选择配置文件",
-                Filter = "JSON 文件 (*.json)|*.json",
-                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
-            };
+                var dialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "选择配置文件",
+                    Filter = "JSON 文件 (*.json)|*.json",
+                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                };
 
-            if (dialog.ShowDialog() == true)
-            {
-                _configManager.ImportKeyConfig(dialog.FileName);
-                MessageBox.Show("配置导入成功，需要重启程序才能生效。是否立即重启？",
-                    "重启提示",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("导入配置失败", ex);
-            MessageBox.Show($"导入配置失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+                if (dialog.ShowDialog() == true)
+                {
+                    ConfigManager.ImportKeyConfig(dialog.FileName);
+                    MessageBox.Show("配置导入成功，需要重启程序才能生效。是否立即重启？",
+                        "重启提示",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                }
+            },
+            "导入配置");
     }
 
     private void ExportConfig()
     {
-        try
-        {
-            var dialog = new Microsoft.Win32.SaveFileDialog
+        ExceptionHandler.Execute(
+            () =>
             {
-                Title = "保存配置文件",
-                Filter = "JSON 文件 (*.json)|*.json",
-                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                FileName = $"AppConfig_{DateTime.Now:yyyyMMdd}.json"
-            };
+                var dialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Title = "保存配置文件",
+                    Filter = "JSON 文件 (*.json)|*.json",
+                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    FileName = $"AppConfig_{DateTime.Now:yyyyMMdd}.json"
+                };
 
-            if (dialog.ShowDialog() == true)
-            {
-                _configManager.ExportKeyConfig(dialog.FileName);
-                MessageBox.Show("配置导出成功", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("导出配置失败", ex);
-            MessageBox.Show($"导出配置失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+                if (dialog.ShowDialog() == true)
+                {
+                    ConfigManager.ExportKeyConfig(dialog.FileName);
+                    MessageBox.Show("配置导出成功", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            },
+            "导出配置");
     }
 }
