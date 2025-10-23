@@ -51,14 +51,14 @@ public class SettingsViewModel : ViewModelBase
         _debugModeStatus = globalConfig.Debug.IsDebugMode ? "🟢 调试模式：已开启" : "⭕ 调试模式：已关闭";
     }
 
-    private void ToggleDebugMode()
+    private async void ToggleDebugMode()
     {
-        ExceptionHandler.Execute(
-            () =>
+        await ExceptionHandler.ExecuteAsync(
+            async () =>
             {
                 var currentDebugMode = ConfigManager.GlobalConfig.Debug.IsDebugMode;
 
-                ConfigManager.UpdateGlobalConfig(config =>
+                await ConfigManager.UpdateGlobalConfigAsync(config =>
                 {
                     config.Debug.IsDebugMode = !currentDebugMode;
                     config.Debug.UpdateDebugState();
@@ -149,10 +149,10 @@ public class SettingsViewModel : ViewModelBase
         _isCheckingUpdate = false;
     }
 
-    private void ImportConfig()
+    private async void ImportConfig()
     {
-        ExceptionHandler.Execute(
-            () =>
+        await ExceptionHandler.ExecuteAsync(
+            async () =>
             {
                 var dialog = new Microsoft.Win32.OpenFileDialog
                 {
@@ -163,7 +163,7 @@ public class SettingsViewModel : ViewModelBase
 
                 if (dialog.ShowDialog() == true)
                 {
-                    ConfigManager.ImportKeyConfig(dialog.FileName);
+                    await ConfigManager.ImportKeyConfigAsync(dialog.FileName);
                     MessageBox.Show("配置导入成功，需要重启程序才能生效。是否立即重启？",
                         "重启提示",
                         MessageBoxButton.YesNo,
@@ -173,10 +173,10 @@ public class SettingsViewModel : ViewModelBase
             "导入配置");
     }
 
-    private void ExportConfig()
+    private async void ExportConfig()
     {
-        ExceptionHandler.Execute(
-            () =>
+        await ExceptionHandler.ExecuteAsync(
+            async () =>
             {
                 var dialog = new Microsoft.Win32.SaveFileDialog
                 {
@@ -188,7 +188,7 @@ public class SettingsViewModel : ViewModelBase
 
                 if (dialog.ShowDialog() == true)
                 {
-                    ConfigManager.ExportKeyConfig(dialog.FileName);
+                    await ConfigManager.ExportKeyConfigAsync(dialog.FileName);
                     MessageBox.Show("配置导出成功", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             },

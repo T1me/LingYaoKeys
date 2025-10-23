@@ -62,7 +62,7 @@ public partial class FloatingStatusWindow : Window
             top = SystemParameters.WorkArea.Bottom - Height - 10;
 
             // 保存默认位置
-            _configManager.UpdateGlobalConfig(config =>
+            _ = _configManager.UpdateGlobalConfigAsync(config =>
             {
                 config.UI.FloatingWindow.Left = left;
                 config.UI.FloatingWindow.Top = top;
@@ -86,7 +86,7 @@ public partial class FloatingStatusWindow : Window
             Top = SystemParameters.WorkArea.Bottom - Height - 10;
 
             // 保存新位置
-            _configManager.UpdateGlobalConfig(config =>
+            _ = _configManager.UpdateGlobalConfigAsync(config =>
             {
                 config.UI.FloatingWindow.Left = Left;
                 config.UI.FloatingWindow.Top = Top;
@@ -337,7 +337,7 @@ public partial class FloatingStatusWindow : Window
         }
     }
 
-    private void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private async void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         ReleaseMouseCapture();
 
@@ -346,7 +346,7 @@ public partial class FloatingStatusWindow : Window
             // 如果发生了拖拽，保存新位置
             if (_isDragging)
             {
-                _configManager.UpdateGlobalConfig(config =>
+                await _configManager.UpdateGlobalConfigAsync(config =>
                 {
                     config.UI.FloatingWindow.Left = Math.Round(Left, 2);
                     config.UI.FloatingWindow.Top = Math.Round(Top, 2);
@@ -428,12 +428,12 @@ public partial class FloatingStatusWindow : Window
         }
     }
 
-    private void FloatingStatusWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    private async void FloatingStatusWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         try
         {
             // 保存窗口位置
-            _configManager.UpdateGlobalConfig(config =>
+            await _configManager.UpdateGlobalConfigAsync(config =>
             {
                 config.UI.FloatingWindow.Left = Left;
                 config.UI.FloatingWindow.Top = Top;

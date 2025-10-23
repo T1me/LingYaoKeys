@@ -107,20 +107,17 @@ public partial class MainWindow : Window
     {
         try
         {
-            // 初始化 ConfigManager
-            _configManager = ConfigManager.Instance;
+            // 初始化组件
+            InitializeComponent();
             
-            // 先初始化ViewModel
+            // 初始化 ConfigManager
+            _configManager = App.ConfigService ?? ConfigManager.Instance;
+            
+            // 初始化ViewModel（会在构造函数内部设置DataContext）
             _viewModel = new MainViewModel(App.LyKeysDriver, this);
             
             // 确保导航栏默认为收起状态
             _viewModel.IsNavExpanded = false;
-
-            // 初始化组件
-            InitializeComponent();
-
-            // 设置DataContext
-            DataContext = _viewModel;
 
             // 初始化托盘图标
             InitializeTrayIcon();
@@ -449,7 +446,7 @@ public partial class MainWindow : Window
                         _logger.Debug("开始清理窗口资源...");
 
                         // 保存窗口大小到配置
-                        await Dispatcher.InvokeAsync(() =>
+                        await Dispatcher.InvokeAsync(async () =>
                         {
                             if (WindowState == WindowState.Normal)
                             {
@@ -458,7 +455,7 @@ public partial class MainWindow : Window
                                 {
                                     try
                                     {
-                                        _configManager.UpdateGlobalConfig(config =>
+                                        await _configManager.UpdateGlobalConfigAsync(config =>
                                         {
                                             if (config != null && config.UI != null && config.UI.MainWindow != null)
                                             {

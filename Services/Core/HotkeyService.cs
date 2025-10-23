@@ -116,6 +116,9 @@ public class HotkeyService
         // 订阅模式切换事件（仅在真正切换模式时触发）
         _lyKeysService.ModeSwitched += OnModeSwitched;
 
+        // 订阅配置变更事件
+        _configManager.ConfigChanged += OnConfigChanged;
+
         // 从配置加载初始状态
         LoadInitialState();
 
@@ -177,6 +180,7 @@ public class HotkeyService
 
             // 移除事件订阅
             _lyKeysService.ModeSwitched -= OnModeSwitched;
+            _configManager.ConfigChanged -= OnConfigChanged;
 
             // 卸载钩子
             if (_keyboardHookHandle != IntPtr.Zero)
@@ -200,6 +204,8 @@ public class HotkeyService
         {
             _isRegisteringHotkey = true; // 进入热键注册模式
             
+            _logger.Debug($"注册热键: KeyCode={keyCode}, Modifiers={modifiers}, SaveToConfig={saveToConfig}");
+            
             // 更新内部状态
             _hotkeyVirtualKey = GetVirtualKeyFromLyKey(keyCode);
             _pendingHotkey = keyCode;
@@ -207,17 +213,28 @@ public class HotkeyService
             // 根据参数决定是否保存到配置文件
             if (saveToConfig)
             {
+                _logger.Debug("保存热键配置到文件");
                 SaveHotkeyConfig(keyCode, modifiers);
+            }
+            else
+            {
+                _logger.Debug("仅更新内部状态，不保存到配置文件");
             }
             
             _isRegisteringHotkey = false;
+            _logger.Debug($"热键注册成功: {keyCode}");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.Error("注册热键失败", ex);
+            _logger.Error($"注册热键失败: KeyCode={keyCode}, Modifiers={modifiers}", ex);
             _isRegisteringHotkey = false;
-            return false;
+            
+            // 通知用户热键注册失败
+            _mainViewModel?.UpdateStatusMessage($"热键注册失败: {ex.Message}", true);
+            
+            // 抛出异常以便调用者处理
+            throw new InvalidOperationException($"无法注册热键 {keyCode}", ex);
         }
     }
 
@@ -226,19 +243,23 @@ public class HotkeyService
     {
         try 
         {
+            _logger.Debug($"开始保存热键配置: KeyCode={keyCode}, Modifiers={modifiers}");
+            
             // 直接调用配置管理器保存热键配置
-            _configManager.UpdateKeyConfig(keyConfig => {
+            _configManager.UpdateKeyConfigAsync(keyConfig => {
                 keyConfig.startKey = keyCode;
                 keyConfig.startMods = modifiers;
                 keyConfig.stopKey = keyCode;
                 keyConfig.stopMods = modifiers;
-            });
+            }).GetAwaiter().GetResult();
             
-            _logger.Debug($"已保存热键配置: {keyCode}");
+            _logger.Debug($"热键配置已成功保存: {keyCode}");
         }
         catch (Exception ex)
         {
-            _logger.Error($"保存热键配置失败: {ex.Message}", ex);
+            _logger.Error($"保存热键配置失败: KeyCode={keyCode}, Modifiers={modifiers}, Error={ex.Message}", ex);
+            // 重新抛出异常，让调用者处理
+            throw new InvalidOperationException($"无法保存热键配置到文件", ex);
         }
     }
 
@@ -697,12 +718,226 @@ public class HotkeyService
     // 模式切换事件处理
     private void OnModeSwitched(object? sender, bool isHoldMode)
     {
-        StopSequence();
-
-        // 重新注册热键
-        if (_pendingHotkey.HasValue)
+        try
         {
-            RegisterHotkey(_pendingHotkey.Value, ModifierKeys.None);
+            _logger.Debug($"模式切换事件: {(isHoldMode ? "按压模式" : "顺序模式")}");
+            
+            StopSequence();
+
+            // 重新注册热键（不保存到配置，因为只是模式切换）
+            if (_pendingHotkey.HasValue)
+            {
+                _logger.Debug($"重新注册热键: {_pendingHotkey.Value}");
+                RegisterHotkey(_pendingHotkey.Value, ModifierKeys.None, saveToConfig: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("处理模式切换事件时发生异常", ex);
+            // 不抛出异常，避免影响模式切换流程
+        }
+    }
+
+    // 配置变更事件处理
+    private void OnConfigChanged(object? sender, ConfigEventArgs e)
+    {
+        try
+        {
+            _logger.Debug($"收到配置变更事件: {e.ChangeType}");
+
+            switch (e.ChangeType)
+            {
+                case ConfigChangeType.Key:
+                    // 按键配置变更 - 重新加载热键和按键序列
+                    if (e.KeyConfigData != null)
+                    {
+                        ReloadKeyConfiguration(e.KeyConfigData);
+                    }
+                    break;
+
+                case ConfigChangeType.ConfigFile:
+                    // 配置文件切换 - 停止当前序列
+                    _logger.Debug("配置文件切换，停止当前序列");
+                    StopSequence();
+                    // 注意：Key事件会紧随其后触发，届时会重新加载配置
+                    break;
+
+                case ConfigChangeType.Global:
+                    // 全局配置变更 - 更新全局设置
+                    if (e.GlobalConfigData != null)
+                    {
+                        UpdateGlobalSettings(e.GlobalConfigData);
+                    }
+                    break;
+
+                case ConfigChangeType.All:
+                    // 所有配置变更 - 同时更新全局和按键配置
+                    if (e.GlobalConfigData != null)
+                    {
+                        UpdateGlobalSettings(e.GlobalConfigData);
+                    }
+                    if (e.KeyConfigData != null)
+                    {
+                        ReloadKeyConfiguration(e.KeyConfigData);
+                    }
+                    break;
+
+                case ConfigChangeType.ConfigList:
+                    // 配置列表变更 - 不需要特殊处理
+                    _logger.Debug("配置列表已变更");
+                    break;
+
+                default:
+                    _logger.Warning($"未处理的配置变更类型: {e.ChangeType}");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("处理配置变更事件时发生异常", ex);
+        }
+    }
+
+    // 重新加载热键配置
+    private void ReloadKeyConfiguration(KeyConfigData keyConfig)
+    {
+        if (keyConfig == null)
+        {
+            _logger.Warning("按键配置为空，无法重新加载");
+            return;
+        }
+
+        try
+        {
+            _logger.Debug("开始重新加载热键配置");
+
+            // 1. 重新注册热键
+            if (keyConfig.startKey.HasValue)
+            {
+                _logger.Debug($"重新注册热键: {keyConfig.startKey.Value}");
+                RegisterHotkey(keyConfig.startKey.Value, keyConfig.startMods, saveToConfig: false);
+            }
+            else
+            {
+                _logger.Debug("未设置启动热键");
+                _pendingHotkey = null;
+                _hotkeyVirtualKey = 0;
+            }
+
+            // 2. 更新按键序列
+            if (keyConfig.keys?.Count > 0)
+            {
+                var selectedItems = keyConfig.keys.Where(k => k.IsSelected).ToList();
+
+                if (selectedItems.Count > 0)
+                {
+                    var operations = new List<KeyItemSettings>();
+
+                    foreach (var item in selectedItems)
+                    {
+                        if (item.Type == KeyItemType.Keyboard && item.Code.HasValue)
+                        {
+                            operations.Add(KeyItemSettings.CreateKeyboard(item.Code.Value, item.KeyInterval));
+                        }
+                        else if (item.Type == KeyItemType.Coordinates)
+                        {
+                            operations.Add(KeyItemSettings.CreateCoordinates(item.X.Value, item.Y.Value, item.KeyInterval));
+                        }
+                    }
+
+                    SetKeySequence(operations);
+                    _logger.Debug($"已更新按键序列 - 总操作数: {operations.Count}, 键盘按键: {operations.Count(o => o.Type == KeyItemType.Keyboard)}, 坐标操作: {operations.Count(o => o.Type == KeyItemType.Coordinates)}");
+                }
+                else
+                {
+                    _logger.Debug("没有选中的按键或坐标");
+                    SetKeySequence(new List<KeyItemSettings>());
+                }
+            }
+            else
+            {
+                _logger.Debug("按键列表为空");
+                SetKeySequence(new List<KeyItemSettings>());
+            }
+
+            // 3. 更新目标窗口信息
+            UpdateTargetWindow(keyConfig);
+
+            // 4. 更新按键模式
+            _lyKeysService.IsHoldMode = keyConfig.keyMode != 0;
+            _logger.Debug($"按键模式已更新: {(keyConfig.keyMode != 0 ? "按压模式" : "顺序模式")}");
+
+            _logger.Debug("热键配置重新加载完成");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("重新加载热键配置失败", ex);
+            throw;
+        }
+    }
+
+    // 更新目标窗口信息
+    private void UpdateTargetWindow(KeyConfigData keyConfig)
+    {
+        try
+        {
+            // 更新目标窗口进程名称到ViewModel（用于显示和窗口查找）
+            if (!string.IsNullOrEmpty(keyConfig.TargetWindowProcessName))
+            {
+                _logger.Debug($"目标窗口进程: {keyConfig.TargetWindowProcessName}");
+                
+                // 注意：这里不直接设置窗口句柄，因为窗口句柄的查找和设置
+                // 应该由MainViewModel或KeyMappingViewModel负责
+                // HotkeyService只负责使用已设置的窗口句柄
+            }
+            else
+            {
+                _logger.Debug("未设置目标窗口");
+                _targetWindowHandle = IntPtr.Zero;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("更新目标窗口信息失败", ex);
+        }
+    }
+
+    // 更新全局设置
+    private void UpdateGlobalSettings(GlobalConfig globalConfig)
+    {
+        if (globalConfig == null)
+        {
+            _logger.Warning("全局配置为空，无法更新全局设置");
+            return;
+        }
+
+        try
+        {
+            _logger.Debug("开始更新全局设置");
+
+            // 更新热键总开关状态
+            var previousState = _isHotkeyControlEnabled;
+            _isHotkeyControlEnabled = globalConfig.isHotkeyControlEnabled ?? true;
+
+            if (previousState != _isHotkeyControlEnabled)
+            {
+                _logger.Debug($"热键总开关已更新: {(_isHotkeyControlEnabled ? "启用" : "禁用")}");
+
+                // 如果热键总开关被禁用，停止当前运行的序列
+                if (!_isHotkeyControlEnabled && _isSequenceRunning)
+                {
+                    _logger.Debug("热键总开关已禁用，停止当前序列");
+                    _lyKeysService.EmergencyStop();
+                    StopSequence();
+                }
+            }
+
+            _logger.Debug("全局设置更新完成");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("更新全局设置失败", ex);
+            throw;
         }
     }
 

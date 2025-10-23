@@ -341,9 +341,8 @@ public partial class App : Application
             splashWindow.UpdateProgress("正在初始化配置服务...", 20);
             ConfigManager.Instance.Initialize();
 
-            // 初始化ConfigService
+            // 初始化ConfigService静态属性
             ConfigService = ConfigManager.Instance;
-            _logger.Debug("ConfigService初始化完成");
 
             // 2. 初始化日志系统
             splashWindow.UpdateProgress("正在初始化日志系统...", 30);
@@ -402,20 +401,6 @@ public partial class App : Application
             // 显式设置为应用程序的主窗口
             Current.MainWindow = mainWindow;
             _logger.Debug($"MainWindow是否设置成功: {Current.MainWindow != null}");
-
-            // 8. 初始化热键服务
-            splashWindow.UpdateProgress("正在初始化热键服务...", 95);
-            _logger.Debug("初始化热键服务");
-            
-            // 检查ConfigService是否正确初始化
-            if (ConfigService == null)
-            {
-                _logger.Warning("ConfigService未初始化，正在重新创建");
-                ConfigService = ConfigManager.Instance;
-            }
-            
-            var hotkeyService = new HotkeyService(mainWindow, LyKeysDriver, ConfigService);
-            _logger.Debug("HotkeyService初始化完成");
 
             // 注册应用程序退出事件
             RegisterExitHandlers();

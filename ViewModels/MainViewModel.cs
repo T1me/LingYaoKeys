@@ -20,6 +20,7 @@ public class MainViewModel : ViewModelBase
     private Page? _currentPage;
     private readonly LyKeysService _lyKeysService;
     private readonly Window _mainWindow;
+    private readonly IConfigManager _configManager;
     private readonly KeyMappingViewModel _keyMappingViewModel;
     private readonly HotkeyService _hotkeyService;
     private string _statusMessage = "就绪";
@@ -83,7 +84,7 @@ public class MainViewModel : ViewModelBase
     {
         get
         {
-            if (_globalConfig == null) _globalConfig = ConfigManager.GlobalConfig;
+            if (_globalConfig == null) _globalConfig = _configManager.GlobalConfig;
             return _globalConfig;
         }
     }
@@ -92,7 +93,7 @@ public class MainViewModel : ViewModelBase
     {
         get
         {
-            if (_keyConfig == null) _keyConfig = ConfigManager.CurrentKeyConfig;
+            if (_keyConfig == null) _keyConfig = _configManager.CurrentKeyConfig;
             return _keyConfig;
         }
     }
@@ -174,13 +175,18 @@ public class MainViewModel : ViewModelBase
             StatusMessageColor = System.Windows.Media.Brushes.Black;
         };
 
-        // 设置DataContext
+        // 必须在创建HotkeyService之前设置DataContext，因为HotkeyService需要访问MainViewModel
         mainWindow.DataContext = this;
-        Logger.Debug("MainWindow的DataContext已设置为MainViewModel");
 
-        // 初始化HotkeyService，并传递窗口、驱动服务和配置服务
-        _hotkeyService = new HotkeyService(mainWindow, lyKeysService, ConfigManager);
-        Logger.Debug("HotkeyService已初始化");
+        // 确保ConfigManager已初始化
+        _configManager = App.ConfigService ?? WpfApp.Services.Core.ConfigManager.Instance;
+        if (_configManager == null)
+        {
+            throw new InvalidOperationException("ConfigManager未初始化，无法创建HotkeyService");
+        }
+        
+        // 初始化HotkeyService
+        _hotkeyService = new HotkeyService(mainWindow, lyKeysService, _configManager);
         
         // 先标记初始化完成，避免循环依赖问题
         _isInitializing = false;
