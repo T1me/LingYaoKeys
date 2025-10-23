@@ -385,7 +385,7 @@ namespace WpfApp.Services.Core
         /// </summary>
         /// <param name="driverPath">驱动文件路径</param>
         /// <returns>是否初始化成功</returns>
-        public async Task<bool> InitializeAsync(string driverPath)
+        public bool Initialize(string driverPath)
         {
             try
             {
@@ -409,7 +409,7 @@ namespace WpfApp.Services.Core
                 _lyKeys = new LyKeys(driverPath);
                 try
                 {
-                    if (!await _lyKeys.Initialize())
+                    if (!_lyKeys.Initialize())
                     {   
                         // 获取并处理详细的错误信息
                         var lastStatus = _lyKeys.GetLastStatus();
@@ -1524,23 +1524,53 @@ namespace WpfApp.Services.Core
         public void Dispose()
         {
             if (_isDisposed) return;
+            _isDisposed = true;
 
             try
             {
+                _logger.Debug("开始释放LyKeysService资源");
+
+                // 1. 停止所有操作
                 IsEnabled = false;
-                StopKeySequence();
-                StopHoldMode();
                 
-                // 恢复系统时钟精度
-                DisableHighResolutionTimer();
-                
-                _lyKeys?.Dispose();
+                // 2. 停止序列
+                try
+                {
+                    StopKeySequence();
+                    StopHoldMode();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("停止序列失败", ex);
+                }
+
+                // 3. 恢复系统时钟精度
+                try
+                {
+                    DisableHighResolutionTimer();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("恢复时钟精度失败", ex);
+                }
+
+                // 4. 释放驱动
+                try
+                {
+                    _lyKeys?.Dispose();
+                    _lyKeys = null;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("释放驱动失败", ex);
+                }
+
                 _isInitialized = false;
-                _isDisposed = true;
+                _logger.Debug("LyKeysService资源释放完成");
             }
             catch (Exception ex)
             {
-                _logger.Error("释放资源异常", ex);
+                _logger.Error("释放LyKeysService资源异常", ex);
             }
         }
         #endregion

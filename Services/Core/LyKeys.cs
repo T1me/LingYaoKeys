@@ -147,7 +147,7 @@ public sealed class LyKeys : IDisposable
         _logger.Debug($"LyKeys实例化，驱动路径: {driverPath}");
     }
 
-    public async Task<bool> Initialize(CancellationToken cancellationToken = default)
+    public bool Initialize()
     {
         try
         {
@@ -193,114 +193,92 @@ public sealed class LyKeys : IDisposable
                 throw new UnauthorizedAccessException($"无法访问文件: {ex.Message}", ex);
             }
 
-            // 使用Task.Run包装同步操作
-            return await Task.Run(async () =>
+            // 加载DLL
+            _logger.Debug($"开始加载DLL: {dllPath}");
+            _dllHandle = LoadLibrary(dllPath);
+            if (_dllHandle == IntPtr.Zero)
             {
-                try
+                var error = Marshal.GetLastWin32Error();
+                var errorMessage = new Win32Exception(error).Message;
+                _logger.Error($"DLL加载失败 - 错误代码: {error}, 错误信息: {errorMessage}");
+                throw new Win32Exception(error, $"DLL加载失败: {errorMessage}");
+            }
+
+            _logger.Debug("DLL加载成功");
+
+            // 加载驱动
+            _logger.Debug($"开始加载驱动: {DriverName}, 路径: {_driverPath}");
+            var loadResult = LoadNTDriver(DriverName, _driverPath);
+            if (!loadResult)
+            {
+                var error = Marshal.GetLastWin32Error();
+                var errorMessage = new Win32Exception(error).Message;
+                _logger.Error($"驱动加载失败 - 错误代码: {error}, 错误信息: {errorMessage}");
+                return false;
+            }
+
+            // 初始化设备句柄
+            _logger.Debug("开始初始化设备句柄");
+            var handleResult = SetHandle();
+            _logger.Debug($"设备句柄初始化结果: {handleResult}");
+            if (!handleResult)
+            {
+                var error = Marshal.GetLastWin32Error();
+                var errorMessage = new Win32Exception(error).Message;
+                _logger.Error($"初始化设备句柄失败 - 错误代码: {error}, 错误信息: {errorMessage}");
+                throw new InvalidOperationException($"初始化设备句柄失败: {errorMessage}");
+            }
+
+            _logger.Debug("设备句柄初始化成功");
+
+            // 检查设备状态
+            _logger.Debug("开始检查设备状态");
+            CheckDeviceStatus();
+            var status = GetDriverStatus();
+            _lastStatus = status;
+            _logger.Debug($"设备状态: {status}");
+
+            if (status != DeviceStatus.Ready)
+            {
+                // 尝试重新初始化句柄
+                _logger.Debug("设备状态不正确，尝试重新初始化句柄");
+                if (!SetHandle()) 
+                    throw new InvalidOperationException("重新初始化设备句柄失败");
+
+                Thread.Sleep(500);
+                CheckDeviceStatus();
+                status = GetDriverStatus();
+                _lastStatus = status;
+                _logger.Debug($"重新初始化后的设备状态: {status}");
+
+                // 根据设备状态提供不同的错误信息
+                if (status != DeviceStatus.Ready)
                 {
-                    // 加载DLL
-                    _logger.Debug($"开始加载DLL: {dllPath}");
-                    _dllHandle = LoadLibrary(dllPath);
-                    if (_dllHandle == IntPtr.Zero)
+                    string errorMessage;
+                    switch (status)
                     {
-                        var error = Marshal.GetLastWin32Error();
-                        var errorMessage = new Win32Exception(error).Message;
-                        _logger.Error($"DLL加载失败 - 错误代码: {error}, 错误信息: {errorMessage}");
-                        throw new Win32Exception(error, $"DLL加载失败: {errorMessage}");
+                        case DeviceStatus.NoKeyboard:
+                            errorMessage = "找不到键盘设备，请检查您的键盘连接。";
+                            break;
+                        case DeviceStatus.NoMouse:
+                            errorMessage = "找不到鼠标设备，请检查您的鼠标连接。";
+                            break;
+                        case DeviceStatus.InitFailed:
+                            errorMessage = "驱动初始化失败，请尝试重新启动计算机或重新安装驱动。";
+                            break;
+                        default:
+                            errorMessage = $"设备状态异常: {status}";
+                            break;
                     }
-
-                    _logger.Debug("DLL加载成功");
-
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    // 加载驱动
-                    _logger.Debug($"开始加载驱动: {DriverName}, 路径: {_driverPath}");
-                    var loadResult = LoadNTDriver(DriverName, _driverPath);
-                    if (!loadResult)
-                    {
-                        var error = Marshal.GetLastWin32Error();
-                        var errorMessage = new Win32Exception(error).Message;
-                        _logger.Error($"驱动加载失败 - 错误代码: {error}, 错误信息: {errorMessage}");
-                        return false;
-                    }
-
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    // 初始化设备句柄
-                    _logger.Debug("开始初始化设备句柄");
-                    var handleResult = SetHandle();
-                    _logger.Debug($"设备句柄初始化结果: {handleResult}");
-                    if (!handleResult)
-                    {
-                        var error = Marshal.GetLastWin32Error();
-                        var errorMessage = new Win32Exception(error).Message;
-                        _logger.Error($"初始化设备句柄失败 - 错误代码: {error}, 错误信息: {errorMessage}");
-                        throw new InvalidOperationException($"初始化设备句柄失败: {errorMessage}");
-                    }
-
-                    _logger.Debug("设备句柄初始化成功");
-
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    // 检查设备状态
-                    _logger.Debug("开始检查设备状态");
-                    CheckDeviceStatus();
-                    var status = GetDriverStatus();
-                    _lastStatus = status;
-                    _logger.Debug($"设备状态: {status}");
-
-                    if (status != DeviceStatus.Ready)
-                    {
-                        // 尝试重新初始化句柄
-                        _logger.Debug("设备状态不正确，尝试重新初始化句柄");
-                        if (!SetHandle()) throw new InvalidOperationException("重新初始化设备句柄失败");
-
-                        await Task.Delay(500, cancellationToken);
-                        CheckDeviceStatus();
-                        status = GetDriverStatus();
-                        _lastStatus = status;
-                        _logger.Debug($"重新初始化后的设备状态: {status}");
-
-                        // 根据设备状态提供不同的错误信息
-                        if (status != DeviceStatus.Ready)
-                        {
-                            string errorMessage;
-                            switch (status)
-                            {
-                                case DeviceStatus.NoKeyboard:
-                                    errorMessage = "找不到键盘设备，请检查您的键盘连接。";
-                                    break;
-                                case DeviceStatus.NoMouse:
-                                    errorMessage = "找不到鼠标设备，请检查您的鼠标连接。";
-                                    break;
-                                case DeviceStatus.InitFailed:
-                                    errorMessage = "驱动初始化失败，请尝试重新启动计算机或重新安装驱动。";
-                                    break;
-                                default:
-                                    errorMessage = $"设备状态异常: {status}";
-                                    break;
-                            }
-                            _logger.Error(errorMessage);
-                            throw new InvalidOperationException(errorMessage);
-                        }
-                    }
-
-                    _logger.Debug("设备句柄初始化成功");
-                    _isInitialized = true;
-                    _logger.InitLog("LyKeys驱动初始化成功");
-                    return true;
+                    _logger.Error(errorMessage);
+                    throw new InvalidOperationException(errorMessage);
                 }
-                catch (OperationCanceledException)
-                {
-                    _logger.Warning("驱动初始化操作被取消");
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error($"驱动初始化失败: {ex.Message}", ex);
-                    return false;
-                }
-            }, cancellationToken);
+            }
+
+            _logger.Debug("设备句柄初始化成功");
+            _isInitialized = true;
+            _logger.InitLog("LyKeys驱动初始化成功");
+            return true;
         }
         catch (Exception ex)
         {

@@ -82,6 +82,18 @@ public partial class SplashWindow : Window
         {
             _statusText.Text = message;
             
+            // 确保获取最新的容器宽度
+            if (_containerActualWidth == 0 && _progressBarContainer.Parent is Grid parentGrid)
+            {
+                _containerActualWidth = parentGrid.ActualWidth;
+            }
+            
+            // 如果容器宽度仍然为0，使用默认宽度
+            if (_containerActualWidth == 0)
+            {
+                _containerActualWidth = 400; // 默认宽度
+            }
+            
             // 设置进度条宽度（0-100%）
             double width = (_containerActualWidth * percentage) / 100.0;
             

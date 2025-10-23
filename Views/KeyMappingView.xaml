@@ -216,6 +216,20 @@
                                       IsChecked="{Binding AutoSwitchToEnglishIME, Mode=TwoWay}"
                                       ToolTip="启用后，程序会在启动时自动切换到英文输入法，停止时恢复原输入法" />
                         </DockPanel>
+
+                        <!-- 硬件加速 -->
+                        <DockPanel Margin="0,0,20,10">
+                            <TextBlock Text="硬件加速"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,0,0" />
+                            <CheckBox Style="{StaticResource ModernSwitch}"
+                                      Height="32"
+                                      VerticalContentAlignment="Center"
+                                      HorizontalAlignment="Left"
+                                      Padding="0,0,0,0"
+                                      IsChecked="{Binding EnableHardwareAcceleration, Mode=TwoWay}"
+                                      ToolTip="启用后，程序将使用硬件加速优化渲染性能，重启应用后生效" />
+                        </DockPanel>
                     </WrapPanel>
                 </Grid>
             </Border>

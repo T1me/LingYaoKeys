@@ -567,6 +567,27 @@ namespace WpfApp.ViewModels
             }
         }
 
+        private bool _enableHardwareAcceleration = true;
+        
+        /// <summary>
+        /// 获取或设置是否启用硬件加速
+        /// </summary>
+        public bool EnableHardwareAcceleration
+        {
+            get => _enableHardwareAcceleration;
+            set
+            {
+                if (SetProperty(ref _enableHardwareAcceleration, value))
+                {
+                    if (!_isInitializing)
+                    {
+                        SaveConfig();
+                        Logger.Info($"硬件加速已{(value ? "启用" : "禁用")}，重启应用后生效");
+                    }
+                }
+            }
+        }
+
         // 选中的按键项
         public KeyItem? SelectedKeyItem
         {
@@ -1520,6 +1541,7 @@ namespace WpfApp.ViewModels
                     globalConfig.AutoSwitchToEnglishIME = AutoSwitchToEnglishIME;
                     globalConfig.isHotkeyControlEnabled = IsHotkeyControlEnabled;
                     globalConfig.SoundVolume = SoundVolume;
+                    globalConfig.EnableHardwareAcceleration = EnableHardwareAcceleration;
                 });
                 
                  Logger.Debug("全局配置已保存");
@@ -2579,6 +2601,7 @@ namespace WpfApp.ViewModels
                 _autoSwitchToEnglishIME = globalConfig.AutoSwitchToEnglishIME ?? true;
                 _isHotkeyControlEnabled = globalConfig.isHotkeyControlEnabled ?? true;
                 _soundVolume = globalConfig.SoundVolume ?? 0.8;
+                _enableHardwareAcceleration = globalConfig.EnableHardwareAcceleration ?? true;
                 
                 // 通知UI更新这些属性
                 OnPropertyChanged(nameof(IsSoundEnabled));
@@ -2587,6 +2610,7 @@ namespace WpfApp.ViewModels
                 OnPropertyChanged(nameof(AutoSwitchToEnglishIME));
                 OnPropertyChanged(nameof(IsHotkeyControlEnabled));
                 OnPropertyChanged(nameof(SoundVolume));
+                OnPropertyChanged(nameof(EnableHardwareAcceleration));
                 
                 // 同步设置到服务
                 SyncConfigToServices();

@@ -11,9 +11,9 @@
         Title="{Binding WindowTitle}"
         Icon="/Resource/icon/app.ico"
         SizeToContent="Manual"
-        Height="{Binding GlobalConfig.UI.MainWindow.Height}"
+        Height="{Binding GlobalConfig.UI.MainWindow.Height, Mode=TwoWay}"
         MinHeight="{Binding GlobalConfig.UI.MainWindow.MinHeight}"
-        Width="{Binding GlobalConfig.UI.MainWindow.Width}"
+        Width="{Binding GlobalConfig.UI.MainWindow.Width, Mode=TwoWay}"
         MinWidth="{Binding GlobalConfig.UI.MainWindow.MinWidth}"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
@@ -36,13 +36,15 @@
     <Border x:Name="WindowBorder"
             Background="Transparent"
             BorderThickness="0"
-            Margin="0">
+            Margin="0"
+            CacheMode="BitmapCache">
         <Border.Effect>
             <DropShadowEffect BlurRadius="10"
                               Direction="0"
                               ShadowDepth="0"
                               Opacity="0.2"
-                              Color="#000000" />
+                              Color="#000000"
+                              RenderingBias="Performance" />
         </Border.Effect>
 
         <Grid>
@@ -85,7 +87,9 @@
                             BorderThickness="1"
                             CornerRadius="8"
                             Margin="5"
-                            ClipToBounds="True">
+                            ClipToBounds="True"
+                            UseLayoutRounding="True"
+                            SnapsToDevicePixels="True">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="32" />
@@ -117,16 +121,11 @@
                                            Width="25"
                                            Height="25"
                                            Margin="0,0,5,0"
-                                           RenderOptions.BitmapScalingMode="HighQuality" 
+                                           RenderOptions.BitmapScalingMode="NearestNeighbor" 
                                            RenderOptions.EdgeMode="Aliased"
                                            UseLayoutRounding="True"
-                                           SnapsToDevicePixels="True">
-                                        <Image.Effect>
-                                            <DropShadowEffect BlurRadius="0" 
-                                                             ShadowDepth="0" 
-                                                             Color="Transparent"/>
-                                        </Image.Effect>
-                                    </Image>
+                                           SnapsToDevicePixels="True"
+                                           CacheMode="BitmapCache" />
                                     <TextBlock Text="{Binding WindowTitle}"
                                                VerticalAlignment="Center" />
                                 </StackPanel>

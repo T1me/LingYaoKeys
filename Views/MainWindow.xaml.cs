@@ -27,8 +27,7 @@ public partial class MainWindow : Window
     private bool _hasShownMinimizeNotification;
     private NotifyIcon _trayIcon;
     internal ContextMenu _trayContextMenu;
-    private readonly SemaphoreSlim _cleanupSemaphore = new(1, 1);
-    private CancellationTokenSource _cleanupCts;
+
 
     // 窗口调整大小相关
     private bool _isResizing;
@@ -38,6 +37,7 @@ public partial class MainWindow : Window
     private double _startHeight;
     private double _startLeft;
     private double _startTop;
+    private System.Threading.Timer _resizeSaveTimer;
 
     // Windows Hook API
     private const int WH_MOUSE_LL = 14;
@@ -107,37 +107,71 @@ public partial class MainWindow : Window
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine("MainWindow: 开始初始化");
+            
             // 初始化组件
+            System.Diagnostics.Debug.WriteLine("MainWindow: 调用 InitializeComponent");
             InitializeComponent();
+            System.Diagnostics.Debug.WriteLine("MainWindow: InitializeComponent 完成");
             
             // 初始化 ConfigManager
+            System.Diagnostics.Debug.WriteLine("MainWindow: 初始化 ConfigManager");
             _configManager = App.ConfigService ?? ConfigManager.Instance;
             
             // 初始化ViewModel（会在构造函数内部设置DataContext）
-            _viewModel = new MainViewModel(App.LyKeysDriver, this);
+            System.Diagnostics.Debug.WriteLine("MainWindow: 创建 MainViewModel");
+            try
+            {
+                _viewModel = new MainViewModel(App.LyKeysDriver, this);
+                System.Diagnostics.Debug.WriteLine("MainWindow: MainViewModel 创建成功");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"MainWindow: MainViewModel 创建失败 - {ex.Message}");
+                throw;
+            }
             
             // 确保导航栏默认为收起状态
             _viewModel.IsNavExpanded = false;
 
             // 初始化托盘图标
-            InitializeTrayIcon();
+            System.Diagnostics.Debug.WriteLine("MainWindow: 初始化托盘图标");
+            try
+            {
+                InitializeTrayIcon();
+                System.Diagnostics.Debug.WriteLine("MainWindow: 托盘图标初始化成功");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"MainWindow: 托盘图标初始化失败 - {ex.Message}");
+                // 托盘图标初始化失败不应该阻止窗口显示
+                _logger.Warning($"托盘图标初始化失败: {ex.Message}");
+            }
 
             // 更新最大化按钮状态
+            System.Diagnostics.Debug.WriteLine("MainWindow: 更新最大化按钮状态");
             UpdateMaximizeButtonState();
 
             // 注册窗口状态改变事件
             StateChanged += MainWindow_StateChanged;
 
             // 设置 MainWindow 引用到 KeyMappingViewModel
-            if (_viewModel.KeyMappingViewModel != null) _viewModel.KeyMappingViewModel.SetMainWindow(this);
+            if (_viewModel.KeyMappingViewModel != null) 
+            {
+                System.Diagnostics.Debug.WriteLine("MainWindow: 设置 KeyMappingViewModel 引用");
+                _viewModel.KeyMappingViewModel.SetMainWindow(this);
+            }
 
             _logger.Debug($"窗口初始化完成 - 尺寸: {Width}x{Height}");
+            System.Diagnostics.Debug.WriteLine($"MainWindow: 初始化完成 - 尺寸: {Width}x{Height}");
         }
         catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"MainWindow: 初始化失败 - {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"MainWindow: 堆栈跟踪 - {ex.StackTrace}");
             _logger.Error("窗口初始化失败", ex);
-            System.Windows.MessageBox.Show($"窗口初始化失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            System.Windows.Application.Current.Shutdown();
+            System.Windows.MessageBox.Show($"窗口初始化失败: {ex.Message}\n\n{ex.StackTrace}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            throw; // 重新抛出异常，让 App.xaml.cs 处理
         }
     }
 
@@ -413,139 +447,88 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         if (_isClosing) return;
+        _isClosing = true;
 
         try
         {
-            // 防止重入
-            if (!await _cleanupSemaphore.WaitAsync(0))
+            // 1. 立即禁用UI，提升响应感
+            IsEnabled = false;
+
+            // 2. 快速保存窗口大小（异步，不等待）
+            if (WindowState == WindowState.Normal && _configManager != null)
             {
-                e.Cancel = true;
-                return;
+                try
+                {
+                    var width = ActualWidth;
+                    var height = ActualHeight;
+                    Task.Run(() =>
+                    {
+                        try
+                        {
+                            _configManager.UpdateGlobalConfigAsync(config =>
+                            {
+                                if (config?.UI?.MainWindow != null)
+                                {
+                                    config.UI.MainWindow.Width = Math.Round(width, 2);
+                                    config.UI.MainWindow.Height = Math.Round(height, 2);
+                                }
+                            }).Wait(500); // 减少等待时间
+                        }
+                        catch { }
+                    });
+                }
+                catch { }
             }
 
-            _isClosing = true;
-            _logger.Debug("正在关闭应用程序");
-
-            // 创建取消令牌，设置3秒超时
-            _cleanupCts = new CancellationTokenSource();
-            _cleanupCts.CancelAfter(TimeSpan.FromSeconds(3));
-
+            // 3. 快速清理UI资源
             try
             {
-                // 1. 立即禁用UI交互
-                IsEnabled = false;
-
-                // 2. 异步执行清理操作
-                await Task.Run(async () =>
+                RemoveMouseHook();
+                
+                if (_trayIcon != null)
                 {
-                    try
-                    {
-                        _logger.Debug("开始清理窗口资源...");
+                    _trayIcon.Visible = false;
+                    _trayIcon.Dispose();
+                    _trayIcon = null;
+                }
 
-                        // 保存窗口大小到配置
-                        await Dispatcher.InvokeAsync(async () =>
-                        {
-                            if (WindowState == WindowState.Normal)
-                            {
-                                _logger.Debug($"保存窗口大小: {ActualWidth}x{ActualHeight}");
-                                if (_configManager != null)
-                                {
-                                    try
-                                    {
-                                        await _configManager.UpdateGlobalConfigAsync(config =>
-                                        {
-                                            if (config != null && config.UI != null && config.UI.MainWindow != null)
-                                            {
-                                                config.UI.MainWindow.Width = ActualWidth;
-                                                config.UI.MainWindow.Height = ActualHeight;
-                                            }
-                                        });
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        _logger.Error("更新配置时发生错误", ex);
-                                    }
-                                }
-                                else
-                                {
-                                    _logger.Warning("无法保存窗口大小：配置管理器为空");
-                                }
-                            }
-                        });
-
-                        // 停止ViewModel操作
-                        if (_viewModel is IDisposable disposableViewModel)
-                            await Task.Run(() => disposableViewModel.Dispose(), _cleanupCts.Token);
-
-                        // 清理托盘图标
-                        await Dispatcher.InvokeAsync(() =>
-                        {
-                            if (_trayIcon != null)
-                            {
-                                _trayIcon.Visible = false;
-                                _trayIcon.Dispose();
-                                _trayIcon = null;
-                            }
-                        });
-
-                        // 清理托盘菜单
-                        await Dispatcher.InvokeAsync(() =>
-                        {
-                            if (_trayContextMenu != null)
-                            {
-                                _trayContextMenu.Items.Clear();
-                                _trayContextMenu = null;
-                            }
-                        });
-
-                        _logger.Debug("窗口资源清理完成");
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        _logger.Warning("清理操作已超时取消");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error("清理过程中发生错误", ex);
-                    }
-                }, _cleanupCts.Token);
+                if (_trayContextMenu != null)
+                {
+                    _trayContextMenu.Items.Clear();
+                    _trayContextMenu = null;
+                }
             }
-            finally
+            catch { }
+
+            // 4. 清理ViewModel（快速）
+            if (_viewModel is IDisposable disposableViewModel)
             {
-                // 设置关闭模式并关闭应用程序
-                await Dispatcher.InvokeAsync(() =>
+                try
                 {
-                    System.Windows.Application.Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                    System.Windows.Application.Current.Shutdown();
-                });
+                    disposableViewModel.Dispose();
+                }
+                catch { }
             }
+
+            // 5. 立即关闭应用程序
+            System.Windows.Application.Current.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            System.Windows.Application.Current.Shutdown();
         }
-        catch (Exception ex)
+        catch
         {
-            _logger.Error("窗口关闭异常", ex);
-        }
-        finally
-        {
-            _cleanupSemaphore.Release();
-            _cleanupCts?.Dispose();
+            Environment.Exit(0);
         }
     }
 
-    protected override async void OnClosed(EventArgs e)
+    protected override void OnClosed(EventArgs e)
     {
         try
         {
-            // 确保钩子被移除
-            await Dispatcher.InvokeAsync(() => RemoveMouseHook());
-
             // 清理页面缓存
-            await Task.Run(() => Services.PageCacheService.ClearCache());
-
-            if (_isClosing) return;
-            _isClosing = true;
+            Services.PageCacheService.ClearCache();
         }
         catch (Exception ex)
         {
@@ -555,13 +538,6 @@ public partial class MainWindow : Window
         {
             base.OnClosed(e);
         }
-    }
-
-    // 在类的末尾添加析构函数
-    ~MainWindow()
-    {
-        _cleanupSemaphore?.Dispose();
-        _cleanupCts?.Dispose();
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -622,9 +598,9 @@ public partial class MainWindow : Window
 
     #region 窗口大小调整
 
-    private const double RESIZE_THRESHOLD = 1.0; // 调整阈值，避免微小变化
-    private const double RESIZE_ACCELERATION = 1.0; // 调整加速度，使移动更平滑
-    private const int RESIZE_INTERVAL = 16; // 约60fps的更新间隔
+    private const double RESIZE_THRESHOLD = 1.0;
+    private const double RESIZE_ACCELERATION = 1.0;
+    private const int RESIZE_INTERVAL = 16;
     private DateTime _lastResizeTime = DateTime.MinValue;
 
     private void StartResize(ResizeDirection direction, MouseButtonEventArgs e)
@@ -633,18 +609,26 @@ public partial class MainWindow : Window
 
         _isResizing = true;
         _resizeDirection = direction;
-        _startPoint = PointToScreen(e.GetPosition(this)); // 使用屏幕坐标
+        _startPoint = PointToScreen(e.GetPosition(this));
         _startWidth = ActualWidth;
         _startHeight = ActualHeight;
         _startLeft = Left;
         _startTop = Top;
 
-        // 捕获鼠标
         Mouse.Capture(e.Source as IInputElement);
         e.Handled = true;
 
-        // 开始调整大小时禁用动画
-        if (FindName("MainBorder") is Border mainBorder) mainBorder.BeginAnimation(MarginProperty, null);
+        // 优化：调整大小时禁用阴影效果以提升性能
+        if (FindName("WindowBorder") is Border windowBorder && windowBorder.Effect is DropShadowEffect shadow)
+        {
+            shadow.BlurRadius = 0;
+        }
+        
+        // 禁用动画
+        if (FindName("MainBorder") is Border mainBorder)
+        {
+            mainBorder.BeginAnimation(MarginProperty, null);
+        }
     }
 
     protected override void OnMouseMove(System.Windows.Input.MouseEventArgs e)
@@ -716,8 +700,17 @@ public partial class MainWindow : Window
             _isResizing = false;
             Mouse.Capture(null);
 
+            // 恢复阴影效果
+            if (FindName("WindowBorder") is Border windowBorder && windowBorder.Effect is DropShadowEffect shadow)
+            {
+                shadow.BlurRadius = 10;
+            }
+            
             // 恢复动画
-            if (FindName("MainBorder") is Border mainBorder) mainBorder.BeginAnimation(MarginProperty, null);
+            if (FindName("MainBorder") is Border mainBorder)
+            {
+                mainBorder.BeginAnimation(MarginProperty, null);
+            }
 
             e.Handled = true;
         }

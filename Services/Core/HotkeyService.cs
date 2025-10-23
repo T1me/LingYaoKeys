@@ -113,11 +113,10 @@ public class HotkeyService
         _mouseProcDelegate = MouseHookCallback;
         _keyboardProcDelegate = KeyboardHookCallback;
 
-        // 订阅模式切换事件（仅在真正切换模式时触发）
+        // 订阅事件
         _lyKeysService.ModeSwitched += OnModeSwitched;
-
-        // 订阅配置变更事件
         _configManager.ConfigChanged += OnConfigChanged;
+        _mainWindow.Closed += (s, e) => Dispose();
 
         // 从配置加载初始状态
         LoadInitialState();
@@ -125,8 +124,7 @@ public class HotkeyService
         // 安装钩子
         InstallHooks();
 
-        // 窗口关闭时清理资源
-        _mainWindow.Closed += (s, e) => Dispose();
+        _logger.Debug("HotkeyService初始化完成");
     }
 
     // 加载初始状态
@@ -175,25 +173,50 @@ public class HotkeyService
     {
         lock (_hookLock)
         {
-            // 停止序列
-            StopSequence();
+            _logger.Debug("开始释放HotkeyService资源");
 
-            // 移除事件订阅
-            _lyKeysService.ModeSwitched -= OnModeSwitched;
-            _configManager.ConfigChanged -= OnConfigChanged;
-
-            // 卸载钩子
-            if (_keyboardHookHandle != IntPtr.Zero)
+            // 1. 停止序列
+            try
             {
-                UnhookWindowsHookEx(_keyboardHookHandle);
-                _keyboardHookHandle = IntPtr.Zero;
+                StopSequence();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("停止序列失败", ex);
             }
 
-            if (_mouseHookHandle != IntPtr.Zero)
+            // 2. 移除事件订阅
+            try
             {
-                UnhookWindowsHookEx(_mouseHookHandle);
-                _mouseHookHandle = IntPtr.Zero;
+                _lyKeysService.ModeSwitched -= OnModeSwitched;
+                _configManager.ConfigChanged -= OnConfigChanged;
             }
+            catch (Exception ex)
+            {
+                _logger.Error("移除事件订阅失败", ex);
+            }
+
+            // 3. 卸载钩子
+            try
+            {
+                if (_keyboardHookHandle != IntPtr.Zero)
+                {
+                    UnhookWindowsHookEx(_keyboardHookHandle);
+                    _keyboardHookHandle = IntPtr.Zero;
+                }
+
+                if (_mouseHookHandle != IntPtr.Zero)
+                {
+                    UnhookWindowsHookEx(_mouseHookHandle);
+                    _mouseHookHandle = IntPtr.Zero;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("卸载钩子失败", ex);
+            }
+
+            _logger.Debug("HotkeyService资源释放完成");
         }
     }
 

@@ -84,7 +84,11 @@ public class MainViewModel : ViewModelBase
     {
         get
         {
-            if (_globalConfig == null) _globalConfig = _configManager.GlobalConfig;
+            if (_globalConfig == null)
+            {
+                _globalConfig = _configManager.GlobalConfig;
+                OnPropertyChanged();
+            }
             return _globalConfig;
         }
     }
@@ -175,15 +179,19 @@ public class MainViewModel : ViewModelBase
             StatusMessageColor = System.Windows.Media.Brushes.Black;
         };
 
-        // 必须在创建HotkeyService之前设置DataContext，因为HotkeyService需要访问MainViewModel
-        mainWindow.DataContext = this;
-
         // 确保ConfigManager已初始化
         _configManager = App.ConfigService ?? WpfApp.Services.Core.ConfigManager.Instance;
         if (_configManager == null)
         {
             throw new InvalidOperationException("ConfigManager未初始化，无法创建HotkeyService");
         }
+        
+        // 预加载GlobalConfig，确保在设置DataContext之前配置已经加载
+        _globalConfig = _configManager.GlobalConfig;
+        Logger.Debug($"GlobalConfig已加载 - MainWindow尺寸: {_globalConfig.UI.MainWindow.Width}x{_globalConfig.UI.MainWindow.Height}");
+        
+        // 必须在创建HotkeyService之前设置DataContext，因为HotkeyService需要访问MainViewModel
+        mainWindow.DataContext = this;
         
         // 初始化HotkeyService
         _hotkeyService = new HotkeyService(mainWindow, lyKeysService, _configManager);

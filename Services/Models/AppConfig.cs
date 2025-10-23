@@ -146,6 +146,7 @@ public class GlobalConfig
     public double? SoundVolume { get; set; } = 0.8;
     public bool? AutoSwitchToEnglishIME { get; set; } = true;
     public bool? isHotkeyControlEnabled { get; set; } = true;
+    public bool? EnableHardwareAcceleration { get; set; } = true;
 
     [JsonIgnore] public string Author { get; set; } = "慕长秋";
 

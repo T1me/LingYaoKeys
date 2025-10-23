@@ -64,8 +64,8 @@ public partial class FloatingStatusWindow : Window
             // 保存默认位置
             _ = _configManager.UpdateGlobalConfigAsync(config =>
             {
-                config.UI.FloatingWindow.Left = left;
-                config.UI.FloatingWindow.Top = top;
+                config.UI.FloatingWindow.Left = Math.Round(left, 2);
+                config.UI.FloatingWindow.Top = Math.Round(top, 2);
             });
             _logger.Debug($"浮窗位置初始化为右下角: Left={left}, Top={top}");
         }
@@ -88,8 +88,8 @@ public partial class FloatingStatusWindow : Window
             // 保存新位置
             _ = _configManager.UpdateGlobalConfigAsync(config =>
             {
-                config.UI.FloatingWindow.Left = Left;
-                config.UI.FloatingWindow.Top = Top;
+                config.UI.FloatingWindow.Left = Math.Round(Left, 2);
+                config.UI.FloatingWindow.Top = Math.Round(Top, 2);
             });
             _logger.Debug($"浮窗位置重置到右下角: Left={Left}, Top={Top}");
         }
@@ -99,8 +99,17 @@ public partial class FloatingStatusWindow : Window
     {
         try
         {
-            // 启用硬件加速和优化渲染设置
-            SetupHardwareAcceleration();
+            // 检查配置是否启用硬件加速
+            bool enableHardwareAcceleration = ConfigManager.Instance?.GlobalConfig?.EnableHardwareAcceleration ?? true;
+            if (enableHardwareAcceleration)
+            {
+                // 启用硬件加速和优化渲染设置
+                SetupHardwareAcceleration();
+            }
+            else
+            {
+                _logger.Debug("硬件加速已禁用，跳过浮窗硬件加速设置");
+            }
             
             // 初始化边框样式
             UpdateBorderStyle();
@@ -117,34 +126,36 @@ public partial class FloatingStatusWindow : Window
         }
     }
     
+    /// <summary>
+    /// DataContext变化事件处理
+    /// </summary>
     private void FloatingStatusWindow_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         try
         {
-            // 数据上下文变化时更新边框样式
-            UpdateBorderStyle();
-            
-            // 尝试适配INotifyPropertyChanged接口
-            if (e.NewValue is INotifyPropertyChanged notifyPropertyChanged)
+            // 移除旧的事件监听
+            if (e.OldValue is INotifyPropertyChanged oldNotify)
             {
-                // 移除旧的事件处理程序（如果有）
-                if (e.OldValue is INotifyPropertyChanged oldNotify)
-                {
-                    oldNotify.PropertyChanged -= ViewModel_PropertyChanged;
-                }
-                
-                // 添加新的事件处理程序
-                notifyPropertyChanged.PropertyChanged += ViewModel_PropertyChanged;
+                oldNotify.PropertyChanged -= ViewModel_PropertyChanged;
+            }
+            
+            // 添加新的事件监听
+            if (e.NewValue is INotifyPropertyChanged newNotify)
+            {
+                newNotify.PropertyChanged += ViewModel_PropertyChanged;
                 _logger.Debug("已注册INotifyPropertyChanged事件监听");
             }
-            else
+            else if (e.NewValue != null)
             {
                 _logger.Warning("ViewModel未实现INotifyPropertyChanged接口，状态更新可能不同步");
             }
+            
+            // 更新边框样式
+            UpdateBorderStyle();
         }
         catch (Exception ex)
         {
-            _logger.Error("更新浮窗边框样式时出错", ex);
+            _logger.Error("处理DataContext变化时出错", ex);
         }
     }
     
@@ -153,104 +164,44 @@ public partial class FloatingStatusWindow : Window
     /// </summary>
     private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
     {
-        try
+        if (e.PropertyName == "StatusText")
         {
-            // 如果是StatusText属性变化，更新边框样式
-            if (e.PropertyName == "StatusText")
-            {
-                UpdateBorderStyle();
-                _logger.Debug("检测到StatusText属性变化，边框样式已更新");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("处理属性变化事件时出错", ex);
+            UpdateBorderStyle();
         }
     }
     
     /// <summary>
-    /// 外部接口：直接更新浮窗边框样式
-    /// 由ViewModel在调用UpdateFloatingStatus时调用
+    /// 更新浮窗边框样式
     /// </summary>
-    /// <param name="statusText">状态文本</param>
-    public void UpdateBorderStyle(string statusText)
+    /// <param name="statusText">状态文本，如果为null则从DataContext获取</param>
+    public void UpdateBorderStyle(string statusText = null)
     {
         if (BorderContainer == null)
             return;
             
         try
         {
+            // 如果未提供状态文本，从DataContext获取
+            if (statusText == null && DataContext != null)
+            {
+                statusText = GetStatusTextFromDataContext();
+            }
+            
+            // 如果仍然无法获取状态文本，直接返回
+            if (statusText == null)
+                return;
+            
             // 如果状态没变化，不需要更新
             if (statusText == _currentStatus)
                 return;
                 
             _currentStatus = statusText;
             
-            // 确定状态对应的颜色索引
-            int colorIndex;
-            switch (statusText)
-            {
-                case "运行中":
-                    colorIndex = 0;
-                    break;
-                case "已禁用":
-                    colorIndex = 1;
-                    break;
-                default: // 已停止或其他
-                    colorIndex = 2;
-                    break;
-            }
-            
             // 获取对应的颜色数组
-            var colors = StatusToColorConverter.GetBorderColors(colorIndex);
+            var colors = GetBorderColorsByStatus(statusText);
             
-            if (BorderContainer.BorderBrush is LinearGradientBrush existingBrush)
-            {
-                // 如果已有LinearGradientBrush，则只更新颜色
-                if (existingBrush.GradientStops.Count == 3)
-                {
-                    // 更新现有GradientStops的Color属性，保持动画和变换不变
-                    existingBrush.GradientStops[0].Color = colors[0];
-                    existingBrush.GradientStops[1].Color = colors[1];
-                    existingBrush.GradientStops[2].Color = colors[2];
-                    
-                    _logger.Debug($"浮窗边框样式已更新（保留动画），当前状态: {statusText}");
-                }
-                else
-                {
-                    // GradientStops数量不匹配，重新创建GradientStops
-                    existingBrush.GradientStops.Clear();
-                    existingBrush.GradientStops.Add(new GradientStop(colors[0], 0.0));
-                    existingBrush.GradientStops.Add(new GradientStop(colors[1], 0.5));
-                    existingBrush.GradientStops.Add(new GradientStop(colors[2], 1.0));
-                    
-                    _logger.Debug($"浮窗边框样式已重建，当前状态: {statusText}");
-                }
-            }
-            else
-            {
-                // 如果没有现有画刷，则创建新的
-                var gradientBrush = new LinearGradientBrush();
-                gradientBrush.StartPoint = new System.Windows.Point(0, 0);
-                gradientBrush.EndPoint = new System.Windows.Point(1, 1);
-                
-                gradientBrush.GradientStops.Add(new GradientStop(colors[0], 0.0));
-                gradientBrush.GradientStops.Add(new GradientStop(colors[1], 0.5));
-                gradientBrush.GradientStops.Add(new GradientStop(colors[2], 1.0));
-                
-                // 设置旋转变换
-                var rotateTransform = new RotateTransform
-                {
-                    CenterX = 0.5,
-                    CenterY = 0.5
-                };
-                gradientBrush.RelativeTransform = rotateTransform;
-                
-                // 设置边框画刷
-                BorderContainer.BorderBrush = gradientBrush;
-                
-                _logger.Debug($"浮窗边框样式已创建新画刷，当前状态: {statusText}");
-            }
+            // 更新或创建边框画刷
+            UpdateOrCreateBorderBrush(colors, statusText);
         }
         catch (Exception ex)
         {
@@ -259,51 +210,106 @@ public partial class FloatingStatusWindow : Window
     }
     
     /// <summary>
-    /// 根据当前状态更新边框样式
+    /// 从DataContext获取状态文本
     /// </summary>
-    private void UpdateBorderStyle()
+    private string GetStatusTextFromDataContext()
     {
-        if (BorderContainer == null || DataContext == null)
-            return;
-            
         try
         {
-            // 获取当前状态文本
-            string statusText = null;
-            
-            // 尝试获取状态文本
+            // 尝试动态访问
+            dynamic viewModel = DataContext;
+            return viewModel?.StatusText as string;
+        }
+        catch
+        {
+            // 如果动态访问失败，尝试使用反射
             try
             {
-                dynamic viewModel = DataContext;
-                statusText = viewModel?.StatusText as string;
+                var property = DataContext.GetType().GetProperty("StatusText");
+                return property?.GetValue(DataContext) as string;
             }
             catch
             {
-                // 如果动态访问失败，尝试使用反射
-                try
-                {
-                    var property = DataContext.GetType().GetProperty("StatusText");
-                    if (property != null)
-                    {
-                        statusText = property.GetValue(DataContext) as string;
-                    }
-                }
-                catch
-                {
-                    _logger.Warning("无法获取StatusText属性值");
-                }
-            }
-            
-            // 更新边框样式
-            if (statusText != null)
-            {
-                UpdateBorderStyle(statusText);
+                _logger.Warning("无法获取StatusText属性值");
+                return null;
             }
         }
-        catch (Exception ex)
+    }
+    
+    /// <summary>
+    /// 根据状态文本获取边框颜色
+    /// </summary>
+    private System.Windows.Media.Color[] GetBorderColorsByStatus(string statusText)
+    {
+        int colorIndex = statusText switch
         {
-            _logger.Error("更新边框样式时出错", ex);
+            "运行中" => 0,
+            "已禁用" => 1,
+            _ => 2 // 已停止或其他
+        };
+        
+        return StatusToColorConverter.GetBorderColors(colorIndex);
+    }
+    
+    /// <summary>
+    /// 更新或创建边框画刷
+    /// </summary>
+    private void UpdateOrCreateBorderBrush(System.Windows.Media.Color[] colors, string statusText)
+    {
+        if (BorderContainer.BorderBrush is LinearGradientBrush existingBrush)
+        {
+            // 更新现有画刷
+            UpdateExistingBrush(existingBrush, colors, statusText);
         }
+        else
+        {
+            // 创建新画刷
+            CreateNewBrush(colors, statusText);
+        }
+    }
+    
+    /// <summary>
+    /// 更新现有的渐变画刷
+    /// </summary>
+    private void UpdateExistingBrush(LinearGradientBrush brush, System.Windows.Media.Color[] colors, string statusText)
+    {
+        if (brush.GradientStops.Count == 3)
+        {
+            // 直接更新颜色，保持动画和变换
+            brush.GradientStops[0].Color = colors[0];
+            brush.GradientStops[1].Color = colors[1];
+            brush.GradientStops[2].Color = colors[2];
+            _logger.Debug($"边框样式已更新（保留动画），状态: {statusText}");
+        }
+        else
+        {
+            // 重建GradientStops
+            brush.GradientStops.Clear();
+            brush.GradientStops.Add(new GradientStop(colors[0], 0.0));
+            brush.GradientStops.Add(new GradientStop(colors[1], 0.5));
+            brush.GradientStops.Add(new GradientStop(colors[2], 1.0));
+            _logger.Debug($"边框样式已重建，状态: {statusText}");
+        }
+    }
+    
+    /// <summary>
+    /// 创建新的渐变画刷
+    /// </summary>
+    private void CreateNewBrush(System.Windows.Media.Color[] colors, string statusText)
+    {
+        var gradientBrush = new LinearGradientBrush
+        {
+            StartPoint = new System.Windows.Point(0, 0),
+            EndPoint = new System.Windows.Point(1, 1),
+            RelativeTransform = new RotateTransform { CenterX = 0.5, CenterY = 0.5 }
+        };
+        
+        gradientBrush.GradientStops.Add(new GradientStop(colors[0], 0.0));
+        gradientBrush.GradientStops.Add(new GradientStop(colors[1], 0.5));
+        gradientBrush.GradientStops.Add(new GradientStop(colors[2], 1.0));
+        
+        BorderContainer.BorderBrush = gradientBrush;
+        _logger.Debug($"边框样式已创建新画刷，状态: {statusText}");
     }
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -343,37 +349,15 @@ public partial class FloatingStatusWindow : Window
 
         try
         {
-            // 如果发生了拖拽，保存新位置
             if (_isDragging)
             {
-                await _configManager.UpdateGlobalConfigAsync(config =>
-                {
-                    config.UI.FloatingWindow.Left = Math.Round(Left, 2);
-                    config.UI.FloatingWindow.Top = Math.Round(Top, 2);
-                });
-                _logger.Debug($"保存浮窗位置: Left={Left}, Top={Top}");
-            }
-            else if (_mainWindow != null)
-            {
-                var currentTime = DateTime.Now;
-                var timeSinceLastClick = (currentTime - _lastClickTime).TotalMilliseconds;
-
-                if (timeSinceLastClick <= DOUBLE_CLICK_THRESHOLD)
-                {
-                    _logger.Debug("检测到浮窗双击，准备显示主窗口");
-                    // 双击，显示主窗口
-                    _mainWindow.RestoreFromMinimized();
-                    _lastClickTime = DateTime.MinValue; // 重置点击时间
-                }
-                else
-                {
-                    _logger.Debug("记录单击时间");
-                    _lastClickTime = currentTime;
-                }
+                // 保存拖拽后的新位置
+                await SaveWindowPosition();
             }
             else
             {
-                _logger.Warning("MainWindow 引用为空，无法处理点击事件");
+                // 处理双击事件
+                HandleDoubleClick();
             }
         }
         catch (Exception ex)
@@ -385,42 +369,74 @@ public partial class FloatingStatusWindow : Window
             _isDragging = false;
         }
     }
+    
+    /// <summary>
+    /// 保存窗口位置
+    /// </summary>
+    private async System.Threading.Tasks.Task SaveWindowPosition()
+    {
+        await _configManager.UpdateGlobalConfigAsync(config =>
+        {
+            config.UI.FloatingWindow.Left = Math.Round(Left, 2);
+            config.UI.FloatingWindow.Top = Math.Round(Top, 2);
+        });
+        _logger.Debug($"保存浮窗位置: Left={Left}, Top={Top}");
+    }
+    
+    /// <summary>
+    /// 处理双击事件
+    /// </summary>
+    private void HandleDoubleClick()
+    {
+        if (_mainWindow == null)
+        {
+            _logger.Warning("MainWindow引用为空，无法处理双击事件");
+            return;
+        }
+        
+        var currentTime = DateTime.Now;
+        var timeSinceLastClick = (currentTime - _lastClickTime).TotalMilliseconds;
+
+        if (timeSinceLastClick <= DOUBLE_CLICK_THRESHOLD)
+        {
+            _logger.Debug("检测到浮窗双击，显示主窗口");
+            _mainWindow.RestoreFromMinimized();
+            _lastClickTime = DateTime.MinValue;
+        }
+        else
+        {
+            _lastClickTime = currentTime;
+        }
+    }
 
     private void Window_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         try
         {
-            _logger.Debug("浮窗接收到右键点击");
-
-            // 确保窗口获得焦点
+            if (_mainWindow?._trayContextMenu == null)
+            {
+                _logger.Warning("MainWindow或托盘菜单为空，无法显示菜单");
+                return;
+            }
+            
             Focus();
-
-            // 显示托盘菜单
-            if (_mainWindow?._trayContextMenu != null)
+            
+            // 配置并显示托盘菜单
+            var menu = _mainWindow._trayContextMenu;
+            menu.PlacementTarget = this;
+            menu.Placement = PlacementMode.MousePoint;
+            menu.StaysOpen = true;
+            menu.IsOpen = true;
+            
+            // 菜单关闭时重置StaysOpen
+            menu.Closed += (s, args) =>
             {
-                _logger.Debug("准备显示托盘菜单");
+                if (_mainWindow?._trayContextMenu != null)
+                    _mainWindow._trayContextMenu.StaysOpen = false;
+            };
 
-                // 设置菜单位置和目标
-                _mainWindow._trayContextMenu.PlacementTarget = this;
-                _mainWindow._trayContextMenu.Placement = PlacementMode.MousePoint;
-
-                // 确保菜单在显示时不会自动关闭
-                _mainWindow._trayContextMenu.StaysOpen = true;
-                _mainWindow._trayContextMenu.IsOpen = true;
-
-                // 订阅菜单关闭事件，以便在关闭时重置 StaysOpen
-                _mainWindow._trayContextMenu.Closed += (s, args) =>
-                {
-                    if (_mainWindow?._trayContextMenu != null) _mainWindow._trayContextMenu.StaysOpen = false;
-                };
-
-                e.Handled = true;
-                _logger.Debug("托盘菜单已显示");
-            }
-            else
-            {
-                _logger.Warning("MainWindow 或托盘菜单为空，无法显示菜单");
-            }
+            e.Handled = true;
+            _logger.Debug("托盘菜单已显示");
         }
         catch (Exception ex)
         {
@@ -432,13 +448,8 @@ public partial class FloatingStatusWindow : Window
     {
         try
         {
-            // 保存窗口位置
-            await _configManager.UpdateGlobalConfigAsync(config =>
-            {
-                config.UI.FloatingWindow.Left = Left;
-                config.UI.FloatingWindow.Top = Top;
-            });
-            _logger.Debug($"保存浮窗关闭前位置: Left={Left}, Top={Top}");
+            await SaveWindowPosition();
+            _logger.Debug("浮窗关闭前位置已保存");
         }
         catch (Exception ex)
         {
@@ -466,44 +477,40 @@ public partial class FloatingStatusWindow : Window
     {
         try
         {
-            // 设置缓存模式为位图缓存，提高渲染性能
-            this.CacheMode = new BitmapCache
+            // 设置窗口缓存模式
+            CacheMode = new BitmapCache
             {
                 EnableClearType = true,
                 SnapsToDevicePixels = true,
                 RenderAtScale = 1.0
             };
             
-            // 启用布局舍入以确保渲染精确
-            this.UseLayoutRounding = true;
+            UseLayoutRounding = true;
             
-            // 设置边框为位图缓存，优化渐变动画性能
+            // 优化边框渲染
             if (BorderContainer != null)
             {
-                // 优化边框渲染
-                BorderContainer.CacheMode = new BitmapCache { 
+                BorderContainer.CacheMode = new BitmapCache 
+                { 
                     EnableClearType = true, 
                     SnapsToDevicePixels = true
                 };
                 RenderOptions.SetCachingHint(BorderContainer, CachingHint.Cache);
             }
             
-            // 强制为此窗口使用硬件加速
-            HwndSource hwndSource = PresentationSource.FromVisual(this) as HwndSource;
-            if (hwndSource != null)
+            // 启用硬件渲染模式
+            if (PresentationSource.FromVisual(this) is HwndSource hwndSource)
             {
                 hwndSource.CompositionTarget.RenderMode = RenderMode.Default;
-                _logger.Debug("已为浮窗启用硬件渲染模式");
             }
             
-            // 设置渲染动画的线程优先级
-            if (Dispatcher != null && Dispatcher.Thread != null)
+            // 优化渲染线程优先级
+            if (Dispatcher?.Thread != null)
             {
                 Dispatcher.Thread.Priority = ThreadPriority.AboveNormal;
-                _logger.Debug("已优化浮窗渲染线程优先级");
             }
             
-            _logger.Debug("浮窗硬件加速已配置完成");
+            _logger.Debug("浮窗硬件加速配置完成");
         }
         catch (Exception ex)
         {
