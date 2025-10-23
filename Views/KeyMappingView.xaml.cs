@@ -917,6 +917,26 @@ public partial class KeyMappingView : Page
             Key.D8 => LyKeysCode.VK_8,
             Key.D9 => LyKeysCode.VK_9,
 
+            // 小键盘数字键
+            Key.NumPad0 => LyKeysCode.VK_NUMPAD0,
+            Key.NumPad1 => LyKeysCode.VK_NUMPAD1,
+            Key.NumPad2 => LyKeysCode.VK_NUMPAD2,
+            Key.NumPad3 => LyKeysCode.VK_NUMPAD3,
+            Key.NumPad4 => LyKeysCode.VK_NUMPAD4,
+            Key.NumPad5 => LyKeysCode.VK_NUMPAD5,
+            Key.NumPad6 => LyKeysCode.VK_NUMPAD6,
+            Key.NumPad7 => LyKeysCode.VK_NUMPAD7,
+            Key.NumPad8 => LyKeysCode.VK_NUMPAD8,
+            Key.NumPad9 => LyKeysCode.VK_NUMPAD9,
+
+            // 小键盘运算符
+            Key.Multiply => LyKeysCode.VK_MULTIPLY,
+            Key.Add => LyKeysCode.VK_ADD,
+            Key.Separator => LyKeysCode.VK_SEPARATOR,
+            Key.Subtract => LyKeysCode.VK_SUBTRACT,
+            Key.Decimal => LyKeysCode.VK_DECIMAL,
+            Key.Divide => LyKeysCode.VK_DIVIDE,
+
             // 功能键
             Key.F1 => LyKeysCode.VK_F1,
             Key.F2 => LyKeysCode.VK_F2,
@@ -945,6 +965,18 @@ public partial class KeyMappingView : Page
             Key.Enter => LyKeysCode.VK_RETURN,
             Key.Back => LyKeysCode.VK_BACK,
 
+            // 导航键
+            Key.Insert => LyKeysCode.VK_INSERT,
+            Key.Delete => LyKeysCode.VK_DELETE,
+            Key.Home => LyKeysCode.VK_HOME,
+            Key.End => LyKeysCode.VK_END,
+            Key.PageUp => LyKeysCode.VK_PRIOR,
+            Key.PageDown => LyKeysCode.VK_NEXT,
+            Key.Up => LyKeysCode.VK_UP,
+            Key.Down => LyKeysCode.VK_DOWN,
+            Key.Left => LyKeysCode.VK_LEFT,
+            Key.Right => LyKeysCode.VK_RIGHT,
+
             // 符号键
             Key.OemTilde => LyKeysCode.VK_OEM_3,
             Key.OemMinus => LyKeysCode.VK_OEM_MINUS,
@@ -957,20 +989,48 @@ public partial class KeyMappingView : Page
             Key.OemPeriod => LyKeysCode.VK_OEM_PERIOD,
             Key.OemQuestion => LyKeysCode.VK_OEM_2,
             Key.OemBackslash => LyKeysCode.VK_OEM_5,
+            Key.OemPipe => LyKeysCode.VK_OEM_5,
 
-            // 添加方向键映射
-            Key.Up => LyKeysCode.VK_UP,
-            Key.Down => LyKeysCode.VK_DOWN,
-            Key.Left => LyKeysCode.VK_LEFT,
-            Key.Right => LyKeysCode.VK_RIGHT,
+            // Windows键
+            Key.LWin => LyKeysCode.VK_LWIN,
+            Key.RWin => LyKeysCode.VK_RWIN,
+            Key.Apps => LyKeysCode.VK_APPS,
+
+            // 锁定键
+            Key.NumLock => LyKeysCode.VK_NUMLOCK,
+            Key.Scroll => LyKeysCode.VK_SCROLL,
+
+            // 其他特殊键
+            Key.Pause => LyKeysCode.VK_PAUSE,
+            Key.PrintScreen => LyKeysCode.VK_SNAPSHOT,
+            Key.Sleep => LyKeysCode.VK_SLEEP,
+
+            // 浏览器控制键
+            Key.BrowserBack => LyKeysCode.VK_BROWSER_BACK,
+            Key.BrowserForward => LyKeysCode.VK_BROWSER_FORWARD,
+            Key.BrowserRefresh => LyKeysCode.VK_BROWSER_REFRESH,
+            Key.BrowserStop => LyKeysCode.VK_BROWSER_STOP,
+            Key.BrowserSearch => LyKeysCode.VK_BROWSER_SEARCH,
+            Key.BrowserFavorites => LyKeysCode.VK_BROWSER_FAVORITES,
+            Key.BrowserHome => LyKeysCode.VK_BROWSER_HOME,
+
+            // 音量控制键
+            Key.VolumeMute => LyKeysCode.VK_VOLUME_MUTE,
+            Key.VolumeDown => LyKeysCode.VK_VOLUME_DOWN,
+            Key.VolumeUp => LyKeysCode.VK_VOLUME_UP,
+
+            // 媒体控制键
+            Key.MediaNextTrack => LyKeysCode.VK_MEDIA_NEXT_TRACK,
+            Key.MediaPreviousTrack => LyKeysCode.VK_MEDIA_PREV_TRACK,
+            Key.MediaStop => LyKeysCode.VK_MEDIA_STOP,
+            Key.MediaPlayPause => LyKeysCode.VK_MEDIA_PLAY_PAUSE,
 
             _ => LyKeysCode.VK_ESCAPE
         };
 
-        // 修改返回逻辑，添加方向键判断
-        return key == Key.Escape ||
-               (key >= Key.Left && key <= Key.Down) || // 方向键
-               lyKeysCode != LyKeysCode.VK_ESCAPE;
+        // 修改返回逻辑，只有当映射成功时才返回true
+        // 对于未映射的键（默认为VK_ESCAPE），只有当输入的确实是Escape键时才返回true
+        return lyKeysCode != LyKeysCode.VK_ESCAPE || key == Key.Escape;
     }
 
     // 处理按键输入框获得焦点
