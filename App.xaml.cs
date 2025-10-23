@@ -60,26 +60,12 @@ public partial class App : Application
 
     public App()
     {
-        // 先初始化基本服务，推迟硬件加速配置
-        // 注册进程退出事件处理
+        // 注册控制台事件处理
         _handler += new EventHandler(Handler);
         SetConsoleCtrlHandler(_handler, true);
 
-        // 注册应用程序域未处理异常处理程序
-        AppDomain.CurrentDomain.ProcessExit += (s, e) => CleanupServices();
-
-        // 注册任务调度器未观察到的异常处理程序
-        TaskScheduler.UnobservedTaskException += (s, e) =>
-        {
-            CleanupServices();
-            e.SetObserved();
-        };
-
-        // 注册应用程序退出事件
+        // 注册应用程序退出事件（只注册一次）
         Exit += OnApplicationExit;
-        
-        // 硬件加速配置放在基本初始化之后
-        ConfigureHardwareAcceleration();
     }
 
     private bool Handler(CtrlType sig)
@@ -105,28 +91,69 @@ public partial class App : Application
 
         try
         {
-            _logger.Debug($"开始清理服务... 清理级别: {level}");
+            _logger.Debug($"开始清理服务 - 级别: {level}");
 
-            // 确保所有服务都被释放
+            // 1. 停止并释放驱动服务
             if (LyKeysDriver != null)
             {
-                LyKeysDriver.Dispose();
+                try
+                {
+                    LyKeysDriver.Dispose();
+                    _logger.Debug("驱动服务已释放");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("释放驱动服务失败", ex);
+                }
                 LyKeysDriver = null;
             }
 
+            // 2. 释放音频服务
             if (AudioService != null)
             {
-                AudioService.Dispose();
+                try
+                {
+                    AudioService.Dispose();
+                    _logger.Debug("音频服务已释放");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("释放音频服务失败", ex);
+                }
                 AudioService = null;
             }
 
-            // 清理配置服务
+            // 3. 清理配置服务引用
             ConfigService = null;
 
-            // 如果是完整清理，则尝试停止和删除驱动服务
+            // 4. 完整清理时卸载驱动
             if (level == CleanupLevel.Complete)
+            {
+                UnloadDriver();
+            }
+
+            _logger.Debug("服务清理完成");
+            _logger.Debug("=================================================");
+
+            // 5. 释放日志服务
+            _logger.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"清理服务异常: {ex.Message}");
+        }
+    }
+
+    private void UnloadDriver()
+    {
+        try
+        {
+            // 异步卸载驱动，不阻塞退出
+            Task.Run(() =>
+            {
                 try
                 {
+                    // 停止驱动服务
                     using (var p = new Process())
                     {
                         p.StartInfo.FileName = "sc.exe";
@@ -134,9 +161,12 @@ public partial class App : Application
                         p.StartInfo.UseShellExecute = false;
                         p.StartInfo.CreateNoWindow = true;
                         p.Start();
-                        p.WaitForExit(100);
+                        p.WaitForExit(1000); // 减少等待时间
                     }
 
+                    Thread.Sleep(100);
+
+                    // 删除驱动服务
                     using (var p = new Process())
                     {
                         p.StartInfo.FileName = "sc.exe";
@@ -144,36 +174,13 @@ public partial class App : Application
                         p.StartInfo.UseShellExecute = false;
                         p.StartInfo.CreateNoWindow = true;
                         p.Start();
-                        p.WaitForExit(100);
+                        p.WaitForExit(1000);
                     }
-
-                    _logger.Debug("驱动服务已停止并删除");
                 }
-                catch (Exception ex)
-                {
-                    _logger.Error("清理驱动服务失败", ex);
-                }
-
-            // 最后释放日志服务
-            _logger.Debug("服务清理完成");
-            _logger.Debug("=================================================");
-
-            // 最后释放日志服务
-            _logger.Dispose();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"清理服务异常: {ex.Message}");
-        }
-        finally
-        {
-            // 确保程序退出
-            Task.Run(() =>
-            {
-                Thread.Sleep(500); // 给清理过程一些时间
-                Environment.Exit(0);
+                catch { }
             });
         }
+        catch { }
     }
 
     private void CleanupServices()
@@ -181,7 +188,7 @@ public partial class App : Application
         Cleanup(CleanupLevel.Complete);
     }
 
-    private async Task<bool> CheckServiceExistsAsync(string serviceName)
+    private bool CheckServiceExists(string serviceName)
     {
         try
         {
@@ -197,17 +204,16 @@ public partial class App : Application
                 }
             };
             process.Start();
-            await process.WaitForExitAsync();
+            process.WaitForExit(1000); // 减少超时时间
             return process.ExitCode == 0;
         }
-        catch (Exception ex)
+        catch
         {
-            _logger.Error($"检查服务状态失败: {ex.Message}", ex);
             return false;
         }
     }
 
-    private async Task<bool> StopServiceAsync(string serviceName)
+    private bool StopService(string serviceName)
     {
         try
         {
@@ -223,17 +229,16 @@ public partial class App : Application
                 }
             };
             process.Start();
-            await process.WaitForExitAsync();
+            process.WaitForExit(1000); // 减少超时时间
             return process.ExitCode == 0;
         }
-        catch (Exception ex)
+        catch
         {
-            _logger.Error($"停止服务失败: {ex.Message}", ex);
             return false;
         }
     }
 
-    private async Task<bool> DeleteServiceAsync(string serviceName)
+    private bool DeleteService(string serviceName)
     {
         try
         {
@@ -249,179 +254,221 @@ public partial class App : Application
                 }
             };
             process.Start();
-            await process.WaitForExitAsync();
+            process.WaitForExit(1000); // 减少超时时间
             return process.ExitCode == 0;
         }
-        catch (Exception ex)
+        catch
         {
-            _logger.Error($"删除服务失败: {ex.Message}", ex);
             return false;
         }
     }
 
-    private async Task CleanupExistingServiceAsync()
+    private void CleanupExistingService()
     {
         const string serviceName = "lykeys";
 
         try
         {
-            if (await CheckServiceExistsAsync(serviceName))
+            _logger.Debug("清理已存在的lykeys服务");
+
+            // 停止服务（减少等待时间）
+            if (StopService(serviceName))
             {
-                _logger.Debug("检测到已存在的lykeys服务，开始清理...");
-
-                // 尝试停止服务
-                if (await StopServiceAsync(serviceName))
-                {
-                    _logger.Debug("成功停止lykeys服务");
-                    // 等待服务完全停止
-                    await Task.Delay(1000);
-                }
-
-                // 尝试删除服务
-                if (await DeleteServiceAsync(serviceName))
-                {
-                    _logger.Debug("成功删除lykeys服务");
-                    // 等待服务完全删除
-                    await Task.Delay(1000);
-                }
-
-                // 尝试结束所有相关进程
-                try
-                {
-                    var processes = Process.GetProcessesByName("lykeys");
-                    foreach (var proc in processes)
-                        try
-                        {
-                            proc.Kill();
-                            proc.WaitForExit(1000);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Error($"结束进程失败: {ex.Message}", ex);
-                        }
-                        finally
-                        {
-                            proc.Dispose();
-                        }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error($"清理相关进程失败: {ex.Message}", ex);
-                }
-
-                // 等待一段时间，确保所有资源都被释放
-                await Task.Delay(1000);
+                _logger.Debug("停止lykeys服务");
+                Thread.Sleep(200); // 减少等待时间
             }
+
+            // 删除服务
+            if (DeleteService(serviceName))
+            {
+                _logger.Debug("删除lykeys服务");
+                Thread.Sleep(200);
+            }
+
+            // 快速清理进程
+            try
+            {
+                var processes = Process.GetProcessesByName("lykeys");
+                foreach (var proc in processes)
+                {
+                    try
+                    {
+                        proc.Kill();
+                        proc.WaitForExit(500); // 减少等待时间
+                    }
+                    catch { }
+                    finally
+                    {
+                        proc.Dispose();
+                    }
+                }
+            }
+            catch { }
+
+            Thread.Sleep(200); // 最终等待时间减少
         }
         catch (Exception ex)
         {
-            _logger.Error("清理已存在的服务失败", ex);
-            throw;
+            _logger.Error("清理服务失败", ex);
+            // 不抛出异常，允许继续启动
         }
     }
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
+        Views.SplashWindow? splashWindow = null;
+
         try
         {
-            // 创建并显示启动屏幕
-            var splashWindow = new Views.SplashWindow();
+            System.Diagnostics.Debug.WriteLine("=== 应用程序启动开始 ===");
+            
+            // 1. 创建并显示启动屏幕
+            System.Diagnostics.Debug.WriteLine("1. 创建启动屏幕");
+            splashWindow = new Views.SplashWindow();
             splashWindow.Show();
             splashWindow.UpdateProgress("正在初始化应用程序...", 0);
 
-            // 设置高DPI模式
-            System.Diagnostics.Debug.WriteLine("正在应用 Per Monitor V2 DPI 感知...");
-
-            // 确保用户数据目录存在
+            // 2. 确保用户数据目录存在
+            System.Diagnostics.Debug.WriteLine("2. 创建用户数据目录");
             Directory.CreateDirectory(_pathService.AppDataPath);
 
-            // 1. 初始化配置服务
+            // 3. 初始化配置服务
+            System.Diagnostics.Debug.WriteLine("3. 初始化配置服务");
             splashWindow.UpdateProgress("正在初始化配置服务...", 20);
             ConfigManager.Instance.Initialize();
-
-            // 初始化ConfigService静态属性
             ConfigService = ConfigManager.Instance;
 
-            // 2. 初始化日志系统
+            // 3.5 配置硬件加速（在配置加载后）
+            System.Diagnostics.Debug.WriteLine("3.5 配置硬件加速");
+            ConfigureHardwareAcceleration();
+
+            // 4. 初始化日志系统
+            System.Diagnostics.Debug.WriteLine("4. 初始化日志系统");
             splashWindow.UpdateProgress("正在初始化日志系统...", 30);
             _logger.SetBaseDirectory(_pathService.LogPath);
             _logger.Initialize(ConfigManager.Instance.GlobalConfig.Debug);
 
-            // 3. 设置配置变更监听
-            ConfigManager.Instance.ConfigChanged += (sender, args) =>
-            {
-                if (args.ChangeType == ConfigChangeType.Global) _logger.UpdateLoggerConfig(args.GlobalConfigData.Debug);
-            };
-
-            // 注册全局异常处理
+            // 5. 注册全局异常处理
+            System.Diagnostics.Debug.WriteLine("5. 注册全局异常处理");
             RegisterGlobalExceptionHandlers();
 
-            // 4. 准备驱动文件
+            // 6. 设置配置变更监听
+            System.Diagnostics.Debug.WriteLine("6. 设置配置变更监听");
+            ConfigManager.Instance.ConfigChanged += (sender, args) =>
+            {
+                if (args.ChangeType == ConfigChangeType.Global) 
+                    _logger.UpdateLoggerConfig(args.GlobalConfigData.Debug);
+            };
+
+            // 7. 准备驱动文件
+            System.Diagnostics.Debug.WriteLine("7. 准备驱动文件");
             splashWindow.UpdateProgress("正在准备驱动文件...", 40);
-            var driverFile = await PrepareDriverFilesAsync();
+            var driverFile = PrepareDriverFiles();
 
-            // 5. 初始化驱动服务
-            splashWindow.UpdateProgress("正在初始化驱动服务...", 60);
-            try
+            // 8. 清理已存在的驱动服务（仅在必要时）
+            if (CheckServiceExists("lykeys"))
             {
-                // 清理已存在的服务
-                await CleanupExistingServiceAsync();
-
-                // 初始化 LyKeys 服务
-                LyKeysDriver = new LyKeysService();
-                if (!await LyKeysDriver.InitializeAsync(driverFile))
-                {
-                    _logger.Error("驱动加载失败，无法加载LyKeys驱动文件");
-                    MessageBox.Show("驱动加载失败，请检查是否以管理员身份运行程序", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                    Current.Shutdown();
-                    return;
-                }
-
-                _logger.Debug("驱动初始化成功");
+                System.Diagnostics.Debug.WriteLine("8. 清理旧驱动");
+                splashWindow.UpdateProgress("正在清理旧驱动...", 50);
+                CleanupExistingService();
             }
-            catch (Exception ex)
+
+            // 9. 初始化驱动服务
+            System.Diagnostics.Debug.WriteLine("9. 初始化驱动服务");
+            splashWindow.UpdateProgress("正在初始化驱动服务...", 60);
+            LyKeysDriver = new LyKeysService();
+            
+            System.Diagnostics.Debug.WriteLine("9.1 开始初始化驱动");
+            if (!LyKeysDriver.Initialize(driverFile))
             {
-                _logger.Error($"驱动初始化失败: {ex.Message}", ex);
-                MessageBox.Show("驱动初始化失败，请检查是否以管理员身份运行程序", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Diagnostics.Debug.WriteLine("9.2 驱动初始化失败");
+                _logger.Error("驱动加载失败");
+                MessageBox.Show("驱动加载失败，请检查是否以管理员身份运行", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 Current.Shutdown();
                 return;
             }
+            
+            System.Diagnostics.Debug.WriteLine("9.2 驱动初始化成功");
 
-            // 6. 初始化音频服务
+            // 10. 初始化音频服务
+            System.Diagnostics.Debug.WriteLine("10. 初始化音频服务");
             splashWindow.UpdateProgress("正在初始化音频服务...", 80);
-            _logger.Debug("初始化音频服务");
             AudioService = new AudioService();
 
-            // 7. 创建并显示主窗口
+            // 11. 创建主窗口
+            System.Diagnostics.Debug.WriteLine("11. 创建主窗口");
             splashWindow.UpdateProgress("正在启动主界面...", 90);
-            _logger.Debug("创建主窗口...");
-            var mainWindow = new Views.MainWindow();
-            // 显式设置为应用程序的主窗口
+            
+            Views.MainWindow? mainWindow = null;
+            try
+            {
+                mainWindow = new Views.MainWindow();
+                System.Diagnostics.Debug.WriteLine("11.1 主窗口创建成功");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"11.1 主窗口创建失败: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"堆栈跟踪: {ex.StackTrace}");
+                throw;
+            }
+            
             Current.MainWindow = mainWindow;
-            _logger.Debug($"MainWindow是否设置成功: {Current.MainWindow != null}");
+            System.Diagnostics.Debug.WriteLine("11.2 主窗口已设置为应用程序主窗口");
 
-            // 注册应用程序退出事件
-            RegisterExitHandlers();
-
-            // 预加载常用页面，提高性能
+            // 12. 预加载常用页面
+            System.Diagnostics.Debug.WriteLine("12. 预加载常用页面");
             if (mainWindow.DataContext is MainViewModel mainViewModel)
             {
-                mainViewModel.PreloadCommonPages();
+                try
+                {
+                    mainViewModel.PreloadCommonPages();
+                    System.Diagnostics.Debug.WriteLine("12.1 页面预加载成功");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"12.1 页面预加载失败: {ex.Message}");
+                    // 预加载失败不影响启动
+                }
             }
 
-            // 显示主窗口
+            // 13. 显示主窗口并关闭启动屏幕
+            System.Diagnostics.Debug.WriteLine("13. 显示主窗口");
             splashWindow.UpdateProgress("启动完成", 100);
-            await Task.Delay(500); // 短暂延迟以显示完成状态
-            mainWindow.Show();
-            _logger.Debug($"主窗口显示后MainWindow是否存在: {Current.MainWindow != null}");
+            Thread.Sleep(300);
+            
+            try
+            {
+                mainWindow.Show();
+                System.Diagnostics.Debug.WriteLine("13.1 主窗口显示成功");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"13.1 主窗口显示失败: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"堆栈跟踪: {ex.StackTrace}");
+                throw;
+            }
+            
             splashWindow.Close();
+            System.Diagnostics.Debug.WriteLine("13.2 启动屏幕已关闭");
+            
+            _logger.Debug("应用程序启动完成");
+            System.Diagnostics.Debug.WriteLine("=== 应用程序启动完成 ===");
         }
         catch (Exception ex)
         {
-            _logger.Error("启动失败, 应用程序启动过程中发生异常", ex);
-            MessageBox.Show($"程序启动异常：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Diagnostics.Debug.WriteLine($"!!! 启动异常: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"!!! 堆栈跟踪: {ex.StackTrace}");
+            if (ex.InnerException != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"!!! 内部异常: {ex.InnerException.Message}");
+                System.Diagnostics.Debug.WriteLine($"!!! 内部堆栈: {ex.InnerException.StackTrace}");
+            }
+            
+            _logger.Error("应用程序启动失败", ex);
+            MessageBox.Show($"程序启动异常：{ex.Message}\n\n详细信息：{ex.StackTrace}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            splashWindow?.Close();
             Current.Shutdown();
         }
     }
@@ -447,48 +494,36 @@ public partial class App : Application
         };
     }
 
-    private async Task<string> PrepareDriverFilesAsync()
+    private string PrepareDriverFiles()
     {
         try
         {
-            // 使用驱动文件的固定目录
             var driverFile = _pathService.GetDriverFilePath("lykeys.sys");
             var dllFile = _pathService.GetDriverFilePath("lykeysdll.dll");
             
             _logger.Debug($"驱动文件目录: {_pathService.DriverPath}");
 
-            // 检查文件是否已存在，如果不存在则提取
+            // 检查文件是否已存在
             bool needsExtraction = !File.Exists(driverFile) || !File.Exists(dllFile);
             
             if (needsExtraction)
             {
-                _logger.Debug("驱动文件不存在，准备提取驱动文件...");
-                
-                // 从嵌入式资源提取驱动文件
-                await Task.Run(() =>
-                {
-                    ExtractEmbeddedResource("WpfApp.Resource.lykeysdll.lykeys.sys", driverFile);
-                    ExtractEmbeddedResource("WpfApp.Resource.lykeysdll.lykeysdll.dll", dllFile);
-                });
-                
+                _logger.Debug("驱动文件不存在，开始提取...");
+                ExtractEmbeddedResource("WpfApp.Resource.lykeysdll.lykeys.sys", driverFile);
+                ExtractEmbeddedResource("WpfApp.Resource.lykeysdll.lykeysdll.dll", dllFile);
                 _logger.Debug("驱动文件提取完成");
             }
             else
             {
-                _logger.Debug("驱动文件已存在，无需提取");
+                _logger.Debug("驱动文件已存在");
             }
 
-            // 验证文件是否存在
+            // 验证文件
             if (!File.Exists(driverFile) || !File.Exists(dllFile))
             {
                 throw new FileNotFoundException("驱动文件不存在或提取失败");
             }
 
-            _logger.Debug($"驱动文件路径:");
-            _logger.Debug($"- 驱动文件: {driverFile}");
-            _logger.Debug($"- DLL文件: {dllFile}");
-
-            // 返回驱动文件路径
             return driverFile;
         }
         catch (Exception ex)
@@ -498,21 +533,7 @@ public partial class App : Application
         }
     }
 
-    private void RegisterExitHandlers()
-    {
-        Exit += OnApplicationExit;
-        Current.Exit += (s, e) =>
-        {
-            try
-            {
-                _logger.Debug("程序正常退出");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"程序退出时发生错误: {ex.Message}", ex);
-            }
-        };
-    }
+
 
     /// <summary>
     /// 从嵌入式资源提取文件
@@ -556,8 +577,21 @@ public partial class App : Application
     {
         try
         {
-            // 启用默认渲染模式（通常会启用硬件加速，如果可用）
-            RenderOptions.ProcessRenderMode = RenderMode.Default;
+            // 检查配置中是否启用硬件加速
+            bool enableHardwareAcceleration = ConfigService?.GlobalConfig?.EnableHardwareAcceleration ?? true;
+            
+            if (enableHardwareAcceleration)
+            {
+                // 启用默认渲染模式（通常会启用硬件加速，如果可用）
+                RenderOptions.ProcessRenderMode = RenderMode.Default;
+                _logger.Debug("硬件加速已启用");
+            }
+            else
+            {
+                // 强制使用软件渲染
+                RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
+                _logger.Debug("硬件加速已禁用，使用软件渲染");
+            }
             
             // 在主线程调度器启动后记录渲染信息
             Dispatcher.BeginInvoke(new Action(() =>
