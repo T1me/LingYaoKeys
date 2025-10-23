@@ -62,7 +62,7 @@ public partial class FloatingStatusWindow : Window
             top = SystemParameters.WorkArea.Bottom - Height - 10;
 
             // 保存默认位置
-            _ = _configManager.UpdateGlobalConfigAsync(config =>
+            _configManager.UpdateGlobalConfig(config =>
             {
                 config.UI.FloatingWindow.Left = Math.Round(left, 2);
                 config.UI.FloatingWindow.Top = Math.Round(top, 2);
@@ -86,7 +86,7 @@ public partial class FloatingStatusWindow : Window
             Top = SystemParameters.WorkArea.Bottom - Height - 10;
 
             // 保存新位置
-            _ = _configManager.UpdateGlobalConfigAsync(config =>
+            _configManager.UpdateGlobalConfig(config =>
             {
                 config.UI.FloatingWindow.Left = Math.Round(Left, 2);
                 config.UI.FloatingWindow.Top = Math.Round(Top, 2);
@@ -352,7 +352,7 @@ public partial class FloatingStatusWindow : Window
             if (_isDragging)
             {
                 // 保存拖拽后的新位置
-                await SaveWindowPosition();
+                SaveWindowPosition();
             }
             else
             {
@@ -373,9 +373,9 @@ public partial class FloatingStatusWindow : Window
     /// <summary>
     /// 保存窗口位置
     /// </summary>
-    private async System.Threading.Tasks.Task SaveWindowPosition()
+    private void SaveWindowPosition()
     {
-        await _configManager.UpdateGlobalConfigAsync(config =>
+        _configManager.UpdateGlobalConfig(config =>
         {
             config.UI.FloatingWindow.Left = Math.Round(Left, 2);
             config.UI.FloatingWindow.Top = Math.Round(Top, 2);
@@ -444,11 +444,11 @@ public partial class FloatingStatusWindow : Window
         }
     }
 
-    private async void FloatingStatusWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    private void FloatingStatusWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         try
         {
-            await SaveWindowPosition();
+            SaveWindowPosition();
             _logger.Debug("浮窗关闭前位置已保存");
         }
         catch (Exception ex)

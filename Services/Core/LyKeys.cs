@@ -287,40 +287,24 @@ public sealed class LyKeys : IDisposable
         }
     }
 
-    public async Task UnloadDriverAsync(CancellationToken cancellationToken = default)
+    public void UnloadDriver()
     {
         if (_isDisposed || !_isInitialized)
             return;
 
         try
         {
-            await Task.Run(() =>
+            if (_isInitialized)
             {
-                try
-                {
-                    if (_isInitialized)
-                    {
-                        UnloadNTDriver(DriverName);
-                        _isInitialized = false;
-                    }
+                UnloadNTDriver(DriverName);
+                _isInitialized = false;
+            }
 
-                    if (_dllHandle != IntPtr.Zero)
-                    {
-                        FreeLibrary(_dllHandle);
-                        _dllHandle = IntPtr.Zero;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error("卸载驱动或DLL失败", ex);
-                    throw;
-                }
-            }, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.Warning("驱动卸载操作被取消");
-            throw;
+            if (_dllHandle != IntPtr.Zero)
+            {
+                FreeLibrary(_dllHandle);
+                _dllHandle = IntPtr.Zero;
+            }
         }
         catch (Exception ex)
         {
@@ -456,7 +440,7 @@ public sealed class LyKeys : IDisposable
     /// <param name="vkCode">虚拟键码</param>
     /// <param name="duration">按下持续时间(毫秒)</param>
     /// <returns>操作是否成功</returns>
-    public async Task<bool> SendKeyPressAsync(ushort vkCode, int duration = 100)
+    public bool SendKeyPress(ushort vkCode, int duration = 100)
     {
         if (_isDisposed || !_isInitialized)
             return false;
@@ -466,7 +450,7 @@ public sealed class LyKeys : IDisposable
             if (!SendKeyDown(vkCode))
                 return false;
 
-            await Task.Delay(duration);
+            Thread.Sleep(duration);
             return SendKeyUp(vkCode);
         }
         catch (Exception ex)
@@ -671,7 +655,7 @@ public sealed class LyKeys : IDisposable
     /// <summary>
     /// 鼠标点击操作
     /// </summary>
-    public async Task<bool> MouseClickAsync(MouseButtonType button, int duration = 100)
+    public bool MouseClick(MouseButtonType button, int duration = 100)
     {
         if (_isDisposed || !_isInitialized)
             return false;
@@ -681,7 +665,7 @@ public sealed class LyKeys : IDisposable
             if (!SendMouseButton(button, true))
                 return false;
 
-            await Task.Delay(duration);
+            Thread.Sleep(duration);
             return SendMouseButton(button, false);
         }
         catch (Exception ex)

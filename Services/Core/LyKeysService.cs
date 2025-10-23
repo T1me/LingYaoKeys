@@ -961,7 +961,7 @@ namespace WpfApp.Services.Core
         /// 模拟组合键
         /// </summary>
         /// <param name="keyCodes">按键代码数组</param>
-        public async Task SimulateKeyComboAsync(params LyKeysCode[] keyCodes)
+        public void SimulateKeyCombo(params LyKeysCode[] keyCodes)
         {
             if (!CheckInitialization()) return;
             if (keyCodes.Any(k => !IsValidLyKeysCode(k)))
@@ -976,16 +976,16 @@ namespace WpfApp.Services.Core
                 foreach (var key in keyCodes)
                 {
                     SendKeyDown(key);
-                    await Task.Delay(5);
+                    Thread.Sleep(5);
                 }
 
-                await Task.Delay(10);
+                Thread.Sleep(10);
 
                 // 释放所有键（反序）
                 for (int i = keyCodes.Length - 1; i >= 0; i--)
                 {
                     SendKeyUp(keyCodes[i]);
-                    await Task.Delay(5);
+                    Thread.Sleep(5);
                 }
             }
             catch (Exception ex)
@@ -1281,16 +1281,16 @@ namespace WpfApp.Services.Core
                         if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
                         {
                             // 执行键盘按键
-                            ExecuteSingleKeyWithDelayAsync(operation.KeyCode.Value, _keyPressInterval, stopwatch, spinWait, 
+                            ExecuteSingleKeyWithDelay(operation.KeyCode.Value, _keyPressInterval, stopwatch, spinWait, 
                                 () => !_isEnabled || _isHoldMode || _emergencyStop,
-                                "顺序模式", CancellationToken.None).GetAwaiter().GetResult();
+                                "顺序模式");
                         }
                         else if (operation.Type == KeyItemType.Coordinates)
                         {
                             // 执行坐标操作
-                            ExecuteCoordinateWithDelayAsync(operation.X, operation.Y, operation.Interval, stopwatch, spinWait,
+                            ExecuteCoordinateWithDelay(operation.X, operation.Y, operation.Interval, stopwatch, spinWait,
                                 () => !_isEnabled || _isHoldMode || _emergencyStop,
-                                "顺序模式", CancellationToken.None).GetAwaiter().GetResult();
+                                "顺序模式");
                         }
                     }
                 }
@@ -1304,16 +1304,15 @@ namespace WpfApp.Services.Core
         }
 
         /// <summary>
-        /// 执行单个按键并等待指定间隔（异步版本）
+        /// 执行单个按键并等待指定间隔
         /// </summary>
-        private async Task<bool> ExecuteSingleKeyWithDelayAsync(
+        private bool ExecuteSingleKeyWithDelay(
             LyKeysCode key, 
             int keyPressInterval,
             Stopwatch stopwatch, 
             SpinWait spinWait,
             Func<bool> shouldStopFunc,
-            string modeDescription,
-            CancellationToken token)
+            string modeDescription)
         {
             // 获取按键间隔
             int keyInterval = GetKeyInterval(key);
@@ -1330,7 +1329,7 @@ namespace WpfApp.Services.Core
                 if (keyPressInterval > 0)
                 {
                     // 使用高精度延迟等待按键按下时长
-                    bool continueOperation = await HighPrecisionDelayAsync(keyPressInterval, shouldStopFunc, token);
+                    bool continueOperation = HighPrecisionDelay(keyPressInterval, shouldStopFunc);
                     if (!continueOperation)
                     {
                         // 如果被中断，确保释放按键
@@ -1350,7 +1349,7 @@ namespace WpfApp.Services.Core
                 
                 if (remainingDelay > 0)
                 {
-                    return await HighPrecisionDelayAsync(remainingDelay, shouldStopFunc, token);
+                    return HighPrecisionDelay(remainingDelay, shouldStopFunc);
                 }
                 
                 return true;
@@ -1365,14 +1364,13 @@ namespace WpfApp.Services.Core
         }
 
         /// <summary>
-        /// 等待剩余延迟时间（异步版本）
+        /// 等待剩余延迟时间
         /// </summary>
-        private async Task<bool> WaitRemainingDelayAsync(
+        private bool WaitRemainingDelay(
             int targetDelay, 
             Stopwatch stopwatch, 
             SpinWait spinWait, 
-            Func<bool> shouldStopFunc,
-            CancellationToken token)
+            Func<bool> shouldStopFunc)
         {
             var elapsedMs = stopwatch.ElapsedMilliseconds;
             var remainingDelay = Math.Max(0, targetDelay - elapsedMs);
@@ -1380,16 +1378,15 @@ namespace WpfApp.Services.Core
             if (remainingDelay <= 0) return true;
             
             // 使用高精度延迟方法，统一处理所有延迟情况
-            return await HighPrecisionDelayAsync(remainingDelay, shouldStopFunc, token);
+            return HighPrecisionDelay(remainingDelay, shouldStopFunc);
         }
         
         /// <summary>
         /// 高精度延迟方法，使用混合策略实现更精确的延迟
         /// </summary>
-        private async Task<bool> HighPrecisionDelayAsync(
+        private bool HighPrecisionDelay(
             long delayMs, 
-            Func<bool> shouldStopFunc,
-            CancellationToken token)
+            Func<bool> shouldStopFunc)
         {
             if (delayMs <= 0) return true;
             
@@ -1398,7 +1395,7 @@ namespace WpfApp.Services.Core
                 // 重置精确计时器
                 _precisionStopwatch.Restart();
                 
-                // 对于超过15ms的延迟，先使用Task.Delay等待大部分时间（留出5ms的余量）
+                // 对于超过15ms的延迟，先使用Thread.Sleep等待大部分时间（留出5ms的余量）
                 if (delayMs > 15)
                 {
                     long sleepTime = delayMs - 5;
@@ -1406,8 +1403,8 @@ namespace WpfApp.Services.Core
                     // 检查是否应该终止
                     if (shouldStopFunc()) return false;
                     
-                    // 异步等待大部分时间
-                    await Task.Delay((int)sleepTime, token);
+                    // 等待大部分时间
+                    Thread.Sleep((int)sleepTime);
                     
                     // 剩余时间使用自旋等待
                     delayMs = 5;
@@ -1429,11 +1426,6 @@ namespace WpfApp.Services.Core
                 
                 return true;
             }
-            catch (OperationCanceledException)
-            {
-                // 操作被取消
-                return false;
-            }
             catch (Exception ex)
             {
                 _logger.Error($"高精度延迟执行异常: {ex.Message}", ex);
@@ -1442,17 +1434,16 @@ namespace WpfApp.Services.Core
         }
 
         /// <summary>
-        /// 执行鼠标移动到指定坐标并等待指定间隔（异步版本）
+        /// 执行鼠标移动到指定坐标并等待指定间隔
         /// </summary>
-        private async Task<bool> ExecuteCoordinateWithDelayAsync(
+        private bool ExecuteCoordinateWithDelay(
             int? x,
             int? y,
             int interval,
             Stopwatch stopwatch,
             SpinWait spinWait,
             Func<bool> shouldStopFunc,
-            string modeDescription,
-            CancellationToken token)
+            string modeDescription)
         {
             stopwatch.Restart();
             
@@ -1468,7 +1459,7 @@ namespace WpfApp.Services.Core
             }
             
             // 计算并等待剩余延迟时间
-            return await WaitRemainingDelayAsync(interval, stopwatch, spinWait, shouldStopFunc, token);
+            return WaitRemainingDelay(interval, stopwatch, spinWait, shouldStopFunc);
         }
 
         private void SendStatusMessage(string message, bool isError = false)
@@ -1722,7 +1713,8 @@ namespace WpfApp.Services.Core
                     {
                         _holdModeCts = new CancellationTokenSource();
                         // 在新线程中启动按压模式
-                        Task.Run(ExecuteHoldMode, _holdModeCts.Token);
+                        Thread holdModeThread = new Thread(ExecuteHoldMode) { IsBackground = true };
+                        holdModeThread.Start();
                         _logger.Debug($"按压模式已启动 - 操作总数: {_operationList.Count}");
                     }
                     else
@@ -1792,7 +1784,7 @@ namespace WpfApp.Services.Core
         /// <summary>
         /// 执行按压模式循环
         /// </summary>
-        private async Task ExecuteHoldMode()
+        private void ExecuteHoldMode()
         {
             CancellationToken token;
             List<KeyItemSettings> operationListSnapshot;
@@ -1851,16 +1843,16 @@ namespace WpfApp.Services.Core
                             if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
                             {
                                 // 执行键盘按键
-                                await ExecuteSingleKeyWithDelayAsync(operation.KeyCode.Value, _keyPressInterval, stopwatch, spinWait, 
+                                ExecuteSingleKeyWithDelay(operation.KeyCode.Value, _keyPressInterval, stopwatch, spinWait, 
                                     () => token.IsCancellationRequested || !_isEnabled || !_isHoldMode,
-                                    "按压模式", token);
+                                    "按压模式");
                             }
                             else if (operation.Type == KeyItemType.Coordinates)
                             {
                                 // 执行坐标操作
-                                await ExecuteCoordinateWithDelayAsync(operation.X, operation.Y, operation.Interval, stopwatch, spinWait,
+                                ExecuteCoordinateWithDelay(operation.X, operation.Y, operation.Interval, stopwatch, spinWait,
                                     () => token.IsCancellationRequested || !_isEnabled || !_isHoldMode,
-                                    "按压模式", token);
+                                    "按压模式");
                             }
                             
                             currentOpIndex++;
@@ -1871,10 +1863,6 @@ namespace WpfApp.Services.Core
                             _logger.Warning("没有可执行的操作，退出按压模式循环");
                             break;
                         }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
                     }
                     catch (Exception ex)
                     {

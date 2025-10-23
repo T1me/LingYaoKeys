@@ -53,12 +53,12 @@ public class SettingsViewModel : ViewModelBase
 
     private async void ToggleDebugMode()
     {
-        await ExceptionHandler.ExecuteAsync(
-            async () =>
+        ExceptionHandler.Execute(
+            () =>
             {
                 var currentDebugMode = ConfigManager.GlobalConfig.Debug.IsDebugMode;
 
-                await ConfigManager.UpdateGlobalConfigAsync(config =>
+                ConfigManager.UpdateGlobalConfig(config =>
                 {
                     config.Debug.IsDebugMode = !currentDebugMode;
                     config.Debug.UpdateDebugState();
@@ -149,10 +149,10 @@ public class SettingsViewModel : ViewModelBase
         _isCheckingUpdate = false;
     }
 
-    private async void ImportConfig()
+    private void ImportConfig()
     {
-        await ExceptionHandler.ExecuteAsync(
-            async () =>
+        ExceptionHandler.Execute(
+            () =>
             {
                 var dialog = new Microsoft.Win32.OpenFileDialog
                 {
@@ -163,7 +163,7 @@ public class SettingsViewModel : ViewModelBase
 
                 if (dialog.ShowDialog() == true)
                 {
-                    await ConfigManager.ImportKeyConfigAsync(dialog.FileName);
+                    ConfigManager.ImportKeyConfig(dialog.FileName);
                     MessageBox.Show("配置导入成功，需要重启程序才能生效。是否立即重启？",
                         "重启提示",
                         MessageBoxButton.YesNo,
@@ -173,10 +173,10 @@ public class SettingsViewModel : ViewModelBase
             "导入配置");
     }
 
-    private async void ExportConfig()
+    private void ExportConfig()
     {
-        await ExceptionHandler.ExecuteAsync(
-            async () =>
+        ExceptionHandler.Execute(
+            () =>
             {
                 var dialog = new Microsoft.Win32.SaveFileDialog
                 {
@@ -188,7 +188,7 @@ public class SettingsViewModel : ViewModelBase
 
                 if (dialog.ShowDialog() == true)
                 {
-                    await ConfigManager.ExportKeyConfigAsync(dialog.FileName);
+                    ConfigManager.ExportKeyConfig(dialog.FileName);
                     MessageBox.Show("配置导出成功", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             },

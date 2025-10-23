@@ -269,12 +269,12 @@ public class HotkeyService
             _logger.Debug($"开始保存热键配置: KeyCode={keyCode}, Modifiers={modifiers}");
             
             // 直接调用配置管理器保存热键配置
-            _configManager.UpdateKeyConfigAsync(keyConfig => {
+            _configManager.UpdateKeyConfig(keyConfig => {
                 keyConfig.startKey = keyCode;
                 keyConfig.startMods = modifiers;
                 keyConfig.stopKey = keyCode;
                 keyConfig.stopMods = modifiers;
-            }).GetAwaiter().GetResult();
+            });
             
             _logger.Debug($"热键配置已成功保存: {keyCode}");
         }

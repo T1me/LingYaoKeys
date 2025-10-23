@@ -181,7 +181,7 @@ namespace WpfApp.ViewModels
             // 使用统一配置服务保存窗口信息
             if (!_isInitializing)
             {
-                await ConfigManager.UpdateKeyConfigAsync(keyConfig => {
+                ConfigManager.UpdateKeyConfig(keyConfig => {
                     keyConfig.TargetWindowClassName = className;
                     keyConfig.TargetWindowProcessName = processName;
                     keyConfig.TargetWindowTitle = title;
@@ -197,9 +197,9 @@ namespace WpfApp.ViewModels
         }
 
         // 清除选中的窗口句柄
-        public async void ClearSelectedWindow()
+        public void ClearSelectedWindow()
         {
-            await ExceptionHandler.ExecuteAsync(async () =>
+            ExceptionHandler.Execute(() =>
             {
                 // 停止窗口检查
                 StopWindowCheck();
@@ -221,7 +221,7 @@ namespace WpfApp.ViewModels
                 // 使用统一配置服务保存窗口信息
                 if (!_isInitializing)
                 {
-                    await ConfigManager.UpdateKeyConfigAsync(keyConfig => {
+                    ConfigManager.UpdateKeyConfig(keyConfig => {
                         keyConfig.TargetWindowClassName = null;
                         keyConfig.TargetWindowProcessName = null;
                         keyConfig.TargetWindowTitle = null;
@@ -460,9 +460,9 @@ namespace WpfApp.ViewModels
         {
             if (_isInitializing) return;
 
-            await ExceptionHandler.ExecuteAsync(async () =>
+            ExceptionHandler.Execute(() =>
             {
-                await ConfigManager.UpdateGlobalConfigAsync(config => {
+                ConfigManager.UpdateGlobalConfig(config => {
                     config.SoundVolume = volume;
                 });
                 Logger.Debug($"音量设置已保存到全局配置: {volume:P0}");
@@ -1165,9 +1165,9 @@ namespace WpfApp.ViewModels
                 if (e.PropertyName == nameof(IsHotkeyEnabled) && IsSoundEnabled)
                 {
                     if (IsHotkeyEnabled)
-                        await _audioService.PlayStartSound();
+                        _audioService.PlayStartSound();
                     else
-                        await _audioService.PlayStopSound();
+                        _audioService.PlayStopSound();
                 }
             };
 
@@ -1438,7 +1438,7 @@ namespace WpfApp.ViewModels
             
             try
             {
-                await ConfigManager.UpdateKeyConfigAsync(config => {
+                ConfigManager.UpdateKeyConfig(config => {
                     // 获取所有按键和它们的状态，根据类型创建不同的配置
                     var keyConfigs = new List<KeyConfig>();
                     
@@ -1534,7 +1534,7 @@ namespace WpfApp.ViewModels
             
             try
             {
-                await ConfigManager.UpdateGlobalConfigAsync(globalConfig => {
+                ConfigManager.UpdateGlobalConfig(globalConfig => {
                     globalConfig.soundEnabled = IsSoundEnabled;
                     globalConfig.IsReduceKeyStuck = IsReduceKeyStuck;
                     globalConfig.UI.FloatingWindow.IsEnabled = IsFloatingWindowEnabled;
@@ -1990,7 +1990,7 @@ namespace WpfApp.ViewModels
                                     SelectedWindowTitle = $"{targetWindow.Title} (句柄: {targetWindow.Handle.ToInt64()})";
 
                                     // 更新配置
-                                    _ = ConfigManager.UpdateKeyConfigAsync(keyConfig => {
+                                    ConfigManager.UpdateKeyConfig(keyConfig => {
                                         keyConfig.TargetWindowClassName = targetWindow.ClassName;
                                         keyConfig.TargetWindowProcessName = targetWindow.ProcessName;
                                         keyConfig.TargetWindowTitle = targetWindow.Title;
@@ -2358,7 +2358,7 @@ namespace WpfApp.ViewModels
                 }
                 
                 // 使用统一配置服务切换配置
-                await ConfigManager.SwitchConfigAsync(configInfo);
+                ConfigManager.SwitchConfig(configInfo);
                 
                 // 更新UI
                 _mainViewModel.UpdateStatusMessage($"已切换到配置：{configInfo.Name}", false);
@@ -2371,11 +2371,11 @@ namespace WpfApp.ViewModels
         }
         
         // 创建新配置
-        public async void CreateNewConfig(string configName, bool copyFromCurrent)
+        public void CreateNewConfig(string configName, bool copyFromCurrent)
         {
-            await ExceptionHandler.ExecuteAsync(async () =>
+            ExceptionHandler.Execute(() =>
             {
-                var newConfig = await ConfigManager.CreateNewConfigAsync(configName, copyFromCurrent);
+                var newConfig = ConfigManager.CreateNewConfig(configName, copyFromCurrent);
                 SelectedConfigFile = newConfig;
                 _mainViewModel.UpdateStatusMessage($"已创建新配置：{newConfig.Name}", false);
             }, $"创建新配置: {configName}",
@@ -2398,7 +2398,7 @@ namespace WpfApp.ViewModels
                  Logger.Debug($"开始重命名配置：{oldName} -> {newName}");
                 
                 // 使用统一配置服务重命名配置
-                await ConfigManager.RenameConfigAsync(SelectedConfigFile, newName);
+                ConfigManager.RenameConfig(SelectedConfigFile, newName);
                 
                  Logger.Debug($"重命名配置成功：{oldName} -> {SelectedConfigFile.Name}");
                 _mainViewModel.UpdateStatusMessage($"已重命名配置：{oldName} -> {SelectedConfigFile.Name}", false);
@@ -2449,7 +2449,7 @@ namespace WpfApp.ViewModels
                 SwitchToConfig(newConfig, false);
                 
                 // 执行删除操作
-                await ConfigManager.DeleteConfigAsync(configToDelete);
+                ConfigManager.DeleteConfig(configToDelete);
                 
                 // 刷新UI选中项，确保显示当前活动配置
                 _selectedConfigFile = ConfigManager.CurrentConfig;
@@ -2478,7 +2478,7 @@ namespace WpfApp.ViewModels
             {
                 if (SelectedConfigFile == null) return;
                 
-                await ConfigManager.SetConfigHotkeyAsync(SelectedConfigFile, hotkeyText);
+                ConfigManager.SetConfigHotkey(SelectedConfigFile, hotkeyText);
                 _mainViewModel.UpdateStatusMessage($"已设置配置快捷键", false);
             }
             catch (Exception ex)
@@ -2495,7 +2495,7 @@ namespace WpfApp.ViewModels
             {
                 if (SelectedConfigFile == null) return;
                 
-                await ConfigManager.SetConfigHotkeyAsync(SelectedConfigFile, string.Empty);
+                ConfigManager.SetConfigHotkey(SelectedConfigFile, string.Empty);
                 _mainViewModel.UpdateStatusMessage("已清除配置快捷键", false);
             }
             catch (Exception ex)
@@ -2511,7 +2511,7 @@ namespace WpfApp.ViewModels
             try
             {
                 var configName = Path.GetFileNameWithoutExtension(sourceFile);
-                var newConfig = await ConfigManager.ImportKeyConfigAsync(sourceFile, configName);
+                var newConfig = ConfigManager.ImportKeyConfig(sourceFile, configName);
                 SelectedConfigFile = newConfig;
                 _mainViewModel.UpdateStatusMessage($"已导入配置：{newConfig.Name}", false);
             }
@@ -2529,7 +2529,7 @@ namespace WpfApp.ViewModels
             {
                 if (SelectedConfigFile == null) return;
                 
-                await ConfigManager.ExportKeyConfigAsync(targetFile, SelectedConfigFile);
+                ConfigManager.ExportKeyConfig(targetFile, SelectedConfigFile);
                 _mainViewModel.UpdateStatusMessage($"已导出配置到：{targetFile}", false);
             }
             catch (Exception ex)

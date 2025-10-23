@@ -457,27 +457,18 @@ public partial class MainWindow : Window
             // 1. 立即禁用UI，提升响应感
             IsEnabled = false;
 
-            // 2. 快速保存窗口大小（异步，不等待）
+            // 2. 保存窗口大小（同步保存，确保在关闭前完成）
             if (WindowState == WindowState.Normal && _configManager != null)
             {
                 try
                 {
-                    var width = ActualWidth;
-                    var height = ActualHeight;
-                    Task.Run(() =>
+                    _configManager.UpdateGlobalConfig(config =>
                     {
-                        try
+                        if (config?.UI?.MainWindow != null)
                         {
-                            _configManager.UpdateGlobalConfigAsync(config =>
-                            {
-                                if (config?.UI?.MainWindow != null)
-                                {
-                                    config.UI.MainWindow.Width = Math.Round(width, 2);
-                                    config.UI.MainWindow.Height = Math.Round(height, 2);
-                                }
-                            }).Wait(500); // 减少等待时间
+                            config.UI.MainWindow.Width = Math.Round(ActualWidth, 2);
+                            config.UI.MainWindow.Height = Math.Round(ActualHeight, 2);
                         }
-                        catch { }
                     });
                 }
                 catch { }

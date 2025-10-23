@@ -108,47 +108,47 @@ namespace WpfApp.Services.Core
         /// <summary>
         /// 更新全局配置
         /// </summary>
-        System.Threading.Tasks.Task UpdateGlobalConfigAsync(Action<GlobalConfig> updateAction);
+        void UpdateGlobalConfig(Action<GlobalConfig> updateAction);
         
         /// <summary>
         /// 更新当前按键配置
         /// </summary>
-        System.Threading.Tasks.Task UpdateKeyConfigAsync(Action<KeyConfigData> updateAction);
+        void UpdateKeyConfig(Action<KeyConfigData> updateAction);
         
         /// <summary>
         /// 切换当前配置文件
         /// </summary>
-        System.Threading.Tasks.Task SwitchConfigAsync(ConfigFileInfo configInfo);
+        void SwitchConfig(ConfigFileInfo configInfo);
         
         /// <summary>
         /// 创建新配置文件
         /// </summary>
-        System.Threading.Tasks.Task<ConfigFileInfo> CreateNewConfigAsync(string configName, bool copyFromCurrent = true);
+        ConfigFileInfo CreateNewConfig(string configName, bool copyFromCurrent = true);
         
         /// <summary>
         /// 重命名配置文件
         /// </summary>
-        System.Threading.Tasks.Task RenameConfigAsync(ConfigFileInfo configInfo, string newName);
+        void RenameConfig(ConfigFileInfo configInfo, string newName);
         
         /// <summary>
         /// 删除配置文件
         /// </summary>
-        System.Threading.Tasks.Task DeleteConfigAsync(ConfigFileInfo configInfo);
+        void DeleteConfig(ConfigFileInfo configInfo);
         
         /// <summary>
         /// 设置配置文件快捷键
         /// </summary>
-        System.Threading.Tasks.Task SetConfigHotkeyAsync(ConfigFileInfo configInfo, string hotkeyText);
+        void SetConfigHotkey(ConfigFileInfo configInfo, string hotkeyText);
         
         /// <summary>
         /// 导入配置文件
         /// </summary>
-        System.Threading.Tasks.Task<ConfigFileInfo> ImportKeyConfigAsync(string sourceFile, string configName = null);
+        ConfigFileInfo ImportKeyConfig(string sourceFile, string configName = null);
         
         /// <summary>
         /// 导出配置文件
         /// </summary>
-        System.Threading.Tasks.Task ExportKeyConfigAsync(string targetFile, ConfigFileInfo configInfo = null);
+        void ExportKeyConfig(string targetFile, ConfigFileInfo configInfo = null);
         
         /// <summary>
         /// 资源清理
