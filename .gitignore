@@ -5,6 +5,7 @@
 
 claude.md
 llmdoc/
+.kiro/
 
 # User-specific files
 *.suo
