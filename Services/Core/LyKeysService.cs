@@ -61,6 +61,10 @@ namespace WpfApp.Services.Core
         private bool _isHighResolutionTimerEnabled = false;
         // 用于精确延迟的Stopwatch
         private readonly Stopwatch _precisionStopwatch = new Stopwatch();
+        // 按键模式实例
+        private SequenceKeyMode? _sequenceMode;
+        private HoldKeyMode? _holdMode;
+        private KeyModeBase? _currentMode;
         #endregion
 
         #region 事件定义
@@ -116,10 +120,8 @@ namespace WpfApp.Services.Core
                     
                     if (_isEnabled)
                     {
-                        // 根据设置决定是否切换输入法
                         if (_autoSwitchIME)
                         {
-                            // 启动前保存输入法状态
                             _inputMethodService.StoreCurrentLayout();
                             _inputMethodService.SwitchToEnglish();
                             _logger.Debug("服务启用：已切换到英文输入法");
@@ -129,33 +131,23 @@ namespace WpfApp.Services.Core
                             _logger.Debug("服务启用：保持当前输入法不变");
                         }
 
-                        if (_isHoldMode)
-                        {
-                            StartHoldMode();
-                        }
-                        else
-                        {
-                            StartKeySequence();
-                        }
+                        _currentMode = _isHoldMode ? _holdMode : _sequenceMode;
+                        _currentMode?.SetOperationList(_operationList);
+                        _currentMode?.Start();
                     }
                     else
                     {
-                        if (_isHoldMode)
-                        {
-                            StopHoldMode();
-                        }
-                        else
-                        {
-                            StopKeySequence();
+                        _currentMode?.Stop();
+                        _currentMode = null;
                         }
 
                         // 只在完全停止时恢复输入法
                         RestoreIME();
                         _logger.Debug("服务停用：已恢复输入法");
-                    }
                 }
             }
         }
+        
 
         /// <summary>
         /// 获取或设置按键间隔
@@ -275,8 +267,12 @@ namespace WpfApp.Services.Core
                 _isReduceKeyStuck = false;
                 _keyPressInterval = 0;
             }
-            
-            _logger.Debug("LyKeysService构造函数：已初始化InputMethodService");
+
+            // 初始化按键模式实例
+            _sequenceMode = new SequenceKeyMode(this);
+            _holdMode = new HoldKeyMode(this);
+
+            _logger.Debug("LyKeysService构造函数：已初始化InputMethodService和按键模式");
         }
         #endregion
 
@@ -582,22 +578,22 @@ namespace WpfApp.Services.Core
 
                 // 清理不再需要的按键缓存
                 CleanupUnusedKeyCaches(keyboardOps);
-                
-                // 处理按键间隔设置
+
+                // 处理按键间隔设置 - 始终更新以确保配置变更生效
                 foreach (var keyCode in keyboardOps)
                 {
-                    if (!_keyIntervals.ContainsKey(keyCode))
+                    // 从操作列表中查找对应的设置
+                    var keySettings = operations.FirstOrDefault(op => op.Type == KeyItemType.Keyboard && op.KeyCode == keyCode);
+                    if (keySettings != null)
                     {
-                        // 从操作列表中查找对应的设置
-                        var keySettings = operations.FirstOrDefault(op => op.Type == KeyItemType.Keyboard && op.KeyCode == keyCode);
-                        if (keySettings != null)
-                        {
-                            _keyIntervals[keyCode] = keySettings.Interval;
-                        }
-                        else
-                        {
-                            _keyIntervals[keyCode] = _keyInterval;
-                        }
+                        // 始终更新间隔值，确保配置修改后立即生效
+                        _keyIntervals[keyCode] = keySettings.Interval;
+                        _logger.Debug($"更新按键 {keyCode} 的间隔: {keySettings.Interval}ms");
+                    }
+                    else
+                    {
+                        // 如果没有找到设置，使用默认间隔
+                        _keyIntervals[keyCode] = _keyInterval;
                     }
                 }
 
@@ -1138,168 +1134,21 @@ namespace WpfApp.Services.Core
             return true;
         }
 
-        private void StartKeySequence()
-        {
-            try
-            {
-                if (!CheckInitialization()) return;
-
-                _logger.Debug("开始启动按键序列");
-                
-                // 重置紧急停止标志
-                lock (_emergencyStopLock)
-                {
-                    _emergencyStop = false;
-                }
-                
-                _sequenceStopwatch.Restart();
-
-                // 使用新的统一操作列表
-                if (_operationList.Count > 0)
-                {
-                    _logger.Debug($"准备执行序列 - 操作总数: {_operationList.Count}, 基础间隔: {_keyInterval}ms");
-                    // 在新线程中启动按键序列
-                    Thread sequenceThread = new Thread(ExecuteKeySequence) { IsBackground = true };
-                    sequenceThread.Start();
-                    _logger.Debug("按键序列线程已启动");
-                }
-                else
-                {
-                    _logger.Warning("操作列表为空，无法启动序列");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("启动按键序列异常", ex);
-                StopKeySequence();
-            }
-        }
-
-        private void StopKeySequence()
-        {
-            try
-            {
-                _sequenceStopwatch.Stop();
-
-                // 确保释放所有可能按下的按键
-                foreach (var operation in _operationList)
-                {
-                    if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
-                    {
-                        SendKeyUp(operation.KeyCode.Value);
-                    }
-                }
-
-                // 恢复输入法
-                RestoreIME();
-                _logger.Debug("按键序列已停止，输入法已恢复");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("停止按键序列异常", ex);
-                ForceStop();
-            }
-        }
-
-        // 新增：紧急停止方法，只在窗口切换时调用
         public void EmergencyStop()
         {
             try
             {
                 _logger.Debug("开始执行紧急停止");
-                
-                // 设置紧急停止标志
-                lock (_emergencyStopLock)
-                {
-                    _emergencyStop = true;
-                }
+                _currentMode?.Stop();
 
-                // 使用计时器确保在阈值时间内停止
-                var stopTimer = new System.Timers.Timer(EMERGENCY_STOP_THRESHOLD);
-                stopTimer.Elapsed += (s, e) =>
-                {
-                    try
-                    {
-                        if (_isEnabled)
-                        {
-                            _logger.Warning("检测到按键未能及时停止，强制停止");
-                            ForceStop();
-                        }
-                        ((System.Timers.Timer)s).Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error("紧急停止时发生异常", ex);
-                    }
-                };
-                stopTimer.Start();
-
-                // 确保释放所有可能按下的按键
                 foreach (var operation in _operationList)
-                {
                     if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
-                    {
                         SendKeyUp(operation.KeyCode.Value);
-                    }
-                }
             }
             catch (Exception ex)
             {
                 _logger.Error("紧急停止异常", ex);
                 ForceStop();
-            }
-        }
-
-        private void ExecuteKeySequence()
-        {
-            _logger.Debug("开始执行按键序列");
-            
-            var spinWait = new SpinWait();
-            var stopwatch = new Stopwatch();
-
-            while (_isEnabled && !_isHoldMode)
-            {
-                try
-                {
-                    // 检查紧急停止标志
-                    if (_emergencyStop)
-                    {
-                        _logger.Debug("检测到紧急停止标志，终止按键序列");
-                        break;
-                    }
-
-                    // 按照原始顺序遍历统一的操作列表
-                    foreach (var operation in _operationList)
-                    {
-                        if (!_isEnabled || _isHoldMode || _emergencyStop)
-                        {
-                            _logger.Debug("检测到停止信号，中断按键序列");
-                            return;
-                        }
-
-                        // 根据操作类型执行不同的操作
-                        if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
-                        {
-                            // 执行键盘按键
-                            ExecuteSingleKeyWithDelay(operation.KeyCode.Value, _keyPressInterval, stopwatch, spinWait, 
-                                () => !_isEnabled || _isHoldMode || _emergencyStop,
-                                "顺序模式");
-                        }
-                        else if (operation.Type == KeyItemType.Coordinates)
-                        {
-                            // 执行坐标操作
-                            ExecuteCoordinateWithDelay(operation.X, operation.Y, operation.Interval, stopwatch, spinWait,
-                                () => !_isEnabled || _isHoldMode || _emergencyStop,
-                                "顺序模式");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error("执行按键序列异常", ex);
-                    IsEnabled = false;
-                    break;
-                }
             }
         }
 
@@ -1527,8 +1376,8 @@ namespace WpfApp.Services.Core
                 // 2. 停止序列
                 try
                 {
-                    StopKeySequence();
-                    StopHoldMode();
+                    _currentMode?.Stop();
+                    RestoreIME();
                 }
                 catch (Exception ex)
                 {
@@ -1688,227 +1537,5 @@ namespace WpfApp.Services.Core
             return _keyInterval;
         }
 
-        /// <summary>
-        /// 启动按压模式
-        /// </summary>
-        private void StartHoldMode()
-        {
-            try
-            {
-                if (!CheckInitialization()) return;
-
-                StopHoldMode();
-
-                // 重置紧急停止标志
-                lock (_emergencyStopLock)
-                {
-                    _emergencyStop = false;
-                    _logger.Debug("已重置紧急停止标志");
-                }
-
-                lock (_stateLock)
-                {
-                    // 检查统一操作列表
-                    if (_operationList.Count > 0)
-                    {
-                        _holdModeCts = new CancellationTokenSource();
-                        // 在新线程中启动按压模式
-                        Thread holdModeThread = new Thread(ExecuteHoldMode) { IsBackground = true };
-                        holdModeThread.Start();
-                        _logger.Debug($"按压模式已启动 - 操作总数: {_operationList.Count}");
-                    }
-                    else
-                    {
-                        _logger.Warning("操作列表为空，无法启动按压模式");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("启动按压模式异常", ex);
-                StopHoldMode();
-            }
-        }
-
-        /// <summary>
-        /// 停止按压模式
-        /// </summary>
-        private void StopHoldMode()
-        {
-            try
-            {
-                CancellationTokenSource? cts = null;
-                lock (_stateLock)
-                {
-                    cts = _holdModeCts;
-                    _holdModeCts = null;
-                }
-
-                if (cts != null)
-                {
-                    try
-                    {
-                        cts.Cancel();
-                        cts.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error("取消按压模式异常", ex);
-                    }
-                }
-
-                // 确保释放所有可能按下的按键
-                foreach (var operation in _operationList)
-                {
-                    if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
-                    {
-                        try
-                        {
-                            SendKeyUp(operation.KeyCode.Value);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Error($"释放按键异常: {operation.KeyCode}", ex);
-                        }
-                    }
-                }
-
-                _logger.Debug("按压模式已停止");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("停止按压模式异常", ex);
-            }
-        }
-
-        /// <summary>
-        /// 执行按压模式循环
-        /// </summary>
-        private void ExecuteHoldMode()
-        {
-            CancellationToken token;
-            List<KeyItemSettings> operationListSnapshot;
-
-            lock (_stateLock)
-            {
-                if (_holdModeCts == null) return;
-                token = _holdModeCts.Token;
-                
-                // 检查操作列表
-                if (_operationList.Count == 0)
-                {
-                    _logger.Warning("操作列表为空");
-                    return;
-                }
-                
-                // 创建快照
-                operationListSnapshot = new List<KeyItemSettings>(_operationList);
-                
-                _logger.Debug($"已创建执行快照 - 操作总数: {operationListSnapshot.Count}");
-            }
-
-            try
-            {
-                _logger.Debug($"开始执行按压模式循环，总操作数: {operationListSnapshot.Count}");
-
-                int currentOpIndex = 0;
-                var stopwatch = new Stopwatch();
-                var spinWait = new SpinWait();
-
-                while (!token.IsCancellationRequested && _isEnabled && _isHoldMode)
-                {
-                    // 检查紧急停止标志
-                    lock (_emergencyStopLock)
-                    {
-                        if (_emergencyStop)
-                        {
-                            _logger.Debug("检测到紧急停止标志，终止按压模式循环");
-                            return;
-                        }
-                    }
-
-                    try
-                    {
-                        if (operationListSnapshot.Count > 0)
-                        {
-                            // 如果已经到达列表末尾，重新开始
-                            if (currentOpIndex >= operationListSnapshot.Count)
-                            {
-                                currentOpIndex = 0;
-                            }
-
-                            var operation = operationListSnapshot[currentOpIndex];
-                            
-                            // 根据操作类型执行不同的操作
-                            if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
-                            {
-                                // 执行键盘按键
-                                ExecuteSingleKeyWithDelay(operation.KeyCode.Value, _keyPressInterval, stopwatch, spinWait, 
-                                    () => token.IsCancellationRequested || !_isEnabled || !_isHoldMode,
-                                    "按压模式");
-                            }
-                            else if (operation.Type == KeyItemType.Coordinates)
-                            {
-                                // 执行坐标操作
-                                ExecuteCoordinateWithDelay(operation.X, operation.Y, operation.Interval, stopwatch, spinWait,
-                                    () => token.IsCancellationRequested || !_isEnabled || !_isHoldMode,
-                                    "按压模式");
-                            }
-                            
-                            currentOpIndex++;
-                        }
-                        else
-                        {
-                            // 没有操作，退出循环
-                            _logger.Warning("没有可执行的操作，退出按压模式循环");
-                            break;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        var operation = operationListSnapshot[currentOpIndex];
-                        string operationDesc = operation.Type == KeyItemType.Keyboard 
-                            ? $"键盘按键: {operation.KeyCode}" 
-                            : $"坐标点: ({operation.X}, {operation.Y})";
-                            
-                        _logger.Error($"按压模式执行异常: {operationDesc}", ex);
-                        if (token.IsCancellationRequested || !_isEnabled || !_isHoldMode)
-                        {
-                            break;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("执行按压模式异常", ex);
-            }
-            finally
-            {
-                try
-                {
-                    // 确保释放所有按键
-                    foreach (var operation in operationListSnapshot)
-                    {
-                        if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
-                        {
-                            try
-                            {
-                                SendKeyUp(operation.KeyCode.Value);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.Error($"释放按键异常: {operation.KeyCode}", ex);
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error("按压模式：释放按键时发生异常", ex);
-                }
-                _logger.Debug("按压模式循环已结束");
-            }
-        }
     }
 } 

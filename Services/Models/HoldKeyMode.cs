@@ -3,131 +3,107 @@ using WpfApp.Services.Core;
 // 按键按压模式
 namespace WpfApp.Services.Models;
 
+/// <summary>
+/// 按压模式 - 按住热键时持续循环执行按键序列
+/// </summary>
 public class HoldKeyMode : KeyModeBase
 {
     private volatile bool _isKeyHeld;
-    private readonly SemaphoreSlim _executionLock = new(1, 1);
     private readonly object _stateLock = new();
-    private bool _isExecuting; // 当前是否有按键序列正在执行
+    private bool _isExecuting;
+    private int _currentIndex;
 
-    // 添加状态消息更新事件
     public event Action<string, bool>? OnStatusMessageUpdated;
 
     public HoldKeyMode(LyKeysService driverService) : base(driverService)
     {
-        _isKeyHeld = false; // 用于按压模式的执行控制
-        _isExecuting = false; // 当前是否有按键序列正在执行
     }
 
     public override void Start()
     {
-        // 防止重复启动
         lock (_stateLock)
         {
             if (_isExecuting)
             {
-                _logger.Warning("已有按键序列在执行中");
+                _logger.Warning("按压模式: 已有序列在执行中");
                 return;
             }
-
             _isExecuting = true;
         }
 
-        try
+        if (_operationList.Count == 0)
         {
-            _isRunning = true;
-            _cts = new CancellationTokenSource();
-
-            LogModeStart();
-
-            var selectedKeys = _keyList.ToList();
-            if (selectedKeys.Count == 0)
-            {
-                _logger.Warning("没有选中的按键");
-                return;
-            }
-
-            var currentIndex = 0;
-            while (_isRunning && _isKeyHeld && !_cts.Token.IsCancellationRequested)
-            {
-                var key = selectedKeys[currentIndex];
-
-                if (!_isRunning || !_isKeyHeld || _cts.Token.IsCancellationRequested)
-                {
-                    _logger.Debug("检测到按键释放或取消请求，停止循环");
-                    break;
-                }
-
-                try
-                {
-                    // 执行按键操作
-                    PressKey(key);
-                    // 使用按键的独立间隔，而不是全局间隔
-                    Thread.Sleep(GetInterval(key));
-
-                    // 更新索引
-                    currentIndex = (currentIndex + 1) % selectedKeys.Count;
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error($"按键执行异常: {key}", ex);
-                }
-            }
+            _logger.Warning("按压模式: 操作列表为空");
+            lock (_stateLock) { _isExecuting = false; }
+            return;
         }
-        catch (Exception ex)
+
+        _isRunning = true;
+        _isKeyHeld = true;
+        _currentIndex = 0;
+        _cts = new CancellationTokenSource();
+
+        LogModeStart();
+
+        var thread = new Thread(() =>
         {
-            _logger.Error("按压模式执行异常", ex);
-        }
-        finally
-        {
-            lock (_stateLock)
+            try
             {
-                _isExecuting = false;
+                ExecuteLoop();
             }
+            catch (Exception ex)
+            {
+                _logger.Error($"按压模式执行异常: {ex.Message}", ex);
+            }
+            finally
+            {
+                lock (_stateLock) { _isExecuting = false; }
+                _isRunning = false;
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "HoldKeyMode-Thread"
+        };
 
-            LogModeEnd();
-            Stop();
-        }
+        thread.Start();
     }
 
-    // 处理按键按下
     public void HandleKeyPress()
     {
         if (!_isExecuting)
-            lock (_stateLock)
-            {
-                if (!_isExecuting)
-                {
-                    _isKeyHeld = true;
-                    _logger.Debug("检测到按键按下，准备开始循环");
-                    // 启动按键循环
-                    new Thread(() => Start()).Start();
-                }
-                else
-                {
-                    _logger.Debug("已有按键序列在执行中，忽略此次按键按下");
-                }
-            }
+        {
+            _isKeyHeld = true;
+            _logger.Debug("按压模式: 检测到按键按下");
+            Start();
+        }
     }
 
-    // 处理按键释放
     public void HandleKeyRelease()
     {
         _isKeyHeld = false;
+        _logger.Debug("按压模式: 检测到按键释放");
         Stop();
     }
 
     public override void Stop()
     {
+        _isKeyHeld = false;
         base.Stop();
     }
 
-    protected override void Dispose(bool disposing)
+    protected override KeyItemSettings? GetNextOperation()
     {
-        if (disposing)
-        {
-            _executionLock.Dispose();
-            base.Dispose(disposing);
-        }
+        if (_currentIndex >= _operationList.Count)
+            _currentIndex = 0;
+
+        var operation = _operationList[_currentIndex];
+        _currentIndex++;
+        return operation;
+    }
+
+    protected override bool ShouldStop()
+    {
+        return !_isKeyHeld || !_isRunning || _cts?.Token.IsCancellationRequested == true;
     }
 }
