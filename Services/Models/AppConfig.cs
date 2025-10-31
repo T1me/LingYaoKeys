@@ -41,7 +41,7 @@ public class VersionInfo
 
 public class KeyConfig
 {
-    public LyKeysCode? Code { get; set; }  // 使用可空类型，坐标类型不需要此属性 
+    public VirtualKeyCode? Code { get; set; }  // 使用可空类型，坐标类型不需要此属性 
     public bool IsSelected { get; set; }
     public int KeyInterval { get; set; }
     public KeyItemType Type { get; set; } = KeyItemType.Keyboard;
@@ -57,7 +57,7 @@ public class KeyConfig
     }
 
     // 键盘按键构造函数
-    public KeyConfig(LyKeysCode code, bool isSelected = true, int keyInterval = 5)
+    public KeyConfig(VirtualKeyCode code, bool isSelected = true, int keyInterval = 5)
     {
         Code = code;
         IsSelected = isSelected;
@@ -85,10 +85,10 @@ public class KeyConfig
     }
     
     /// <summary>
-    /// 将KeyConfig转换为LyKeysCode，用于与LyKeysService兼容
+    /// 将KeyConfig转换为VirtualKeyCode，用于与LyKeysService兼容
     /// 注意：坐标类型会被忽略，返回null
     /// </summary>
-    public LyKeysCode? ToLyKeysCode()
+    public VirtualKeyCode? ToVirtualKeyCode()
     {
         // 只有键盘类型且被选中的按键才会返回有效值
         if (Type == KeyItemType.Keyboard && IsSelected && Code.HasValue)
@@ -99,11 +99,11 @@ public class KeyConfig
     }
     
     /// <summary>
-    /// 从KeyConfig列表中提取有效的LyKeysCode列表
+    /// 从KeyConfig列表中提取有效的VirtualKeyCode列表
     /// </summary>
-    public static List<LyKeysCode> ExtractValidKeyCodes(List<KeyConfig> keyConfigs)
+    public static List<VirtualKeyCode> ExtractValidKeyCodes(List<KeyConfig> keyConfigs)
     {
-        if (keyConfigs == null) return new List<LyKeysCode>();
+        if (keyConfigs == null) return new List<VirtualKeyCode>();
         
         return keyConfigs
             .Where(k => k.Type == KeyItemType.Keyboard && k.IsSelected && k.Code.HasValue)
@@ -128,6 +128,7 @@ public class GlobalConfig
     public bool? AutoSwitchToEnglishIME { get; set; } = true;
     public bool? isHotkeyControlEnabled { get; set; } = true;
     public bool? EnableHardwareAcceleration { get; set; } = true;
+    public string? SelectedDriver { get; set; } = "AHK";
 
     [JsonIgnore] public string Author { get; set; } = "慕长秋";
 
@@ -144,9 +145,9 @@ public class GlobalConfig
 public class KeyConfigData
 {
     // 按键配置相关属性
-    public LyKeysCode? startKey { get; set; }
+    public VirtualKeyCode? startKey { get; set; }
     public ModifierKeys startMods { get; set; }
-    public LyKeysCode? stopKey { get; set; }
+    public VirtualKeyCode? stopKey { get; set; }
     public ModifierKeys stopMods { get; set; }
     public List<KeyConfig> keys { get; set; } = new();
     public int keyMode { get; set; }

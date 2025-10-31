@@ -44,6 +44,8 @@ public abstract class KeyModeBase
     {
         _isRunning = false;
         _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
         Thread.Sleep(50);
 
         foreach (var op in _operationList)
@@ -144,16 +146,5 @@ public abstract class KeyModeBase
     protected virtual void LogModeEnd()
     {
         _logger.Info($"{GetType().Name} 停止");
-    }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposing) _cts?.Dispose();
     }
 }

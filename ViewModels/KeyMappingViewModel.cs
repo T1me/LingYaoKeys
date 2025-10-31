@@ -16,14 +16,14 @@ using System.IO;
 // 定义KeyItemSettings结构用于传递按键设置
 public class KeyItemSettings
 {
-    public LyKeysCode? KeyCode { get; set; }
+    public VirtualKeyCode? KeyCode { get; set; }
     public int Interval { get; set; } = 5;
     public KeyItemType Type { get; set; } = KeyItemType.Keyboard;
     public int? X { get; set; }
     public int? Y { get; set; }
     
     // 创建键盘按键设置
-    public static KeyItemSettings CreateKeyboard(LyKeysCode keyCode, int interval = 5)
+    public static KeyItemSettings CreateKeyboard(VirtualKeyCode keyCode, int interval = 5)
     {
         return new KeyItemSettings
         {
@@ -59,11 +59,11 @@ namespace WpfApp.ViewModels
         
         private readonly LyKeysService _lyKeysService;
         public LyKeysService LyKeysService => _lyKeysService;
-        private LyKeysCode? _currentKey;
+        private VirtualKeyCode? _currentKey;
         private string _currentKeyText = string.Empty;
         private ObservableCollection<KeyItem> _keyList;
         private string _hotkeyText = string.Empty; // 简化为单一热键文本
-        private LyKeysCode? _hotkey; // 主热键
+        private VirtualKeyCode? _hotkey; // 主热键
         private ModifierKeys _hotkeyModifiers = ModifierKeys.None; // 修饰热键
         private int _selectedKeyMode;
         private readonly HotkeyService _hotkeyService;
@@ -844,7 +844,7 @@ namespace WpfApp.ViewModels
                 KeyList = new ObservableCollection<KeyItem>();
 
                 // 从AppConfig加载初始配置
-                _currentKey = LyKeysCode.VK_ESCAPE; // 使用一个有效的LyKeysCode值
+                _currentKey = VirtualKeyCode.VK_ESCAPE; // 使用一个有效的VirtualKeyCode值
 
                 // 播放声音服务
                 if (_audioService != null)
@@ -1078,7 +1078,7 @@ namespace WpfApp.ViewModels
         }
 
         // 设置当前按键
-        public void SetCurrentKey(LyKeysCode keyCode)
+        public void SetCurrentKey(VirtualKeyCode keyCode)
         {
             _currentKey = keyCode;
             CurrentKeyText = _lyKeysService.GetKeyDescription(keyCode);
@@ -1088,7 +1088,7 @@ namespace WpfApp.ViewModels
         }
 
         // 设置热键
-        public bool SetHotkey(LyKeysCode keyCode, ModifierKeys modifiers)
+        public bool SetHotkey(VirtualKeyCode keyCode, ModifierKeys modifiers)
         {
             // 检查是否与当前按键序列冲突
             if (IsKeyInList(keyCode))
@@ -1122,7 +1122,7 @@ namespace WpfApp.ViewModels
         }
 
         // 更新热键文本
-        private void UpdateHotkeyText(LyKeysCode keyCode, ModifierKeys modifiers)
+        private void UpdateHotkeyText(VirtualKeyCode keyCode, ModifierKeys modifiers)
         {
             var sb = new StringBuilder();
 
@@ -1158,7 +1158,7 @@ namespace WpfApp.ViewModels
                 }
 
                 var keyCode = _currentKey.Value;
-                if (!_lyKeysService.IsValidLyKeysCode(keyCode))
+                if (!_lyKeysService.IsValidVirtualKeyCode(keyCode))
                 {
                      Logger.Warning($"无效的按键码: {_lyKeysService.GetKeyDescription(keyCode)}");
                     _mainViewModel.UpdateStatusMessage($"无效的按键码: {_lyKeysService.GetKeyDescription(keyCode)}", true);
@@ -1586,7 +1586,7 @@ namespace WpfApp.ViewModels
         }
 
         // 检查按键是否已在列表中
-        private bool IsKeyInList(LyKeysCode keyCode)
+        private bool IsKeyInList(VirtualKeyCode keyCode)
         {
             // 仅检查键盘类型的按键
             return KeyList.Any(k => k.Type == KeyItemType.Keyboard && k.KeyCode.Equals(keyCode));
@@ -1657,7 +1657,7 @@ namespace WpfApp.ViewModels
         }
 
         // 添加热键冲突检测方法
-        public bool IsHotkeyConflict(LyKeysCode keyCode)
+        public bool IsHotkeyConflict(VirtualKeyCode keyCode)
         {
             try
             {

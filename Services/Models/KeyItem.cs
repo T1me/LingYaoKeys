@@ -24,7 +24,7 @@ public class KeyItem : INotifyPropertyChanged
 {
     private readonly LyKeysService _lyKeysService;
     private bool _isSelected = true;
-    private LyKeysCode _keyCode;
+    private VirtualKeyCode _keyCode;
     private int _keyInterval;
     private int? _x;
     private int? _y;
@@ -38,7 +38,7 @@ public class KeyItem : INotifyPropertyChanged
     /// <summary>
     /// 创建键盘按键类型的项目
     /// </summary>
-    public KeyItem(LyKeysCode keyCode, LyKeysService lyKeysService)
+    public KeyItem(VirtualKeyCode keyCode, LyKeysService lyKeysService)
     {
         _keyCode = keyCode;
         _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
@@ -79,7 +79,7 @@ public class KeyItem : INotifyPropertyChanged
     /// <summary>
     /// 键盘按键码（仅当Type为Keyboard时有效）
     /// </summary>
-    public LyKeysCode KeyCode
+    public VirtualKeyCode KeyCode
     {
         get => _keyCode;
         set

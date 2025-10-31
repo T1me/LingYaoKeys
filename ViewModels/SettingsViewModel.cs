@@ -2,6 +2,7 @@ using System;
 using System.Windows.Input;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using WpfApp.Services.Core;
 using MessageBox = System.Windows.MessageBox;
 using Application = System.Windows.Application;
@@ -14,6 +15,7 @@ public class SettingsViewModel : ViewModelBase
     private bool _isCheckingUpdate;
     private string _updateStatus = "检查更新";
     private string _debugModeStatus = "调试模式关闭";
+    private string _selectedDriver = "AHK";
 
     public string UpdateStatus
     {
@@ -25,6 +27,18 @@ public class SettingsViewModel : ViewModelBase
     {
         get => _debugModeStatus;
         set => SetProperty(ref _debugModeStatus, value);
+    }
+
+    public string SelectedDriver
+    {
+        get => _selectedDriver;
+        set
+        {
+            if (SetProperty(ref _selectedDriver, value))
+            {
+                ConfigManager.UpdateGlobalConfig(config => config.SelectedDriver = value);
+            }
+        }
     }
 
     public ICommand CheckUpdateCommand { get; }
@@ -43,12 +57,19 @@ public class SettingsViewModel : ViewModelBase
         ToggleDebugModeCommand = CreateCommand(ToggleDebugMode);
 
         UpdateDebugModeStatus();
+        UpdateDriverStatus();
     }
 
     private void UpdateDebugModeStatus()
     {
         var globalConfig = ConfigManager.GlobalConfig;
         _debugModeStatus = globalConfig.Debug.IsDebugMode ? "🟢 调试模式：已开启" : "⭕ 调试模式：已关闭";
+    }
+
+    private void UpdateDriverStatus()
+    {
+        var globalConfig = ConfigManager.GlobalConfig;
+        _selectedDriver = globalConfig.SelectedDriver ?? "AHK";
     }
 
     private async void ToggleDebugMode()
