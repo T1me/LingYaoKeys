@@ -42,7 +42,6 @@ namespace WpfApp.Services.Core
         private string _configDir;
         private string _globalConfigPath;
         private const string CONFIG_INDEX_FILE = "config_index.json";
-        private const int MAX_BACKUP_FILES = 5;
         
         /// <summary>全局配置实例</summary>
         private GlobalConfig _globalConfig;

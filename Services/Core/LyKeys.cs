@@ -71,7 +71,7 @@ public sealed class LyKeys : IDisposable
     [DllImport("lykeysdll.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern DeviceStatus GetDriverStatus();
 
-    // 新增：获取详细错误信息
+    // 获取详细错误信息
     [DllImport("lykeysdll.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern int GetDetailedErrorCode();
 

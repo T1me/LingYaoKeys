@@ -1281,16 +1281,6 @@ namespace WpfApp.ViewModels
                     SaveConfig();
                     UpdateHotkeyServiceKeyList();
                 };
-                // 订阅KeyIntervalChanged事件
-                newKey.KeyIntervalChanged += (s, newInterval) =>
-                {
-                    if (!_isInitializing)
-                    {
-                        // 更新LyKeysService中的按键间隔缓存
-                        _lyKeysService.SetKeyIntervalForKey(newKey.KeyCode, newInterval);
-                         Logger.Debug($"按键{newKey.KeyCode}的间隔已更新为{newInterval}ms");
-                    }
-                };
 
                 KeyList.Add(newKey);
                 
@@ -1392,8 +1382,8 @@ namespace WpfApp.ViewModels
                 }
                 
                 // 设置统一操作列表到服务 - 一站式更新，避免多处重复调用
-                _lyKeysService.SetUnifiedOperationList(operations);
-                
+                _lyKeysService.SetOperationList(operations);
+
                 // 只通知HotkeyService一次
                 _hotkeyService.SetKeySequence(operations);
 
@@ -1610,16 +1600,15 @@ namespace WpfApp.ViewModels
                         return;
                     }
 
-                    // 设置按键列表到驱动服务
-                    _lyKeysService.SetKeyList(selectedKeys.Select(k => k.KeyCode).ToList());
+                    // 统一设置操作列表（只设置一次）
+                    var operations = selectedKeys.Select(k => new KeyItemSettings
+                    {
+                        KeyCode = k.KeyCode,
+                        Interval = k.KeyInterval,
+                        Type = KeyItemType.Keyboard
+                    }).ToList();
 
-                    // 将选中的按键及其间隔传递给HotkeyService
-                    _hotkeyService.SetKeySequence(
-                        selectedKeys.Select(k => new KeyItemSettings
-                        {
-                            KeyCode = k.KeyCode,
-                            Interval = k.KeyInterval
-                        }).ToList());
+                    _lyKeysService.SetOperationList(operations);
 
                     // 设置按键模式并启动
                     _lyKeysService.IsHoldMode = !IsSequenceMode;
@@ -2219,7 +2208,7 @@ namespace WpfApp.ViewModels
                 newCoordinate.KeyInterval = _keyInterval; // 使用当前默认间隔值
                 
                 // 添加事件订阅
-                newCoordinate.SelectionChanged += (s, isSelected) => 
+                newCoordinate.SelectionChanged += (s, isSelected) =>
                 {
                     SaveConfig();
                     UpdateHotkeyServiceKeyList();
@@ -2228,8 +2217,8 @@ namespace WpfApp.ViewModels
                 {
                     if (!_isInitializing)
                     {
-                        // 更新LyKeysService中的坐标间隔缓存，但不立即保存配置
-                        _lyKeysService.SetCoordinateInterval(newCoordinate.X, newCoordinate.Y, newInterval);
+                        SaveConfig();
+                        UpdateHotkeyServiceKeyList();
                          Logger.Debug($"坐标[{newCoordinate.X},{newCoordinate.Y}]的间隔已更新为{newInterval}ms");
                     }
                 };

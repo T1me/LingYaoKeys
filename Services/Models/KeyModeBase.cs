@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using WpfApp.Services.Core;
 using WpfApp.Services.Utils;
 
@@ -41,15 +40,12 @@ public abstract class KeyModeBase
 
     protected void ExecuteLoop()
     {
-        var stopwatch = new Stopwatch();
-        var spinWait = new SpinWait();
-
         while (_isRunning && !ShouldStop())
         {
             var operation = GetNextOperation();
             if (operation == null) break;
 
-            if (!ExecuteOperation(operation, stopwatch, spinWait))
+            if (!ExecuteOperation(operation))
                 break;
         }
 
@@ -59,36 +55,46 @@ public abstract class KeyModeBase
     protected abstract KeyItemSettings? GetNextOperation();
     protected abstract bool ShouldStop();
 
-    private bool ExecuteOperation(KeyItemSettings operation, Stopwatch stopwatch, SpinWait spinWait)
+    private bool ExecuteOperation(KeyItemSettings operation)
     {
         if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
-            return ExecuteSingleKey(operation.KeyCode.Value, stopwatch, spinWait);
+            return ExecuteSingleKey(operation);
 
         if (operation.Type == KeyItemType.Coordinates)
-            return ExecuteCoordinate(operation.X, operation.Y, operation.Interval, stopwatch, spinWait);
+            return ExecuteCoordinate(operation.X, operation.Y, operation.Interval);
 
         return true;
     }
 
-    private bool ExecuteSingleKey(LyKeysCode key, Stopwatch stopwatch, SpinWait spinWait)
+    private bool ExecuteSingleKey(KeyItemSettings operation)
     {
-        int keyInterval = _driverService.GetKeyInterval(key);
-        stopwatch.Restart();
+        var key = operation.KeyCode.Value;
+        int keyInterval = operation.Interval;
 
         try
         {
             _driverService.SendKeyDown(key);
-            if (KeyPressInterval > 0 && !HighPrecisionDelay(KeyPressInterval))
+
+            if (KeyPressInterval > 0)
             {
-                _driverService.SendKeyUp(key);
-                return false;
+                Thread.Sleep(KeyPressInterval);
+                if (ShouldStop())
+                {
+                    _driverService.SendKeyUp(key);
+                    return false;
+                }
             }
+
             _driverService.SendKeyUp(key);
 
             _logger.Debug($"{GetType().Name} - 执行按键: {key}, 按下时长: {KeyPressInterval}ms, 间隔: {keyInterval}ms");
 
-            var remainingDelay = Math.Max(0, keyInterval - stopwatch.ElapsedMilliseconds);
-            return remainingDelay <= 0 || HighPrecisionDelay(remainingDelay);
+            if (keyInterval > 0)
+            {
+                Thread.Sleep(keyInterval);
+            }
+
+            return !ShouldStop();
         }
         catch (Exception ex)
         {
@@ -98,14 +104,18 @@ public abstract class KeyModeBase
         }
     }
 
-    private bool ExecuteCoordinate(int? x, int? y, int interval, Stopwatch stopwatch, SpinWait spinWait)
+    private bool ExecuteCoordinate(int? x, int? y, int interval)
     {
-        stopwatch.Restart();
         try
         {
             _driverService.MoveMouseToPosition(x, y);
-            var remainingDelay = Math.Max(0, interval - stopwatch.ElapsedMilliseconds);
-            return remainingDelay <= 0 || HighPrecisionDelay(remainingDelay);
+
+            if (interval > 0)
+            {
+                Thread.Sleep(interval);
+            }
+
+            return !ShouldStop();
         }
         catch (Exception ex)
         {
@@ -114,23 +124,6 @@ public abstract class KeyModeBase
         }
     }
 
-    private bool HighPrecisionDelay(long delayMs)
-    {
-        if (delayMs <= 0) return true;
-        var sw = Stopwatch.StartNew();
-        if (delayMs > 15)
-        {
-            if (ShouldStop()) return false;
-            Thread.Sleep((int)(delayMs - 5));
-        }
-        var spinWait = new SpinWait();
-        while (sw.ElapsedMilliseconds < delayMs)
-        {
-            if (ShouldStop()) return false;
-            spinWait.SpinOnce();
-        }
-        return true;
-    }
 
     protected virtual void LogModeStart()
     {

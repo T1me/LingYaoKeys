@@ -14,13 +14,6 @@ namespace WpfApp.Services.Core
     /// </summary>
     public class LyKeysService : IDisposable
     {
-        // Windows API 用于提高系统时钟精度
-        [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
-        private static extern uint TimeBeginPeriod(uint uMilliseconds);
-
-        [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
-        private static extern uint TimeEndPeriod(uint uMilliseconds);
-        
         #region 私有字段
         private LyKeys? _lyKeys;
         private readonly SerilogManager _logger;
@@ -45,22 +38,10 @@ namespace WpfApp.Services.Core
         private const int EMERGENCY_STOP_THRESHOLD = 100; // 100ms内未能停止则强制停止
         private readonly object _emergencyStopLock = new object();
         private bool _autoSwitchIME = true; // 是否自动切换输入法
-        // 存储每个按键的间隔信息
-        private Dictionary<LyKeysCode, int> _keyIntervals = new Dictionary<LyKeysCode, int>();
-        // 添加初始化标志
-        private bool _isGettingKeyItem = false;
-        // 添加缓存字典，用于存储按键配置
-        private Dictionary<LyKeysCode, KeyItem> _keyItemCache = new Dictionary<LyKeysCode, KeyItem>();
-        // 缓存过期时间戳
-        private DateTime _cacheExpirationTime = DateTime.MinValue;
-        // 是否正在执行SetKeyList
+        // 是否正在执行SetOperationList
         private bool _isSettingKeyList = false;
         // 是否启用降低卡位功能
         private bool _isReduceKeyStuck = false;
-        // 是否已提高时钟精度
-        private bool _isHighResolutionTimerEnabled = false;
-        // 用于精确延迟的Stopwatch
-        private readonly Stopwatch _precisionStopwatch = new Stopwatch();
         // 按键模式实例
         private SequenceKeyMode? _sequenceMode;
         private HoldKeyMode? _holdMode;
@@ -243,10 +224,7 @@ namespace WpfApp.Services.Core
             _isHoldMode = false;
             _virtualKeyMap = InitializeVirtualKeyMap();
             _inputMethodService = new InputMethodService();  // 初始化InputMethodService
-            
-            // 提高系统时钟精度
-            EnableHighResolutionTimer();
-            
+
             // 从配置中读取是否自动切换输入法
             try
             {
@@ -456,81 +434,7 @@ namespace WpfApp.Services.Core
             }
         }
 
-        /// <summary>
-        /// 设置按键列表
-        /// </summary>
-        /// <param name="keyList">按键列表</param>
-        public void SetKeyList(List<LyKeysCode> keyList)
-        {
-            try
-            {
-                var operations = new List<KeyItemSettings>();
-                
-                foreach (var key in keyList)
-                {
-                    int interval = _keyIntervals.TryGetValue(key, out int value) ? value : _keyInterval;
-                    operations.Add(KeyItemSettings.CreateKeyboard(key, interval));
-                }
-                
-                SetOperationList(operations);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("SetKeyList转发异常", ex);
-                _operationList.Clear();
-                IsEnabled = false;
-            }
-        }
 
-        /// <summary>
-        /// 设置按键和坐标列表，支持混合操作
-        /// </summary>
-        /// <param name="keyboard">键盘按键列表</param>
-        /// <param name="coordinates">坐标列表</param>
-        public void SetKeyItemsListWithCoordinates(List<LyKeysCode> keyboard, List<(int X, int Y, int Interval)> coordinates)
-        {
-            try
-            {
-                // 转换为统一操作列表
-                var operations = new List<KeyItemSettings>();
-                
-                // 先将原有的键盘按键添加到操作列表
-                if (keyboard != null)
-                {
-                    foreach (var key in keyboard)
-                    {
-                        int interval = _keyIntervals.TryGetValue(key, out int value) ? value : _keyInterval;
-                        operations.Add(KeyItemSettings.CreateKeyboard(key, interval));
-                    }
-                }
-                
-                // 然后将坐标添加到操作列表
-                if (coordinates != null)
-                {
-                    foreach (var coord in coordinates)
-                    {
-                        operations.Add(KeyItemSettings.CreateCoordinates((int?)coord.X, (int?)coord.Y, coord.Interval));
-                    }
-                }
-                
-                // 使用统一的方法设置操作列表
-                SetOperationList(operations);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("SetKeyItemsListWithCoordinates转发异常", ex);
-                _operationList.Clear();
-                IsEnabled = false;
-            }
-        }
-        
-        /// <summary>
-        /// 设置统一的操作列表，包含按键和坐标，按指定顺序执行
-        /// </summary>
-        public void SetUnifiedOperationList(List<KeyItemSettings> operations)
-        {
-            SetOperationList(operations);
-        }
 
         /// <summary>
         /// 设置按键列表 - 统一操作列表版本
@@ -546,9 +450,9 @@ namespace WpfApp.Services.Core
                     _logger.Warning("检测到SetOperationList正在执行中，跳过重复调用");
                     return;
                 }
-                
+
                 _isSettingKeyList = true;
-                
+
                 // 验证输入
                 if (operations == null || operations.Count == 0)
                 {
@@ -558,48 +462,21 @@ namespace WpfApp.Services.Core
                     return;
                 }
 
-                // 添加数据比较逻辑，避免重复设置相同内容的操作列表
-                if (IsOperationListIdentical(operations, _operationList))
-                {
-                    _logger.Debug("操作列表内容相同，跳过重复更新");
-                    return;
-                }
-
                 // 验证键盘按键有效性
-                var keyboardOps = operations.Where(op => op.Type == KeyItemType.Keyboard && op.KeyCode.HasValue)
-                                          .Select(op => op.KeyCode.Value)
-                                          .ToList();
-                                  
+                var keyboardOps = operations
+                    .Where(op => op.Type == KeyItemType.Keyboard && op.KeyCode.HasValue)
+                    .Select(op => op.KeyCode.Value)
+                    .ToList();
+
                 if (keyboardOps.Any(k => !IsValidLyKeysCode(k)))
                 {
                     _logger.Warning("操作列表包含无效的键码");
                     return;
                 }
 
-                // 清理不再需要的按键缓存
-                CleanupUnusedKeyCaches(keyboardOps);
-
-                // 处理按键间隔设置 - 始终更新以确保配置变更生效
-                foreach (var keyCode in keyboardOps)
-                {
-                    // 从操作列表中查找对应的设置
-                    var keySettings = operations.FirstOrDefault(op => op.Type == KeyItemType.Keyboard && op.KeyCode == keyCode);
-                    if (keySettings != null)
-                    {
-                        // 始终更新间隔值，确保配置修改后立即生效
-                        _keyIntervals[keyCode] = keySettings.Interval;
-                        _logger.Debug($"更新按键 {keyCode} 的间隔: {keySettings.Interval}ms");
-                    }
-                    else
-                    {
-                        // 如果没有找到设置，使用默认间隔
-                        _keyIntervals[keyCode] = _keyInterval;
-                    }
-                }
-
-                // 更新操作列表
+                // 直接更新操作列表
                 _operationList = operations.ToList();
-                
+
                 _logger.Debug($"操作列表已更新 - 总操作数: {_operationList.Count}, 键盘按键数: {keyboardOps.Count}, 坐标点数: {operations.Count(op => op.Type == KeyItemType.Coordinates)}");
             }
             catch (Exception ex)
@@ -614,203 +491,6 @@ namespace WpfApp.Services.Core
             }
         }
 
-        /// <summary>
-        /// 比较两个操作列表是否内容相同
-        /// </summary>
-        /// <param name="list1">第一个操作列表</param>
-        /// <param name="list2">第二个操作列表</param>
-        /// <returns>是否内容相同</returns>
-        private bool IsOperationListIdentical(List<KeyItemSettings> list1, List<KeyItemSettings> list2)
-        {
-            if (list1 == null || list2 == null)
-                return list1 == list2;
-                
-            if (list1.Count != list2.Count)
-                return false;
-                
-            for (int i = 0; i < list1.Count; i++)
-            {
-                var op1 = list1[i];
-                var op2 = list2[i];
-                
-                if (op1.Type != op2.Type)
-                    return false;
-                    
-                if (op1.Type == KeyItemType.Keyboard)
-                {
-                    if (op1.KeyCode != op2.KeyCode || op1.Interval != op2.Interval)
-                        return false;
-                }
-                else if (op1.Type == KeyItemType.Coordinates)
-                {
-                    if (op1.X != op2.X || op1.Y != op2.Y || op1.Interval != op2.Interval)
-                        return false;
-                }
-            }
-            
-            return true;
-        }
-
-        /// <summary>
-        /// 清理不再使用的按键缓存
-        /// </summary>
-        private void CleanupUnusedKeyCaches(List<LyKeysCode> activeKeys)
-        {
-            var keysToRemove = _keyIntervals.Keys
-                .Where(cachedKey => !activeKeys.Contains(cachedKey))
-                .ToList();
-                
-            foreach (var keyToRemove in keysToRemove)
-            {
-                _keyIntervals.Remove(keyToRemove);
-                _keyItemCache.Remove(keyToRemove);
-            }
-            
-            _cacheExpirationTime = DateTime.MinValue;
-        }
-
-        /// <summary>
-        /// 获取按键对应的KeyItem
-        /// </summary>
-        private KeyItem? GetKeyItem(LyKeysCode keyCode)
-        {
-            // 防止循环调用
-            if (_isGettingKeyItem)
-            {
-                return null;
-            }
-            
-            _isGettingKeyItem = true;
-            
-            try
-            {
-                // 首先检查缓存是否有效
-                if (_keyItemCache.ContainsKey(keyCode) && DateTime.Now < _cacheExpirationTime)
-                {
-                    var cachedItem = _keyItemCache[keyCode];
-                    _logger.Debug($"[GetKeyItem] 从缓存获取按键{keyCode}的KeyItem, 间隔值: {cachedItem?.KeyInterval ?? _keyInterval}ms");
-                    _isGettingKeyItem = false;
-                    return cachedItem;
-                }
-                
-                // 检查是否处于初始化阶段
-                if (IsInitializing())
-                {
-                    _isGettingKeyItem = false;
-                    return null;
-                }
-                
-                // 通过反射获取主窗口实例
-                var mainWindow = System.Windows.Application.Current?.MainWindow;
-                if (mainWindow == null)
-                {
-                    _logger.Debug($"[GetKeyItem] 主窗口为空");
-                    _isGettingKeyItem = false;
-                    return null;
-                }
-
-                var mainViewModel = mainWindow.DataContext as MainViewModel;
-                if (mainViewModel == null)
-                {
-                    _logger.Debug($"[GetKeyItem] MainViewModel为空");
-                    _isGettingKeyItem = false;
-                    return null;
-                }
-
-                var keyMappingViewModel = mainViewModel.KeyMappingViewModel;
-                if (keyMappingViewModel == null || keyMappingViewModel.IsInitializing)
-                {
-                    // 只在调试模式下输出日志
-                    if (_configManager.GlobalConfig.Debug.IsDebugMode)
-                    {
-                        _logger.Debug($"[GetKeyItem] KeyMappingViewModel未初始化，跳过获取KeyItem: {keyCode}");
-                    }
-                    _isGettingKeyItem = false;
-                    return null;
-                }
-
-                if (keyMappingViewModel.KeyList == null)
-                {
-                    _logger.Debug($"[GetKeyItem] KeyList为空");
-                    _isGettingKeyItem = false;
-                    return null;
-                }
-
-                var keyItem = keyMappingViewModel.KeyList.FirstOrDefault(k => k?.KeyCode == keyCode);
-                
-                // 更新缓存
-                if (keyItem != null)
-                {
-                    _keyItemCache[keyCode] = keyItem;
-                    // 设置缓存过期时间为5秒
-                    _cacheExpirationTime = DateTime.Now.AddSeconds(5);
-                    _logger.Debug($"[GetKeyItem] 找到按键{keyCode}的KeyItem, 间隔值: {keyItem.KeyInterval}ms，已缓存");
-                }
-                else
-                {
-                    if (!IsInitializing())
-                    {
-                        _logger.Debug($"[GetKeyItem] 未找到按键{keyCode}的KeyItem");
-                    }
-                }
-                
-                return keyItem;
-            }
-            catch (Exception ex)
-            {
-                // 只记录非初始化阶段的异常
-                if (!IsInitializing())
-                {
-                    _logger.Debug($"[GetKeyItem] 获取KeyItem时发生异常: {keyCode}, 错误: {ex.Message}");
-                }
-                return null;
-            }
-            finally
-            {
-                _isGettingKeyItem = false;
-            }
-        }
-
-        /// <summary>
-        /// 检查是否处于初始化阶段
-        /// </summary>
-        private bool IsInitializing()
-        {
-            try
-            {
-                // 检查Application是否已经初始化
-                if (System.Windows.Application.Current == null)
-                {
-                    return true;
-                }
-                
-                // 检查主窗口是否存在
-                var mainWindow = System.Windows.Application.Current.MainWindow;
-                if (mainWindow == null)
-                {
-                    return true;
-                }
-                
-                // 检查MainViewModel是否存在
-                if (!(mainWindow.DataContext is MainViewModel mainViewModel))
-                {
-                    return true;
-                }
-                
-                // 检查KeyMappingViewModel是否存在和是否正在初始化
-                if (mainViewModel.KeyMappingViewModel == null || 
-                    mainViewModel.KeyMappingViewModel.IsInitializing)
-                {
-                    return true;
-                }
-                
-                return false;
-            }
-            catch
-            {
-                return true;
-            }
-        }
 
         /// <summary>
         /// 模拟按键按下
@@ -995,95 +675,6 @@ namespace WpfApp.Services.Core
             }
         }
 
-        /// <summary>
-        /// 为特定按键设置独立间隔
-        /// </summary>
-        /// <param name="keyCode">需要设置间隔的按键代码</param>
-        /// <param name="interval">间隔值(毫秒)</param>
-        public void SetKeyIntervalForKey(LyKeysCode keyCode, int interval)
-        {
-            try
-            {
-                // 验证按键是否有效
-                if (!IsValidLyKeysCode(keyCode))
-                {
-                    _logger.Warning($"无效的按键代码：{keyCode}，无法设置间隔");
-                    return;
-                }
-
-                // 确保间隔值合法
-                int validInterval = Math.Max(MIN_KEY_INTERVAL, interval);
-                
-                // 直接更新缓存
-                _keyIntervals[keyCode] = validInterval;
-                
-                // 同时更新KeyItem缓存
-                if (_keyItemCache.TryGetValue(keyCode, out KeyItem? item) && item != null)
-                {
-                    item.KeyInterval = validInterval;
-                }
-                
-                _logger.Debug($"已设置按键 {keyCode} 的间隔为 {validInterval}ms");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"设置按键 {keyCode} 间隔时发生异常", ex);
-            }
-        }
-
-        /// <summary>
-        /// 为特定坐标设置独立间隔
-        /// </summary>
-        /// <param name="x">坐标X位置</param>
-        /// <param name="y">坐标Y位置</param>
-        /// <param name="interval">间隔值(毫秒)</param>
-        public void SetCoordinateInterval(int? x, int? y, int interval)
-        {
-            try
-            {
-                // 如果坐标为null，则不进行处理
-                if (x == null || y == null)
-                {
-                    _logger.Warning("设置坐标间隔失败：坐标包含null值");
-                    return;
-                }
-                
-                // 确保间隔值合法
-                int validInterval = Math.Max(MIN_KEY_INTERVAL, interval);
-                
-                // 查找并更新坐标操作的间隔
-                bool found = false;
-                
-                for (int i = 0; i < _operationList.Count; i++)
-                {
-                    var op = _operationList[i];
-                    if (op.Type == KeyItemType.Coordinates && op.X == x && op.Y == y)
-                    {
-                        // 创建新实例以更新间隔
-                        _operationList[i] = KeyItemSettings.CreateCoordinates(x.Value, y.Value, validInterval);
-                        found = true;
-                        _logger.Debug($"已更新坐标 ({x}, {y}) 的间隔为 {validInterval}ms");
-                        break;
-                    }
-                }
-                
-                if (!found && x != 0 && y != 0) // 避免添加无效坐标
-                {
-                    // 如果未找到匹配坐标但应用正在运行，可以添加新坐标
-                    _operationList.Add(KeyItemSettings.CreateCoordinates(x.Value, y.Value, validInterval));
-                    _logger.Debug($"已添加新坐标 ({x}, {y}) 的间隔为 {validInterval}ms");
-                }
-                
-                if (!found && !_isInitialized)
-                {
-                    _logger.Warning($"未找到要更新间隔的坐标 ({x}, {y})");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"设置坐标 ({x}, {y}) 间隔时发生异常", ex);
-            }
-        }
 
         /// <summary>
         /// 移动鼠标到指定的绝对坐标位置
@@ -1152,164 +743,6 @@ namespace WpfApp.Services.Core
             }
         }
 
-        /// <summary>
-        /// 执行单个按键并等待指定间隔
-        /// </summary>
-        private bool ExecuteSingleKeyWithDelay(
-            LyKeysCode key, 
-            int keyPressInterval,
-            Stopwatch stopwatch, 
-            SpinWait spinWait,
-            Func<bool> shouldStopFunc,
-            string modeDescription)
-        {
-            // 获取按键间隔
-            int keyInterval = GetKeyInterval(key);
-            
-            // 重置总计时器，用于衡量整个操作的时间
-            stopwatch.Restart();
-            
-            try
-            {
-                // 按下按键
-                SendKeyDown(key);
-                
-                // 如果设置了按键按下时长，等待指定时间后释放按键
-                if (keyPressInterval > 0)
-                {
-                    // 使用高精度延迟等待按键按下时长
-                    bool continueOperation = HighPrecisionDelay(keyPressInterval, shouldStopFunc);
-                    if (!continueOperation)
-                    {
-                        // 如果被中断，确保释放按键
-                        SendKeyUp(key);
-                        return false;
-                    }
-                }
-                
-                // 释放按键
-                SendKeyUp(key);
-                
-                _logger.Debug($"{modeDescription} - 执行按键: {key}, 按下时长: {keyPressInterval}ms, 按键间隔: {keyInterval}ms");
-                
-                // 计算并等待剩余的按键间隔时间（总间隔减去已经消耗的时间）
-                var elapsedMs = stopwatch.ElapsedMilliseconds;
-                var remainingDelay = Math.Max(0, keyInterval - elapsedMs);
-                
-                if (remainingDelay > 0)
-                {
-                    return HighPrecisionDelay(remainingDelay, shouldStopFunc);
-                }
-                
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"执行按键异常: {key}, {ex.Message}", ex);
-                // 确保按键被释放
-                SendKeyUp(key);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// 等待剩余延迟时间
-        /// </summary>
-        private bool WaitRemainingDelay(
-            int targetDelay, 
-            Stopwatch stopwatch, 
-            SpinWait spinWait, 
-            Func<bool> shouldStopFunc)
-        {
-            var elapsedMs = stopwatch.ElapsedMilliseconds;
-            var remainingDelay = Math.Max(0, targetDelay - elapsedMs);
-            
-            if (remainingDelay <= 0) return true;
-            
-            // 使用高精度延迟方法，统一处理所有延迟情况
-            return HighPrecisionDelay(remainingDelay, shouldStopFunc);
-        }
-        
-        /// <summary>
-        /// 高精度延迟方法，使用混合策略实现更精确的延迟
-        /// </summary>
-        private bool HighPrecisionDelay(
-            long delayMs, 
-            Func<bool> shouldStopFunc)
-        {
-            if (delayMs <= 0) return true;
-            
-            try
-            {
-                // 重置精确计时器
-                _precisionStopwatch.Restart();
-                
-                // 对于超过15ms的延迟，先使用Thread.Sleep等待大部分时间（留出5ms的余量）
-                if (delayMs > 15)
-                {
-                    long sleepTime = delayMs - 5;
-                    
-                    // 检查是否应该终止
-                    if (shouldStopFunc()) return false;
-                    
-                    // 等待大部分时间
-                    Thread.Sleep((int)sleepTime);
-                    
-                    // 剩余时间使用自旋等待
-                    delayMs = 5;
-                }
-                
-                // 对于短延迟或剩余时间，使用高精度自旋等待
-                var sw = new SpinWait();
-                while (_precisionStopwatch.ElapsedMilliseconds < delayMs)
-                {
-                    // 定期检查是否应该终止
-                    if (_precisionStopwatch.ElapsedMilliseconds % 1 == 0 && shouldStopFunc())
-                    {
-                        return false;
-                    }
-                    
-                    // 使用SpinWait避免CPU过度消耗
-                    sw.SpinOnce();
-                }
-                
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"高精度延迟执行异常: {ex.Message}", ex);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// 执行鼠标移动到指定坐标并等待指定间隔
-        /// </summary>
-        private bool ExecuteCoordinateWithDelay(
-            int? x,
-            int? y,
-            int interval,
-            Stopwatch stopwatch,
-            SpinWait spinWait,
-            Func<bool> shouldStopFunc,
-            string modeDescription)
-        {
-            stopwatch.Restart();
-            
-            // 移动鼠标到指定坐标，MoveMouseToPosition方法会处理null值
-            bool moveResult = MoveMouseToPosition(x, y);
-            if (moveResult)
-            {
-                _logger.Debug($"{modeDescription} - 移动鼠标到坐标: ({x}, {y}), 使用间隔: {interval}ms");
-            }
-            else
-            {
-                _logger.Warning($"{modeDescription} - 移动鼠标到坐标: ({x}, {y}) 失败");
-            }
-            
-            // 计算并等待剩余延迟时间
-            return WaitRemainingDelay(interval, stopwatch, spinWait, shouldStopFunc);
-        }
 
         private void SendStatusMessage(string message, bool isError = false)
         {
@@ -1384,17 +817,7 @@ namespace WpfApp.Services.Core
                     _logger.Error("停止序列失败", ex);
                 }
 
-                // 3. 恢复系统时钟精度
-                try
-                {
-                    DisableHighResolutionTimer();
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error("恢复时钟精度失败", ex);
-                }
-
-                // 4. 释放驱动
+                // 3. 释放驱动
                 try
                 {
                     _lyKeys?.Dispose();
@@ -1415,49 +838,6 @@ namespace WpfApp.Services.Core
         }
         #endregion
 
-        #region 高精度时钟
-        /// <summary>
-        /// 启用高精度时钟
-        /// </summary>
-        private void EnableHighResolutionTimer()
-        {
-            try
-            {
-                if (!_isHighResolutionTimerEnabled)
-                {
-                    // 设置计时器精度为1毫秒
-                    TimeBeginPeriod(1);
-                    _isHighResolutionTimerEnabled = true;
-                    _logger.Debug("已启用高精度时钟（1ms精度）");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("启用高精度时钟失败", ex);
-            }
-        }
-        
-        /// <summary>
-        /// 禁用高精度时钟，恢复系统默认精度
-        /// </summary>
-        private void DisableHighResolutionTimer()
-        {
-            try
-            {
-                if (_isHighResolutionTimerEnabled)
-                {
-                    // 恢复默认精度
-                    TimeEndPeriod(1);
-                    _isHighResolutionTimerEnabled = false;
-                    _logger.Debug("已恢复系统默认时钟精度");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("恢复系统默认时钟精度失败", ex);
-            }
-        }
-        #endregion
 
         #region 输入法管理
         /// <summary>
@@ -1500,42 +880,6 @@ namespace WpfApp.Services.Core
         }
         #endregion
 
-        /// <summary>
-        /// 获取按键的独立间隔，如果没有找到则使用默认间隔
-        /// </summary>
-        public int GetKeyInterval(LyKeysCode keyCode)
-        {
-            // 首先尝试从缓存字典中获取间隔
-            if (_keyIntervals.TryGetValue(keyCode, out int interval))
-            {
-                // 只在调试模式记录此日志，减少冗余日志
-                if (_configManager.GlobalConfig.Debug.IsDebugMode && !IsInitializing())
-                {
-                    _logger.Debug($"从缓存中获取按键{keyCode}的间隔: {interval}ms");
-                }
-                return interval;
-            }
-            
-            // 如果缓存中没有且不在初始化阶段，尝试从KeyItem获取间隔
-            if (!IsInitializing())
-            {
-                var keyItem = GetKeyItem(keyCode);
-                if (keyItem != null)
-                {
-                    interval = keyItem.KeyInterval;
-                    // 更新缓存
-                    _keyIntervals[keyCode] = interval;
-                    _logger.Debug($"已找到按键{keyCode}的KeyItem，使用独立间隔: {interval}ms");
-                    return interval;
-                }
-            }
-            
-            // 使用默认间隔
-            _logger.Debug($"未找到按键{keyCode}的间隔信息，使用默认间隔: {_keyInterval}ms");
-            // 更新缓存以避免频繁查询
-            _keyIntervals[keyCode] = _keyInterval;
-            return _keyInterval;
-        }
 
     }
 } 

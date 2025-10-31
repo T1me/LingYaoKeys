@@ -42,6 +42,7 @@ public class SequenceKeyMode : KeyModeBase
             finally
             {
                 _isRunning = false;
+                _driverService.IsEnabled = false;
             }
         })
         {

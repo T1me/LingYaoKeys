@@ -67,7 +67,6 @@ public class HotkeyService
     private readonly IConfigManager _configManager;
     private readonly MainViewModel _mainViewModel;
     private readonly Window _mainWindow;
-    private List<LyKeysCode> _keyList = new();
     private List<KeyItemSettings> _keySettings = new();
 
     // 热键状态
@@ -115,6 +114,7 @@ public class HotkeyService
 
         // 订阅事件
         _lyKeysService.ModeSwitched += OnModeSwitched;
+        _lyKeysService.EnableStatusChanged += OnEnableStatusChanged;
         _configManager.ConfigChanged += OnConfigChanged;
         _mainWindow.Closed += (s, e) => Dispose();
 
@@ -189,6 +189,7 @@ public class HotkeyService
             try
             {
                 _lyKeysService.ModeSwitched -= OnModeSwitched;
+                _lyKeysService.EnableStatusChanged -= OnEnableStatusChanged;
                 _configManager.ConfigChanged -= OnConfigChanged;
             }
             catch (Exception ex)
@@ -297,9 +298,9 @@ public class HotkeyService
             if (!_isRegisteringHotkey && !CanTriggerHotkey()) return;
 
             // 检查是否有可执行项（键盘按键或坐标）
-            bool hasKeyboardKeys = _keyList.Count > 0;
+            bool hasKeyboardKeys = _keySettings.Any(k => k.Type == KeyItemType.Keyboard);
             bool hasCoordinates = _keySettings.Any(k => k.Type == KeyItemType.Coordinates);
-            
+
             if (!hasKeyboardKeys && !hasCoordinates)
             {
                 _logger.Warning("按键和坐标列表均为空，无法启动序列");
@@ -309,13 +310,14 @@ public class HotkeyService
 
             _isSequenceRunning = true;
             _logger.Debug($"序列运行状态已设置为: {_isSequenceRunning}");
-            
+
             _lyKeysService.IsEnabled = true;
-            
+
+            int keyboardCount = _keySettings.Count(k => k.Type == KeyItemType.Keyboard);
             int coordinatesCount = _keySettings.Count(k => k.Type == KeyItemType.Coordinates);
             _logger.Debug($"序列已启动 - 模式: {(_lyKeysService.IsHoldMode ? "按压" : "顺序")}, " +
-                          $"键盘按键数: {_keyList.Count}, 坐标点数: {coordinatesCount}, " +
-                          $"使用独立按键间隔设置, 目标窗口句柄: {_targetWindowHandle}");
+                          $"键盘按键数: {keyboardCount}, 坐标点数: {coordinatesCount}, " +
+                          $"目标窗口句柄: {_targetWindowHandle}");
 
             SequenceModeStarted?.Invoke();
         }
@@ -674,7 +676,7 @@ public class HotkeyService
             if (_keySettings != null && _keySettings.Count > 0)
             {
                 _logger.Debug($"模式切换后重新设置操作列表: {_keySettings.Count} 个操作");
-                _lyKeysService.SetUnifiedOperationList(_keySettings);
+                _lyKeysService.SetOperationList(_keySettings);
             }
             else
             {
@@ -685,6 +687,27 @@ public class HotkeyService
         {
             _logger.Error("处理模式切换事件时发生异常", ex);
             // 不抛出异常，避免影响模式切换流程
+        }
+    }
+
+    // 服务启用状态变更事件处理
+    private void OnEnableStatusChanged(object? sender, bool isEnabled)
+    {
+        try
+        {
+            _logger.Debug($"服务启用状态变更: {isEnabled}");
+
+            // 当服务被禁用且当前序列正在运行时，重置序列运行状态
+            if (!isEnabled && _isSequenceRunning)
+            {
+                _logger.Debug("顺序模式执行完成，重置序列运行状态");
+                _isSequenceRunning = false;
+                SequenceModeStopped?.Invoke();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("处理服务启用状态变更事件时发生异常", ex);
         }
     }
 
@@ -953,19 +976,18 @@ public class HotkeyService
     {
         try
         {
-            // 筛选出键盘类型且KeyCode有值的按键，然后提取KeyCode值组成新列表
-            _keyList = keySettings
-                .Where(k => k.Type == KeyItemType.Keyboard && k.KeyCode.HasValue)
-                .Select(k => k.KeyCode.Value)
-                .ToList();
+            if (keySettings == null)
+                keySettings = new List<KeyItemSettings>();
 
             // 传递给LyKeysService统一的操作列表
-            _lyKeysService.SetUnifiedOperationList(keySettings);
+            _lyKeysService.SetOperationList(keySettings);
 
             // 保存完整的按键设置
             _keySettings = keySettings.ToList();
 
-            _logger.Debug($"设置按键序列: 总操作数={keySettings.Count}, 键盘按键={_keyList.Count}, 坐标点={keySettings.Count(k => k.Type == KeyItemType.Coordinates)}, 使用独立按键间隔");
+            int keyboardCount = keySettings.Count(k => k.Type == KeyItemType.Keyboard);
+            int coordinatesCount = keySettings.Count(k => k.Type == KeyItemType.Coordinates);
+            _logger.Debug($"设置按键序列: 总操作数={keySettings.Count}, 键盘按键={keyboardCount}, 坐标点={coordinatesCount}");
         }
         catch (Exception ex)
         {

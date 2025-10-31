@@ -34,17 +34,13 @@ public class KeyMappingService
 
     public bool IsExecuting { get; private set; }
 
+    /// <summary>
+    /// 全局默认按键间隔（仅用于新添加的按键）
+    /// </summary>
     public int KeyInterval
     {
         get => _lyKeysService.KeyInterval;
-        set
-        {
-            if (_lyKeysService.KeyInterval != value)
-            {
-                _lyKeysService.KeyInterval = value;
-                UpdateHotkeyServiceKeyList();
-            }
-        }
+        set => _lyKeysService.KeyInterval = value;
     }
 
     private void InitializeEventHandlers()
@@ -62,11 +58,7 @@ public class KeyMappingService
         }
 
         var newKeyItem = new KeyItem(keyCode, _lyKeysService);
-        newKeyItem.SelectionChanged += (s, isSelected) =>
-        {
-            UpdateHotkeyServiceKeyList();
-            KeyListChanged?.Invoke();
-        };
+        SubscribeKeyItemEvents(newKeyItem);
 
         _keyList.Add(newKeyItem);
         UpdateHotkeyServiceKeyList();
@@ -103,10 +95,8 @@ public class KeyMappingService
     {
         if (IsExecuting) return;
 
-        // 获取选中的键盘类型按键
-        var keyboardKeys = GetSelectedKeyboardKeys();
         var selectedItems = GetSelectedItems();
-        
+
         if (selectedItems.Count == 0)
         {
             _logger.Warning("没有选中的按键");
@@ -115,22 +105,12 @@ public class KeyMappingService
 
         try
         {
-            // 设置按键列表到驱动服务 - 仅键盘类型
-            _lyKeysService.SetKeyList(keyboardKeys);
-
             // 创建按键设置，支持不同类型
-            var keySettings = selectedItems.Select(k => 
-            {
-                if (k.Type == KeyItemType.Keyboard)
-                {
-                    return KeyItemSettings.CreateKeyboard(k.KeyCode, k.KeyInterval);
-                }
-                else // KeyItemType.Coordinates
-                {
-                    return KeyItemSettings.CreateCoordinates(k.X, k.Y, k.KeyInterval);
-                }
-            }).ToList();
-            
+            var keySettings = CreateKeySettings(selectedItems);
+
+            // 设置统一操作列表到驱动服务
+            _lyKeysService.SetOperationList(keySettings);
+
             // 传递给HotkeyService所有类型的按键
             _hotkeyService.SetKeySequence(keySettings);
 
@@ -204,29 +184,19 @@ public class KeyMappingService
         try
         {
             // 获取选中的按键列表
-            var selectedItems = _keyList.Where(k => k.IsSelected).ToList();
-            
-            // 创建KeyItemSettings，根据类型创建不同的设置
-            var keySettings = selectedItems.Select(k => 
-            {
-                if (k.Type == KeyItemType.Keyboard)
-                {
-                    return KeyItemSettings.CreateKeyboard(k.KeyCode, k.KeyInterval);
-                }
-                else // KeyItemType.Coordinates
-                {
-                    return KeyItemSettings.CreateCoordinates(k.X, k.Y, k.KeyInterval);
-                }
-            }).ToList();
-            
+            var selectedItems = GetSelectedItems();
+
+            // 创建KeyItemSettings
+            var keySettings = CreateKeySettings(selectedItems);
+
+            // 设置统一操作列表到驱动服务
+            _lyKeysService.SetOperationList(keySettings);
+
             // 将所有设置（包括键盘和坐标）传递给HotkeyService
             _hotkeyService.SetKeySequence(keySettings);
-            
-            // 只提取键盘类型的按键发送给LyKeysService
-            var keyboardKeys = GetSelectedKeyboardKeys();
-            _lyKeysService.SetKeyList(keyboardKeys);
-            
-            _logger.Debug($"更新按键列表 - 选中按键数: {selectedItems.Count}, 键盘按键数: {keyboardKeys.Count}, 使用独立按键间隔");
+
+            int keyboardCount = keySettings.Count(k => k.Type == KeyItemType.Keyboard);
+            _logger.Debug($"更新按键列表 - 选中按键数: {selectedItems.Count}, 键盘按键数: {keyboardCount}");
         }
         catch (Exception ex)
         {
@@ -241,17 +211,6 @@ public class KeyMappingService
     {
         return _keyList.Where(k => k.IsSelected).ToList();
     }
-    
-    /// <summary>
-    /// 获取选中的键盘类型按键
-    /// </summary>
-    private List<LyKeysCode> GetSelectedKeyboardKeys()
-    {
-        return _keyList
-            .Where(k => k.IsSelected && k.Type == KeyItemType.Keyboard)
-            .Select(k => k.KeyCode)
-            .ToList();
-    }
 
     private bool IsKeyInList(LyKeysCode keyCode)
     {
@@ -262,6 +221,36 @@ public class KeyMappingService
     {
         // 简化为只检查单一热键
         return _hotkey.HasValue && keyCode.Equals(_hotkey.Value);
+    }
+
+    /// <summary>
+    /// 从 KeyItem 列表创建 KeyItemSettings 列表
+    /// </summary>
+    private List<KeyItemSettings> CreateKeySettings(List<KeyItem> items)
+    {
+        return items.Select(k =>
+        {
+            if (k.Type == KeyItemType.Keyboard)
+            {
+                return KeyItemSettings.CreateKeyboard(k.KeyCode, k.KeyInterval);
+            }
+            else // KeyItemType.Coordinates
+            {
+                return KeyItemSettings.CreateCoordinates(k.X, k.Y, k.KeyInterval);
+            }
+        }).ToList();
+    }
+
+    /// <summary>
+    /// 为 KeyItem 订阅事件
+    /// </summary>
+    private void SubscribeKeyItemEvents(KeyItem keyItem)
+    {
+        keyItem.SelectionChanged += (s, isSelected) =>
+        {
+            UpdateHotkeyServiceKeyList();
+            KeyListChanged?.Invoke();
+        };
     }
 
     public void LoadConfiguration(KeyConfigData config)
@@ -279,7 +268,8 @@ public class KeyMappingService
                 // 创建键盘按键
                 keyItem = new KeyItem(keyConfig.Code.Value, _lyKeysService)
                 {
-                    IsSelected = keyConfig.IsSelected
+                    IsSelected = keyConfig.IsSelected,
+                    KeyInterval = keyConfig.KeyInterval
                 };
             }
             else if (keyConfig.Type == KeyItemType.Coordinates)
@@ -289,7 +279,8 @@ public class KeyMappingService
                 int yValue = keyConfig.Y ?? 1;
                 keyItem = new KeyItem(xValue, yValue, _lyKeysService)
                 {
-                    IsSelected = keyConfig.IsSelected
+                    IsSelected = keyConfig.IsSelected,
+                    KeyInterval = keyConfig.KeyInterval
                 };
             }
             else
@@ -298,8 +289,8 @@ public class KeyMappingService
                 _logger.Warning($"跳过无效的按键配置: 类型={keyConfig.Type}, Code={keyConfig.Code}");
                 continue;
             }
-            
-            keyItem.SelectionChanged += (s, isSelected) => KeyListChanged?.Invoke();
+
+            SubscribeKeyItemEvents(keyItem);
             _keyList.Add(keyItem);
         }
 
