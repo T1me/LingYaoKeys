@@ -318,25 +318,15 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        Views.SplashWindow? splashWindow = null;
-
         try
         {
-            System.Diagnostics.Debug.WriteLine("=== 应用启动 ===");
-
-            splashWindow = new Views.SplashWindow();
-            splashWindow.Show();
-            splashWindow.UpdateProgress("正在初始化应用程序...", 0);
 
             Directory.CreateDirectory(_pathService.AppDataPath);
-
-            splashWindow.UpdateProgress("正在初始化配置服务...", 20);
             ConfigManager.Instance.Initialize();
             ConfigService = ConfigManager.Instance;
 
             ConfigureHardwareAcceleration();
 
-            splashWindow.UpdateProgress("正在初始化日志系统...", 30);
             _logger.SetBaseDirectory(_pathService.LogPath);
             _logger.Initialize(ConfigManager.Instance.GlobalConfig.Debug);
 
@@ -348,68 +338,48 @@ public partial class App : Application
                     _logger.UpdateLoggerConfig(args.GlobalConfigData.Debug);
             };
 
-            splashWindow.UpdateProgress("正在准备驱动文件...", 40);
-            var driverFile = PrepareDriverFiles();
+            var selectedDriver = ConfigService.GlobalConfig.SelectedDriver ?? "LyKeys";
+            _logger.Debug($"选择的驱动: {selectedDriver}");
 
-            if (CheckServiceExists("lykeys"))
+            var driverFile = DriverFactory.PrepareDriverFiles(selectedDriver, _pathService, ExtractEmbeddedResource);
+
+            if (selectedDriver.Equals("LyKeys", StringComparison.OrdinalIgnoreCase))
             {
-                splashWindow.UpdateProgress("正在清理旧驱动...", 50);
-                CleanupExistingService();
+                if (CheckServiceExists("lykeys"))
+                {
+                    CleanupExistingService();
+                }
             }
 
-            splashWindow.UpdateProgress("正在初始化驱动服务...", 60);
-            LyKeysDriver = new LyKeysService();
+            var driver = DriverFactory.CreateDriver(selectedDriver, driverFile);
+            LyKeysDriver = new LyKeysService(driver);
 
             if (!LyKeysDriver.Initialize(driverFile))
             {
-                System.Diagnostics.Debug.WriteLine("驱动初始化失败");
                 _logger.Error("驱动加载失败");
-                MessageBox.Show("驱动加载失败，请检查是否以管理员身份运行", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"驱动加载失败({selectedDriver})，请检查是否以管理员身份运行", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 Current.Shutdown();
                 return;
             }
 
-            splashWindow.UpdateProgress("正在初始化音频服务...", 80);
             AudioService = new AudioService();
 
-            splashWindow.UpdateProgress("正在启动主界面...", 90);
             var mainWindow = new Views.MainWindow();
             Current.MainWindow = mainWindow;
 
             if (mainWindow.DataContext is MainViewModel mainViewModel)
             {
-                try
-                {
-                    mainViewModel.PreloadCommonPages();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"页面预加载失败: {ex.Message}");
-                }
+                mainViewModel.PreloadCommonPages();
             }
 
-            splashWindow.UpdateProgress("启动完成", 100);
-            Thread.Sleep(300);
+            Thread.Sleep(400);
 
             mainWindow.Show();
-            splashWindow.Close();
-
-            _logger.Debug("应用程序启动完成");
-            System.Diagnostics.Debug.WriteLine("=== 启动完成 ===");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"!!! 启动异常: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"!!! 堆栈跟踪: {ex.StackTrace}");
-            if (ex.InnerException != null)
-            {
-                System.Diagnostics.Debug.WriteLine($"!!! 内部异常: {ex.InnerException.Message}");
-                System.Diagnostics.Debug.WriteLine($"!!! 内部堆栈: {ex.InnerException.StackTrace}");
-            }
-            
             _logger.Error("应用程序启动失败", ex);
-            MessageBox.Show($"程序启动异常：{ex.Message}\n\n详细信息：{ex.StackTrace}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            splashWindow?.Close();
+            MessageBox.Show($"程序启动异常：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
             Current.Shutdown();
         }
     }
@@ -435,44 +405,6 @@ public partial class App : Application
         };
     }
 
-    private string PrepareDriverFiles()
-    {
-        try
-        {
-            var driverFile = _pathService.GetDriverFilePath("lykeys.sys");
-            var dllFile = _pathService.GetDriverFilePath("lykeysdll.dll");
-            
-            _logger.Debug($"驱动文件目录: {_pathService.DriverPath}");
-
-            // 检查文件是否已存在
-            bool needsExtraction = !File.Exists(driverFile) || !File.Exists(dllFile);
-            
-            if (needsExtraction)
-            {
-                _logger.Debug("驱动文件不存在，开始提取...");
-                ExtractEmbeddedResource("WpfApp.Resource.lykeysdll.lykeys.sys", driverFile);
-                ExtractEmbeddedResource("WpfApp.Resource.lykeysdll.lykeysdll.dll", dllFile);
-                _logger.Debug("驱动文件提取完成");
-            }
-            else
-            {
-                _logger.Debug("驱动文件已存在");
-            }
-
-            // 验证文件
-            if (!File.Exists(driverFile) || !File.Exists(dllFile))
-            {
-                throw new FileNotFoundException("驱动文件不存在或提取失败");
-            }
-
-            return driverFile;
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"准备驱动文件失败: {ex.Message}", ex);
-            throw;
-        }
-    }
 
 
 

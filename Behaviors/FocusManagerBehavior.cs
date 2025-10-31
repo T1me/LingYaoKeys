@@ -1,182 +1,164 @@
+using System;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using TextBox = System.Windows.Controls.TextBox;
-using ComboBox = System.Windows.Controls.ComboBox;
-using Application = System.Windows.Application;
-using RichTextBox = System.Windows.Controls.RichTextBox;
-using PasswordBox = System.Windows.Controls.PasswordBox;
-using WpfApp.Services.Utils;
 
 namespace WpfApp.Behaviors;
 
 /// <summary>
-/// 焦点管理行为 - 提供简单的方式来管理控件的焦点
+/// 焦点管理行为 - 通过附加属性提供声明式焦点控制
 /// </summary>
 public static class FocusManagerBehavior
 {
-    #region EnableFocusManagement 附加属性
+    #region AutoClearOnEnterEscape 附加属性
 
-    public static readonly DependencyProperty EnableFocusManagementProperty =
+    public static readonly DependencyProperty AutoClearOnEnterEscapeProperty =
         DependencyProperty.RegisterAttached(
-            "EnableFocusManagement",
+            "AutoClearOnEnterEscape",
             typeof(bool),
             typeof(FocusManagerBehavior),
-            new PropertyMetadata(false, OnEnableFocusManagementChanged));
+            new PropertyMetadata(false, OnAutoClearOnEnterEscapeChanged));
 
-    public static bool GetEnableFocusManagement(DependencyObject obj)
-    {
-        return (bool)obj.GetValue(EnableFocusManagementProperty);
-    }
+    public static void SetAutoClearOnEnterEscape(DependencyObject obj, bool value)
+        => obj.SetValue(AutoClearOnEnterEscapeProperty, value);
 
-    public static void SetEnableFocusManagement(DependencyObject obj, bool value)
-    {
-        obj.SetValue(EnableFocusManagementProperty, value);
-    }
+    public static bool GetAutoClearOnEnterEscape(DependencyObject obj)
+        => (bool)obj.GetValue(AutoClearOnEnterEscapeProperty);
 
-    private static void OnEnableFocusManagementChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    private static void OnAutoClearOnEnterEscapeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is FrameworkElement element && (bool)e.NewValue)
+        if (d is not UIElement element) return;
+
+        element.PreviewKeyDown -= OnPreviewKeyDown;
+        if ((bool)e.NewValue)
         {
-            if (element.IsLoaded)
-                InitializeFocusManagement(element);
-            else
-                element.Loaded += (s, args) => InitializeFocusManagement(element);
+            element.PreviewKeyDown += OnPreviewKeyDown;
+        }
+    }
+
+    private static void OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter || e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            ClearFocus(sender as FrameworkElement);
         }
     }
 
     #endregion
 
-    #region AutoClearFocusOnClick 附加属性
+    #region ClearFocusOnClickOutside 附加属性
 
-    public static readonly DependencyProperty AutoClearFocusOnClickProperty =
+    public static readonly DependencyProperty ClearFocusOnClickOutsideProperty =
         DependencyProperty.RegisterAttached(
-            "AutoClearFocusOnClick",
+            "ClearFocusOnClickOutside",
             typeof(bool),
             typeof(FocusManagerBehavior),
-            new PropertyMetadata(false, OnAutoClearFocusOnClickChanged));
+            new PropertyMetadata(false, OnClearFocusOnClickOutsideChanged));
 
-    public static bool GetAutoClearFocusOnClick(DependencyObject obj)
-    {
-        return (bool)obj.GetValue(AutoClearFocusOnClickProperty);
-    }
+    public static void SetClearFocusOnClickOutside(DependencyObject obj, bool value)
+        => obj.SetValue(ClearFocusOnClickOutsideProperty, value);
 
-    public static void SetAutoClearFocusOnClick(DependencyObject obj, bool value)
-    {
-        obj.SetValue(AutoClearFocusOnClickProperty, value);
-    }
+    public static bool GetClearFocusOnClickOutside(DependencyObject obj)
+        => (bool)obj.GetValue(ClearFocusOnClickOutsideProperty);
 
-    private static void OnAutoClearFocusOnClickChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    private static void OnClearFocusOnClickOutsideChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is FrameworkElement element && (bool)e.NewValue)
+        if (d is not FrameworkElement element) return;
+
+        element.PreviewMouseDown -= OnPreviewMouseDown;
+
+        if (element is Window window)
         {
-            element.PreviewMouseDown += (s, args) =>
-            {
-                // 检查点击位置是否在弹出窗口上
-                var hitPoint = args.GetPosition(element);
-                
-                // 如果点击位置超出当前元素的范围，可能点击在弹窗上，不应清除焦点
-                if (hitPoint.X < 0 || hitPoint.Y < 0 || 
-                    hitPoint.X > element.ActualWidth || hitPoint.Y > element.ActualHeight)
-                {
-                    return;
-                }
-                
-                var hitTestResult = VisualTreeHelper.HitTest(element, hitPoint);
-                
-                // 检查点击的是否为弹窗或其子元素
-                if (IsPopupOrChildOfPopup(args.OriginalSource as DependencyObject))
-                {
-                    return;
-                }
-                
-                if (hitTestResult == null || !IsInputControl(hitTestResult.VisualHit as DependencyObject))
-                {
-                    Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        FocusManagementService.Instance.ClearFocus();
-                        Keyboard.ClearFocus();
-
-                        // 如果是窗口，设置焦点到窗口本身
-                        if (element is Window window) window.Focus();
-                    }), System.Windows.Threading.DispatcherPriority.Input);
-
-                    args.Handled = true;
-                }
-            };
-
-            // 添加窗口失去焦点的处理
-            if (element is Window window)
-                window.Deactivated += (s, args) =>
-                {
-                    Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        FocusManagementService.Instance.ClearFocus();
-                        Keyboard.ClearFocus();
-                    }), System.Windows.Threading.DispatcherPriority.Input);
-                };
+            window.Deactivated -= OnWindowDeactivated;
         }
-    }
 
-    #endregion
-
-    #region 私有辅助方法
-
-    private static void InitializeFocusManagement(FrameworkElement element)
-    {
-        if (element is TextBox || element is ComboBox)
+        if ((bool)e.NewValue)
         {
-            FocusManagementService.Instance.RegisterFocusableElement(element);
+            element.PreviewMouseDown += OnPreviewMouseDown;
 
-            // 为TextBox添加特殊处理
-            if (element is TextBox textBox)
-                SetupTextBoxBehavior(textBox);
-            // 为ComboBox添加特殊处理
-            else if (element is ComboBox comboBox) SetupComboBoxBehavior(comboBox);
-        }
-    }
-
-    private static void SetupTextBoxBehavior(TextBox textBox)
-    {
-        // 处理Enter和Escape键
-        textBox.PreviewKeyDown += (s, e) =>
-        {
-            if (e.Key == Key.Enter || e.Key == Key.Escape)
+            if (element is Window win)
             {
-                e.Handled = true;
-                FocusManagementService.Instance.ClearFocus();
+                win.Deactivated += OnWindowDeactivated;
             }
-        };
+        }
     }
 
-    private static void SetupComboBoxBehavior(ComboBox comboBox)
+    private static void OnWindowDeactivated(object? sender, EventArgs e) => ClearFocus(null);
+
+    private static void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        // 处理选择变化
-        comboBox.SelectionChanged += (s, e) =>
-        {
-            if (comboBox.IsLoaded && !comboBox.IsDropDownOpen && !comboBox.IsFocused)
-                Application.Current.Dispatcher.BeginInvoke(
-                    new Action(() => { FocusManagementService.Instance.ClearFocus(); }),
-                    System.Windows.Threading.DispatcherPriority.Input);
-        };
+        if (sender is not FrameworkElement element) return;
 
-        // 处理下拉框关闭
-        comboBox.DropDownClosed += (s, e) =>
-        {
-            if (comboBox.IsLoaded && !comboBox.IsFocused)
-                Application.Current.Dispatcher.BeginInvoke(
-                    new Action(() => { FocusManagementService.Instance.ClearFocus(); }),
-                    System.Windows.Threading.DispatcherPriority.Input);
-        };
+        var hitPoint = e.GetPosition(element);
 
-        // 处理失去焦点
-        comboBox.LostFocus += (s, e) =>
+        if (hitPoint.X < 0 || hitPoint.Y < 0 ||
+            hitPoint.X > element.ActualWidth || hitPoint.Y > element.ActualHeight)
         {
-            if (comboBox.IsLoaded && !comboBox.IsDropDownOpen)
-                Application.Current.Dispatcher.BeginInvoke(
-                    new Action(() => { FocusManagementService.Instance.ClearFocus(); }),
-                    System.Windows.Threading.DispatcherPriority.Input);
-        };
+            return;
+        }
+
+        if (IsPopupOrChildOfPopup(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        var hitTestResult = VisualTreeHelper.HitTest(element, hitPoint);
+        var hitElement = hitTestResult?.VisualHit as DependencyObject;
+
+        // 只在点击空白区域时清除焦点，不阻止可交互控件的事件
+        if (hitTestResult != null && !IsInputControl(hitElement) && !IsInteractiveControl(hitElement))
+        {
+            ClearFocus(null);
+        }
+    }
+
+    #endregion
+
+    #region 辅助方法
+
+    private static void ClearFocus(FrameworkElement element)
+    {
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            // 更新数据绑定
+            if (element != null)
+            {
+                var property = element switch
+                {
+                    System.Windows.Controls.TextBox => System.Windows.Controls.TextBox.TextProperty,
+                    System.Windows.Controls.ComboBox => System.Windows.Controls.ComboBox.TextProperty,
+                    _ => null
+                };
+
+                if (property != null)
+                {
+                    BindingOperations.GetBindingExpression(element, property)?.UpdateSource();
+                }
+
+                if (element is System.Windows.Controls.ComboBox comboBox)
+                {
+                    comboBox.IsDropDownOpen = false;
+                }
+            }
+
+            // 清除焦点
+            var focusScope = FocusManager.GetFocusScope(element ?? System.Windows.Application.Current.MainWindow);
+            if (focusScope != null)
+            {
+                FocusManager.SetFocusedElement(focusScope, null);
+            }
+
+            Keyboard.ClearFocus();
+
+            // 如果是窗口，设置焦点到窗口本身
+            if (element is Window window)
+            {
+                window.Focus();
+            }
+        }), System.Windows.Threading.DispatcherPriority.Input);
     }
 
     private static bool IsInputControl(DependencyObject element)
@@ -185,56 +167,78 @@ public static class FocusManagerBehavior
 
         while (element != null)
         {
-            // 检查是否是输入控件
-            if (element is TextBox || element is ComboBox ||
-                element is PasswordBox || element is RichTextBox)
+            if (element is System.Windows.Controls.TextBox || element is System.Windows.Controls.ComboBox ||
+                element is PasswordBox || element is System.Windows.Controls.RichTextBox)
+            {
                 return true;
-
-            // 检查是否有特定标记
-            if (element is FrameworkElement fe &&
-                GetEnableFocusManagement(fe))
-                return true;
+            }
 
             element = VisualTreeHelper.GetParent(element);
         }
 
         return false;
     }
-    
-    private static bool IsPopupOrChildOfPopup(DependencyObject element)
+
+    private static bool IsInteractiveControl(DependencyObject element)
     {
         if (element == null) return false;
-        
-        // 遍历可视树向上查找
+
         while (element != null)
         {
-            // 检查是否是弹出窗口相关类型
-            if (element is System.Windows.Controls.Primitives.Popup || 
-                element is Window window && window != Application.Current.MainWindow)
-                return true;
-            
-            // 检查名称是否包含常见的弹窗关键词
-            if (element is FrameworkElement fe && 
-                (fe.Name?.Contains("Popup") == true || 
-                 fe.Name?.Contains("Dialog") == true ||
-                 fe.Name?.Contains("Config") == true))
-                return true;
-                
-            try
+            if (element is System.Windows.Controls.Button ||
+                element is System.Windows.Controls.Primitives.ToggleButton ||
+                element is System.Windows.Controls.CheckBox ||
+                element is System.Windows.Controls.RadioButton ||
+                element is System.Windows.Controls.Slider ||
+                element is System.Windows.Controls.ListBox ||
+                element is System.Windows.Controls.ListBoxItem)
             {
-                element = VisualTreeHelper.GetParent(element);
+                return true;
             }
-            catch
-            {
-                // 如果获取父元素失败(例如跨窗口边界)，尝试获取逻辑父元素
-                if (element is FrameworkElement frameworkElement)
-                    element = frameworkElement.Parent;
-                else
-                    break;
-            }
+
+            element = VisualTreeHelper.GetParent(element);
         }
-        
+
         return false;
+    }
+
+    private static bool IsPopupOrChildOfPopup(DependencyObject? element)
+    {
+        while (element != null)
+        {
+            if (element is System.Windows.Controls.Primitives.Popup ||
+                element is System.Windows.Controls.ComboBoxItem ||
+                element is Window window && window != System.Windows.Application.Current.MainWindow)
+            {
+                return true;
+            }
+
+            if (element is FrameworkElement { Name: var name } && IsPopupRelatedName(name))
+            {
+                return true;
+            }
+
+            element = GetParentElement(element);
+        }
+
+        return false;
+    }
+
+    private static bool IsPopupRelatedName(string? name) =>
+        name?.Contains("Popup") == true ||
+        name?.Contains("Dialog") == true ||
+        name?.Contains("Config") == true;
+
+    private static DependencyObject? GetParentElement(DependencyObject element)
+    {
+        try
+        {
+            return VisualTreeHelper.GetParent(element);
+        }
+        catch (InvalidOperationException)
+        {
+            return element is FrameworkElement fe ? fe.Parent : null;
+        }
     }
 
     #endregion

@@ -20,7 +20,7 @@
         MouseRightButtonDown="Window_MouseRightButtonDown"
         ResizeMode="NoResize"
         Closing="FloatingStatusWindow_Closing"
-        behaviors:FocusManagerBehavior.AutoClearFocusOnClick="False"
+        behaviors:FocusManagerBehavior.ClearFocusOnClickOutside="False"
         d:Background="Transparent"
         Loaded="Window_Loaded">
 

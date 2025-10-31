@@ -9,6 +9,7 @@
       xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
       mc:Ignorable="d"
       Title="按键映射"
+      behaviors:FocusManagerBehavior.ClearFocusOnClickOutside="True"
       PreviewMouseDown="Page_PreviewMouseDown">
     <Grid>
         <!-- 主要内容 -->
@@ -460,8 +461,7 @@
                         CornerRadius="4"
                         Padding="15">
                     <Grid Width="300" FocusManager.IsFocusScope="True"
-                          behaviors:FocusManagerBehavior.EnableFocusManagement="True"
-                          behaviors:FocusManagerBehavior.AutoClearFocusOnClick="True">
+                          behaviors:FocusManagerBehavior.ClearFocusOnClickOutside="True">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -788,6 +788,7 @@
                                          Width="70"
                                          VerticalContentAlignment="Center"
                                          TextAlignment="Center"
+                                         behaviors:FocusManagerBehavior.AutoClearOnEnterEscape="True"
                                          IsReadOnly="False"
                                          ToolTip="新添加按键时使用的默认间隔值(ms)"
                                          PreviewTextInput="NumberValidationTextBox"
@@ -800,6 +801,7 @@
                                      Style="{StaticResource ModernTextBox}"
                                      IsEnabled="{Binding IsNotExecuting}"
                                      Text="{Binding CurrentKeyText, Mode=OneWay}"
+                                     behaviors:FocusManagerBehavior.AutoClearOnEnterEscape="True"
                                      PreviewKeyDown="KeyInputBox_PreviewKeyDown"
                                      PreviewMouseDown="KeyInputBox_PreviewMouseDown"
                                      GotFocus="KeyInputBox_GotFocus"
@@ -911,6 +913,7 @@
                                      Width="80"
                                      IsEnabled="{Binding IsNotExecuting}"
                                      Text="{Binding CurrentX, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+                                     behaviors:FocusManagerBehavior.AutoClearOnEnterEscape="True"
                                      Tag="X坐标"
                                      Margin="0,0,5,0"
                                      PreviewTextInput="NumberValidationTextBox"
@@ -933,6 +936,7 @@
                                      Width="80"
                                      IsEnabled="{Binding IsNotExecuting}"
                                      Text="{Binding CurrentY, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+                                     behaviors:FocusManagerBehavior.AutoClearOnEnterEscape="True"
                                      Tag="Y坐标"
                                      PreviewTextInput="NumberValidationTextBox"
                                      GotFocus="NumberInput_GotFocus"
@@ -1294,6 +1298,7 @@
                                          IsUndoEnabled="False"
                                          CaretBrush="Transparent"
                                          TextAlignment="Center"
+                                         behaviors:FocusManagerBehavior.AutoClearOnEnterEscape="True"
                                          PreviewKeyDown="StartHotkeyInput_PreviewKeyDown"
                                          KeyDown="StartHotkeyInput_KeyDown"
                                          PreviewMouseDown="StartHotkeyInput_PreviewMouseDown"

@@ -5,7 +5,7 @@
 
     <!-- 通用输入框样式 -->
     <Style x:Key="ModernTextBox" TargetType="TextBox">
-        <Setter Property="behaviors:FocusManagerBehavior.EnableFocusManagement" Value="True" />
+        <Setter Property="behaviors:FocusManagerBehavior.ClearFocusOnClickOutside" Value="True" />
         <Setter Property="Height" Value="32" />
         <Setter Property="Padding" Value="8,4" />
         <Setter Property="Background" Value="White" />
@@ -61,7 +61,7 @@
 
     <!-- 通用下拉框样式 -->
     <Style x:Key="ModernComboBox" TargetType="ComboBox">
-        <Setter Property="behaviors:FocusManagerBehavior.EnableFocusManagement" Value="True" />
+        <Setter Property="behaviors:FocusManagerBehavior.ClearFocusOnClickOutside" Value="True" />
         <Setter Property="Height" Value="32" />
         <Setter Property="Padding" Value="8,4" />
         <Setter Property="Background" Value="White" />
@@ -295,7 +295,7 @@
 
     <!-- 帮助提示浮窗样式 -->
     <Style x:Key="HelpPopupStyle" TargetType="Border">
-        <Setter Property="behaviors:FocusManagerBehavior.AutoClearFocusOnClick" Value="True" />
+        <Setter Property="behaviors:FocusManagerBehavior.ClearFocusOnClickOutside" Value="True" />
         <Setter Property="Background" Value="White" />
         <Setter Property="BorderBrush" Value="#BDBDBD" />
         <Setter Property="BorderThickness" Value="1" />

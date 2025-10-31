@@ -18,8 +18,8 @@ using System.Drawing;
 using System.Windows.Forms;
 using WpfApp.ViewModels;
 using WpfApp.Services.Core;
-using WpfApp.Services.Models;
 using WpfApp.Services.Utils;
+using WpfApp.Services.Models;
 using WpfApp.Behaviors;
 using System.Windows.Media.Animation;
 using System.ComponentModel;
@@ -837,7 +837,7 @@ public partial class KeyMappingView : Page
         if (key == Key.None) return;
 
         // 转换并检查按键
-        if (TryConvertToLyKeysCode(key, out var lyKeysCode))
+        if (TryConvertToVirtualKeyCode(key, out var lyKeysCode))
         {
             // 检查是否与热键冲突
             if (ViewModel.IsHotkeyConflict(lyKeysCode))
@@ -871,166 +871,166 @@ public partial class KeyMappingView : Page
         }
     }
 
-    // 将WPF的Key映射到LyKeysCode
-    private bool TryConvertToLyKeysCode(Key key, out LyKeysCode lyKeysCode)
+    // 将WPF的Key映射到VirtualKeyCode
+    private bool TryConvertToVirtualKeyCode(Key key, out VirtualKeyCode lyKeysCode)
     {
-        // 将WPF的Key映射到LyKeysCode
+        // 将WPF的Key映射到VirtualKeyCode
         lyKeysCode = key switch
         {
             // 字母键
-            Key.A => LyKeysCode.VK_A,
-            Key.B => LyKeysCode.VK_B,
-            Key.C => LyKeysCode.VK_C,
-            Key.D => LyKeysCode.VK_D,
-            Key.E => LyKeysCode.VK_E,
-            Key.F => LyKeysCode.VK_F,
-            Key.G => LyKeysCode.VK_G,
-            Key.H => LyKeysCode.VK_H,
-            Key.I => LyKeysCode.VK_I,
-            Key.J => LyKeysCode.VK_J,
-            Key.K => LyKeysCode.VK_K,
-            Key.L => LyKeysCode.VK_L,
-            Key.M => LyKeysCode.VK_M,
-            Key.N => LyKeysCode.VK_N,
-            Key.O => LyKeysCode.VK_O,
-            Key.P => LyKeysCode.VK_P,
-            Key.Q => LyKeysCode.VK_Q,
-            Key.R => LyKeysCode.VK_R,
-            Key.S => LyKeysCode.VK_S,
-            Key.T => LyKeysCode.VK_T,
-            Key.U => LyKeysCode.VK_U,
-            Key.V => LyKeysCode.VK_V,
-            Key.W => LyKeysCode.VK_W,
-            Key.X => LyKeysCode.VK_X,
-            Key.Y => LyKeysCode.VK_Y,
-            Key.Z => LyKeysCode.VK_Z,
+            Key.A => VirtualKeyCode.VK_A,
+            Key.B => VirtualKeyCode.VK_B,
+            Key.C => VirtualKeyCode.VK_C,
+            Key.D => VirtualKeyCode.VK_D,
+            Key.E => VirtualKeyCode.VK_E,
+            Key.F => VirtualKeyCode.VK_F,
+            Key.G => VirtualKeyCode.VK_G,
+            Key.H => VirtualKeyCode.VK_H,
+            Key.I => VirtualKeyCode.VK_I,
+            Key.J => VirtualKeyCode.VK_J,
+            Key.K => VirtualKeyCode.VK_K,
+            Key.L => VirtualKeyCode.VK_L,
+            Key.M => VirtualKeyCode.VK_M,
+            Key.N => VirtualKeyCode.VK_N,
+            Key.O => VirtualKeyCode.VK_O,
+            Key.P => VirtualKeyCode.VK_P,
+            Key.Q => VirtualKeyCode.VK_Q,
+            Key.R => VirtualKeyCode.VK_R,
+            Key.S => VirtualKeyCode.VK_S,
+            Key.T => VirtualKeyCode.VK_T,
+            Key.U => VirtualKeyCode.VK_U,
+            Key.V => VirtualKeyCode.VK_V,
+            Key.W => VirtualKeyCode.VK_W,
+            Key.X => VirtualKeyCode.VK_X,
+            Key.Y => VirtualKeyCode.VK_Y,
+            Key.Z => VirtualKeyCode.VK_Z,
 
             // 数字键
-            Key.D0 => LyKeysCode.VK_0,
-            Key.D1 => LyKeysCode.VK_1,
-            Key.D2 => LyKeysCode.VK_2,
-            Key.D3 => LyKeysCode.VK_3,
-            Key.D4 => LyKeysCode.VK_4,
-            Key.D5 => LyKeysCode.VK_5,
-            Key.D6 => LyKeysCode.VK_6,
-            Key.D7 => LyKeysCode.VK_7,
-            Key.D8 => LyKeysCode.VK_8,
-            Key.D9 => LyKeysCode.VK_9,
+            Key.D0 => VirtualKeyCode.VK_0,
+            Key.D1 => VirtualKeyCode.VK_1,
+            Key.D2 => VirtualKeyCode.VK_2,
+            Key.D3 => VirtualKeyCode.VK_3,
+            Key.D4 => VirtualKeyCode.VK_4,
+            Key.D5 => VirtualKeyCode.VK_5,
+            Key.D6 => VirtualKeyCode.VK_6,
+            Key.D7 => VirtualKeyCode.VK_7,
+            Key.D8 => VirtualKeyCode.VK_8,
+            Key.D9 => VirtualKeyCode.VK_9,
 
             // 小键盘数字键
-            Key.NumPad0 => LyKeysCode.VK_NUMPAD0,
-            Key.NumPad1 => LyKeysCode.VK_NUMPAD1,
-            Key.NumPad2 => LyKeysCode.VK_NUMPAD2,
-            Key.NumPad3 => LyKeysCode.VK_NUMPAD3,
-            Key.NumPad4 => LyKeysCode.VK_NUMPAD4,
-            Key.NumPad5 => LyKeysCode.VK_NUMPAD5,
-            Key.NumPad6 => LyKeysCode.VK_NUMPAD6,
-            Key.NumPad7 => LyKeysCode.VK_NUMPAD7,
-            Key.NumPad8 => LyKeysCode.VK_NUMPAD8,
-            Key.NumPad9 => LyKeysCode.VK_NUMPAD9,
+            Key.NumPad0 => VirtualKeyCode.VK_NUMPAD0,
+            Key.NumPad1 => VirtualKeyCode.VK_NUMPAD1,
+            Key.NumPad2 => VirtualKeyCode.VK_NUMPAD2,
+            Key.NumPad3 => VirtualKeyCode.VK_NUMPAD3,
+            Key.NumPad4 => VirtualKeyCode.VK_NUMPAD4,
+            Key.NumPad5 => VirtualKeyCode.VK_NUMPAD5,
+            Key.NumPad6 => VirtualKeyCode.VK_NUMPAD6,
+            Key.NumPad7 => VirtualKeyCode.VK_NUMPAD7,
+            Key.NumPad8 => VirtualKeyCode.VK_NUMPAD8,
+            Key.NumPad9 => VirtualKeyCode.VK_NUMPAD9,
 
             // 小键盘运算符
-            Key.Multiply => LyKeysCode.VK_MULTIPLY,
-            Key.Add => LyKeysCode.VK_ADD,
-            Key.Separator => LyKeysCode.VK_SEPARATOR,
-            Key.Subtract => LyKeysCode.VK_SUBTRACT,
-            Key.Decimal => LyKeysCode.VK_DECIMAL,
-            Key.Divide => LyKeysCode.VK_DIVIDE,
+            Key.Multiply => VirtualKeyCode.VK_MULTIPLY,
+            Key.Add => VirtualKeyCode.VK_ADD,
+            Key.Separator => VirtualKeyCode.VK_SEPARATOR,
+            Key.Subtract => VirtualKeyCode.VK_SUBTRACT,
+            Key.Decimal => VirtualKeyCode.VK_DECIMAL,
+            Key.Divide => VirtualKeyCode.VK_DIVIDE,
 
             // 功能键
-            Key.F1 => LyKeysCode.VK_F1,
-            Key.F2 => LyKeysCode.VK_F2,
-            Key.F3 => LyKeysCode.VK_F3,
-            Key.F4 => LyKeysCode.VK_F4,
-            Key.F5 => LyKeysCode.VK_F5,
-            Key.F6 => LyKeysCode.VK_F6,
-            Key.F7 => LyKeysCode.VK_F7,
-            Key.F8 => LyKeysCode.VK_F8,
-            Key.F9 => LyKeysCode.VK_F9,
-            Key.F10 => LyKeysCode.VK_F10,
-            Key.F11 => LyKeysCode.VK_F11,
-            Key.F12 => LyKeysCode.VK_F12,
+            Key.F1 => VirtualKeyCode.VK_F1,
+            Key.F2 => VirtualKeyCode.VK_F2,
+            Key.F3 => VirtualKeyCode.VK_F3,
+            Key.F4 => VirtualKeyCode.VK_F4,
+            Key.F5 => VirtualKeyCode.VK_F5,
+            Key.F6 => VirtualKeyCode.VK_F6,
+            Key.F7 => VirtualKeyCode.VK_F7,
+            Key.F8 => VirtualKeyCode.VK_F8,
+            Key.F9 => VirtualKeyCode.VK_F9,
+            Key.F10 => VirtualKeyCode.VK_F10,
+            Key.F11 => VirtualKeyCode.VK_F11,
+            Key.F12 => VirtualKeyCode.VK_F12,
 
             // 特殊键
-            Key.Escape => LyKeysCode.VK_ESCAPE,
-            Key.Tab => LyKeysCode.VK_TAB,
-            Key.CapsLock => LyKeysCode.VK_CAPITAL,
-            Key.LeftShift => LyKeysCode.VK_LSHIFT,
-            Key.RightShift => LyKeysCode.VK_RSHIFT,
-            Key.LeftCtrl => LyKeysCode.VK_LCONTROL,
-            Key.RightCtrl => LyKeysCode.VK_RCONTROL,
-            Key.LeftAlt => LyKeysCode.VK_LMENU,
-            Key.RightAlt => LyKeysCode.VK_RMENU,
-            Key.Space => LyKeysCode.VK_SPACE,
-            Key.Enter => LyKeysCode.VK_RETURN,
-            Key.Back => LyKeysCode.VK_BACK,
+            Key.Escape => VirtualKeyCode.VK_ESCAPE,
+            Key.Tab => VirtualKeyCode.VK_TAB,
+            Key.CapsLock => VirtualKeyCode.VK_CAPITAL,
+            Key.LeftShift => VirtualKeyCode.VK_LSHIFT,
+            Key.RightShift => VirtualKeyCode.VK_RSHIFT,
+            Key.LeftCtrl => VirtualKeyCode.VK_LCONTROL,
+            Key.RightCtrl => VirtualKeyCode.VK_RCONTROL,
+            Key.LeftAlt => VirtualKeyCode.VK_LMENU,
+            Key.RightAlt => VirtualKeyCode.VK_RMENU,
+            Key.Space => VirtualKeyCode.VK_SPACE,
+            Key.Enter => VirtualKeyCode.VK_RETURN,
+            Key.Back => VirtualKeyCode.VK_BACK,
 
             // 导航键
-            Key.Insert => LyKeysCode.VK_INSERT,
-            Key.Delete => LyKeysCode.VK_DELETE,
-            Key.Home => LyKeysCode.VK_HOME,
-            Key.End => LyKeysCode.VK_END,
-            Key.PageUp => LyKeysCode.VK_PRIOR,
-            Key.PageDown => LyKeysCode.VK_NEXT,
-            Key.Up => LyKeysCode.VK_UP,
-            Key.Down => LyKeysCode.VK_DOWN,
-            Key.Left => LyKeysCode.VK_LEFT,
-            Key.Right => LyKeysCode.VK_RIGHT,
+            Key.Insert => VirtualKeyCode.VK_INSERT,
+            Key.Delete => VirtualKeyCode.VK_DELETE,
+            Key.Home => VirtualKeyCode.VK_HOME,
+            Key.End => VirtualKeyCode.VK_END,
+            Key.PageUp => VirtualKeyCode.VK_PRIOR,
+            Key.PageDown => VirtualKeyCode.VK_NEXT,
+            Key.Up => VirtualKeyCode.VK_UP,
+            Key.Down => VirtualKeyCode.VK_DOWN,
+            Key.Left => VirtualKeyCode.VK_LEFT,
+            Key.Right => VirtualKeyCode.VK_RIGHT,
 
             // 符号键
-            Key.OemTilde => LyKeysCode.VK_OEM_3,
-            Key.OemMinus => LyKeysCode.VK_OEM_MINUS,
-            Key.OemPlus => LyKeysCode.VK_OEM_PLUS,
-            Key.OemOpenBrackets => LyKeysCode.VK_OEM_4,
-            Key.OemCloseBrackets => LyKeysCode.VK_OEM_6,
-            Key.OemSemicolon => LyKeysCode.VK_OEM_1,
-            Key.OemQuotes => LyKeysCode.VK_OEM_7,
-            Key.OemComma => LyKeysCode.VK_OEM_COMMA,
-            Key.OemPeriod => LyKeysCode.VK_OEM_PERIOD,
-            Key.OemQuestion => LyKeysCode.VK_OEM_2,
-            Key.OemBackslash => LyKeysCode.VK_OEM_5,
-            Key.OemPipe => LyKeysCode.VK_OEM_5,
+            Key.OemTilde => VirtualKeyCode.VK_OEM_3,
+            Key.OemMinus => VirtualKeyCode.VK_OEM_MINUS,
+            Key.OemPlus => VirtualKeyCode.VK_OEM_PLUS,
+            Key.OemOpenBrackets => VirtualKeyCode.VK_OEM_4,
+            Key.OemCloseBrackets => VirtualKeyCode.VK_OEM_6,
+            Key.OemSemicolon => VirtualKeyCode.VK_OEM_1,
+            Key.OemQuotes => VirtualKeyCode.VK_OEM_7,
+            Key.OemComma => VirtualKeyCode.VK_OEM_COMMA,
+            Key.OemPeriod => VirtualKeyCode.VK_OEM_PERIOD,
+            Key.OemQuestion => VirtualKeyCode.VK_OEM_2,
+            Key.OemBackslash => VirtualKeyCode.VK_OEM_5,
+            Key.OemPipe => VirtualKeyCode.VK_OEM_5,
 
             // Windows键
-            Key.LWin => LyKeysCode.VK_LWIN,
-            Key.RWin => LyKeysCode.VK_RWIN,
-            Key.Apps => LyKeysCode.VK_APPS,
+            Key.LWin => VirtualKeyCode.VK_LWIN,
+            Key.RWin => VirtualKeyCode.VK_RWIN,
+            Key.Apps => VirtualKeyCode.VK_APPS,
 
             // 锁定键
-            Key.NumLock => LyKeysCode.VK_NUMLOCK,
-            Key.Scroll => LyKeysCode.VK_SCROLL,
+            Key.NumLock => VirtualKeyCode.VK_NUMLOCK,
+            Key.Scroll => VirtualKeyCode.VK_SCROLL,
 
             // 其他特殊键
-            Key.Pause => LyKeysCode.VK_PAUSE,
-            Key.PrintScreen => LyKeysCode.VK_SNAPSHOT,
-            Key.Sleep => LyKeysCode.VK_SLEEP,
+            Key.Pause => VirtualKeyCode.VK_PAUSE,
+            Key.PrintScreen => VirtualKeyCode.VK_SNAPSHOT,
+            Key.Sleep => VirtualKeyCode.VK_SLEEP,
 
             // 浏览器控制键
-            Key.BrowserBack => LyKeysCode.VK_BROWSER_BACK,
-            Key.BrowserForward => LyKeysCode.VK_BROWSER_FORWARD,
-            Key.BrowserRefresh => LyKeysCode.VK_BROWSER_REFRESH,
-            Key.BrowserStop => LyKeysCode.VK_BROWSER_STOP,
-            Key.BrowserSearch => LyKeysCode.VK_BROWSER_SEARCH,
-            Key.BrowserFavorites => LyKeysCode.VK_BROWSER_FAVORITES,
-            Key.BrowserHome => LyKeysCode.VK_BROWSER_HOME,
+            Key.BrowserBack => VirtualKeyCode.VK_BROWSER_BACK,
+            Key.BrowserForward => VirtualKeyCode.VK_BROWSER_FORWARD,
+            Key.BrowserRefresh => VirtualKeyCode.VK_BROWSER_REFRESH,
+            Key.BrowserStop => VirtualKeyCode.VK_BROWSER_STOP,
+            Key.BrowserSearch => VirtualKeyCode.VK_BROWSER_SEARCH,
+            Key.BrowserFavorites => VirtualKeyCode.VK_BROWSER_FAVORITES,
+            Key.BrowserHome => VirtualKeyCode.VK_BROWSER_HOME,
 
             // 音量控制键
-            Key.VolumeMute => LyKeysCode.VK_VOLUME_MUTE,
-            Key.VolumeDown => LyKeysCode.VK_VOLUME_DOWN,
-            Key.VolumeUp => LyKeysCode.VK_VOLUME_UP,
+            Key.VolumeMute => VirtualKeyCode.VK_VOLUME_MUTE,
+            Key.VolumeDown => VirtualKeyCode.VK_VOLUME_DOWN,
+            Key.VolumeUp => VirtualKeyCode.VK_VOLUME_UP,
 
             // 媒体控制键
-            Key.MediaNextTrack => LyKeysCode.VK_MEDIA_NEXT_TRACK,
-            Key.MediaPreviousTrack => LyKeysCode.VK_MEDIA_PREV_TRACK,
-            Key.MediaStop => LyKeysCode.VK_MEDIA_STOP,
-            Key.MediaPlayPause => LyKeysCode.VK_MEDIA_PLAY_PAUSE,
+            Key.MediaNextTrack => VirtualKeyCode.VK_MEDIA_NEXT_TRACK,
+            Key.MediaPreviousTrack => VirtualKeyCode.VK_MEDIA_PREV_TRACK,
+            Key.MediaStop => VirtualKeyCode.VK_MEDIA_STOP,
+            Key.MediaPlayPause => VirtualKeyCode.VK_MEDIA_PLAY_PAUSE,
 
-            _ => LyKeysCode.VK_ESCAPE
+            _ => VirtualKeyCode.VK_ESCAPE
         };
 
         // 修改返回逻辑，只有当映射成功时才返回true
         // 对于未映射的键（默认为VK_ESCAPE），只有当输入的确实是Escape键时才返回true
-        return lyKeysCode != LyKeysCode.VK_ESCAPE || key == Key.Escape;
+        return lyKeysCode != VirtualKeyCode.VK_ESCAPE || key == Key.Escape;
     }
 
     // 处理按键输入框获得焦点
@@ -1099,13 +1099,13 @@ public partial class KeyMappingView : Page
         {
             var keyCode = e.ChangedButton switch
             {
-                MouseButton.Middle => LyKeysCode.VK_MBUTTON,
-                MouseButton.XButton1 => LyKeysCode.VK_XBUTTON1,
-                MouseButton.XButton2 => LyKeysCode.VK_XBUTTON2,
-                _ => LyKeysCode.VK_ESCAPE
+                MouseButton.Middle => VirtualKeyCode.VK_MBUTTON,
+                MouseButton.XButton1 => VirtualKeyCode.VK_XBUTTON1,
+                MouseButton.XButton2 => VirtualKeyCode.VK_XBUTTON2,
+                _ => VirtualKeyCode.VK_ESCAPE
             };
 
-            if (keyCode != LyKeysCode.VK_ESCAPE)
+            if (keyCode != VirtualKeyCode.VK_ESCAPE)
             {
                 ViewModel.SetCurrentKey(keyCode);
                 e.Handled = true;
@@ -1118,7 +1118,7 @@ public partial class KeyMappingView : Page
     }
 
     // 统一的热键处理方法
-    private void HandleHotkeyInput(System.Windows.Controls.TextBox textBox, LyKeysCode keyCode, ModifierKeys modifiers,
+    private void HandleHotkeyInput(System.Windows.Controls.TextBox textBox, VirtualKeyCode keyCode, ModifierKeys modifiers,
         bool isStartHotkey)
     {
         if (textBox == null)
@@ -1178,14 +1178,14 @@ public partial class KeyMappingView : Page
     }
 
     // 判断是否为修饰键
-    private bool IsModifierKey(LyKeysCode keyCode)
+    private bool IsModifierKey(VirtualKeyCode keyCode)
     {
-        return keyCode == LyKeysCode.VK_LCONTROL
-               || keyCode == LyKeysCode.VK_RCONTROL
-               || keyCode == LyKeysCode.VK_LMENU
-               || keyCode == LyKeysCode.VK_RMENU
-               || keyCode == LyKeysCode.VK_LSHIFT
-               || keyCode == LyKeysCode.VK_RSHIFT;
+        return keyCode == VirtualKeyCode.VK_LCONTROL
+               || keyCode == VirtualKeyCode.VK_RCONTROL
+               || keyCode == VirtualKeyCode.VK_LMENU
+               || keyCode == VirtualKeyCode.VK_RMENU
+               || keyCode == VirtualKeyCode.VK_LSHIFT
+               || keyCode == VirtualKeyCode.VK_RSHIFT;
     }
 
     // 处理开始热键
@@ -1209,7 +1209,7 @@ public partial class KeyMappingView : Page
         if (sender is System.Windows.Controls.TextBox textBox)
         {
             e.Handled = true;
-            var keyCode = e.Delta > 0 ? LyKeysCode.VK_WHEELUP : LyKeysCode.VK_WHEELDOWN;
+            var keyCode = e.Delta > 0 ? VirtualKeyCode.VK_WHEELUP : VirtualKeyCode.VK_WHEELDOWN;
             _logger.Debug($"检测到滚轮事件: {keyCode}, Delta: {e.Delta}");
             HandleHotkeyInput(textBox, keyCode, Keyboard.Modifiers, true);
         }
@@ -1242,7 +1242,7 @@ public partial class KeyMappingView : Page
 
             if (key == Key.None) return;
 
-            if (TryConvertToLyKeysCode(key, out var lyKeysCode))
+            if (TryConvertToVirtualKeyCode(key, out var lyKeysCode))
             {
                 // 只调用HandleHotkeyInput，由它处理是否显示成功消息
                 HandleHotkeyInput(textBox, lyKeysCode, Keyboard.Modifiers, true);
@@ -1265,11 +1265,11 @@ public partial class KeyMappingView : Page
     {
         if (sender is System.Windows.Controls.TextBox textBox)
         {
-            LyKeysCode? keyCode = e.ChangedButton switch
+            VirtualKeyCode? keyCode = e.ChangedButton switch
             {
-                MouseButton.Middle => LyKeysCode.VK_MBUTTON,
-                MouseButton.XButton1 => LyKeysCode.VK_XBUTTON1,
-                MouseButton.XButton2 => LyKeysCode.VK_XBUTTON2,
+                MouseButton.Middle => VirtualKeyCode.VK_MBUTTON,
+                MouseButton.XButton1 => VirtualKeyCode.VK_XBUTTON1,
+                MouseButton.XButton2 => VirtualKeyCode.VK_XBUTTON2,
                 _ => null // 对于左键和右键不处理，让输入框正常获取焦点以接收键盘输入
             };
 
@@ -1642,13 +1642,13 @@ public partial class KeyMappingView : Page
         }
 
         // 已有焦点时，处理所有鼠标按键
-        LyKeysCode? keyCode = e.ChangedButton switch
+        VirtualKeyCode? keyCode = e.ChangedButton switch
         {
-            MouseButton.Left => LyKeysCode.VK_LBUTTON,
-            MouseButton.Right => LyKeysCode.VK_RBUTTON,
-            MouseButton.Middle => LyKeysCode.VK_MBUTTON,
-            MouseButton.XButton1 => LyKeysCode.VK_XBUTTON1,
-            MouseButton.XButton2 => LyKeysCode.VK_XBUTTON2,
+            MouseButton.Left => VirtualKeyCode.VK_LBUTTON,
+            MouseButton.Right => VirtualKeyCode.VK_RBUTTON,
+            MouseButton.Middle => VirtualKeyCode.VK_MBUTTON,
+            MouseButton.XButton1 => VirtualKeyCode.VK_XBUTTON1,
+            MouseButton.XButton2 => VirtualKeyCode.VK_XBUTTON2,
             _ => null
         };
 
@@ -3241,10 +3241,10 @@ public partial class KeyMappingView : Page
             return;
         }
 
-        // 尝试将WPF按键转换为LyKeysCode
-        if (!TryConvertToLyKeysCode(e.Key, out LyKeysCode lyKeysCode))
+        // 尝试将WPF按键转换为VirtualKeyCode
+        if (!TryConvertToVirtualKeyCode(e.Key, out VirtualKeyCode lyKeysCode))
         {
-            _logger.Warning($"无法将按键 {e.Key} 转换为LyKeysCode");
+            _logger.Warning($"无法将按键 {e.Key} 转换为VirtualKeyCode");
             return;
         }
 
@@ -3273,7 +3273,7 @@ public partial class KeyMappingView : Page
         txtConfigHotkey.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#333333"));
         
         // 记录调试信息
-        _logger.Debug($"设置配置快捷键: {hotkeyText} (LyKeysCode: {lyKeysCode})");
+        _logger.Debug($"设置配置快捷键: {hotkeyText} (VirtualKeyCode: {lyKeysCode})");
     }
 
     /// <summary>

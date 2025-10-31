@@ -312,67 +312,24 @@ public class ListBoxDragDropBehavior : Behavior<System.Windows.Controls.ListBox>
         }
     }
 
-    // 添加成功动画效果 - 闪烁提示不改变最终背景
+    // 添加成功动画效果 - 简单的缩放反馈
     private void ApplySuccessAnimation(ListBoxItem targetItem)
     {
-        var border = FindVisualChild<Border>(targetItem);
-        if (border == null) return;
+        var scaleTransform = new ScaleTransform(1.0, 1.0);
+        targetItem.RenderTransform = scaleTransform;
+        targetItem.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
 
-        // 创建闪烁动画效果，从选中色到绿色再返回选中色
-        var flashAnimation = new ColorAnimation
+        var scaleAnimation = new DoubleAnimation
         {
-            From = Colors.LightGreen, // 闪烁颜色
-            Duration = TimeSpan.FromMilliseconds(200), // 短暂的闪烁
-            AutoReverse = true, // 自动反向动画
-            RepeatBehavior = new RepeatBehavior(2), // 重复两次
-            FillBehavior = FillBehavior.Stop // 结束后停止
+            From = 1.0,
+            To = 1.05,
+            Duration = TimeSpan.FromMilliseconds(100),
+            AutoReverse = true,
+            FillBehavior = FillBehavior.Stop
         };
 
-        // 在UI线程上执行动画
-        targetItem.Dispatcher.BeginInvoke(new Action(() =>
-        {
-            try
-            {
-                // 创建一个分离的画刷用于动画，避免影响原背景
-                var overlayBorder = new Border
-                {
-                    Width = border.ActualWidth,
-                    Height = border.ActualHeight,
-                    Background = new SolidColorBrush(Colors.LightGreen),
-                    Opacity = 0.5
-                };
-
-                // 将闪烁边框添加为临时视觉元素
-                var parentPanel = FindAncestor<System.Windows.Controls.Panel>(border);
-                if (parentPanel != null)
-                {
-                    var index = parentPanel.Children.IndexOf(border);
-                    if (index >= 0)
-                    {
-                        parentPanel.Children.Insert(index + 1, overlayBorder);
-
-                        // 创建淡出动画
-                        var fadeOutAnimation = new DoubleAnimation
-                        {
-                            From = 0.5,
-                            To = 0.0,
-                            Duration = TimeSpan.FromMilliseconds(400),
-                            FillBehavior = FillBehavior.Stop
-                        };
-
-                        // 动画完成后移除临时边框
-                        fadeOutAnimation.Completed += (s, e) => { parentPanel.Children.Remove(overlayBorder); };
-
-                        // 执行淡出动画
-                        overlayBorder.BeginAnimation(UIElement.OpacityProperty, fadeOutAnimation);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"应用闪烁动画时出错: {ex.Message}");
-            }
-        }));
+        scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnimation);
+        scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnimation);
     }
 
     private void ListBox_DragEnter(object sender, System.Windows.DragEventArgs e)
