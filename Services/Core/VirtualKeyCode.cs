@@ -2,7 +2,7 @@ using System.ComponentModel;
 
 namespace WpfApp.Services.Core;
 
-public enum LyKeysCode
+public enum VirtualKeyCode
 {
     // 鼠标按键
     [Description("Left")] VK_LBUTTON = 0x01,

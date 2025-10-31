@@ -59,7 +59,7 @@ public class HotkeyService
     public event Action? StartHotkeyReleased; // 启动热键释放事件
     public event Action? SequenceModeStarted; // 序列模式开始事件
     public event Action? SequenceModeStopped; // 序列模式停止事件
-    public event Action<LyKeysCode>? KeyTriggered; // 触发按键事件
+    public event Action<VirtualKeyCode>? KeyTriggered; // 触发按键事件
 
     // 核心字段
     private readonly KeySequenceExecutor _executor;
@@ -72,7 +72,7 @@ public class HotkeyService
 
     // 热键状态
     private int _hotkeyVirtualKey;
-    private LyKeysCode? _pendingHotkey;
+    private VirtualKeyCode? _pendingHotkey;
     private bool _isKeyHeld;
     private bool _isInputFocused;
     private bool _isHotkeyControlEnabled = true;
@@ -213,7 +213,7 @@ public class HotkeyService
     }
 
     // 注册热键
-    public bool RegisterHotkey(LyKeysCode keyCode, ModifierKeys modifiers, bool saveToConfig = true)
+    public bool RegisterHotkey(VirtualKeyCode keyCode, ModifierKeys modifiers, bool saveToConfig = true)
     {
         try
         {
@@ -250,7 +250,7 @@ public class HotkeyService
     }
 
     // 保存热键配置
-    private void SaveHotkeyConfig(LyKeysCode keyCode, ModifierKeys modifiers)
+    private void SaveHotkeyConfig(VirtualKeyCode keyCode, ModifierKeys modifiers)
     {
         try 
         {
@@ -554,7 +554,7 @@ public class HotkeyService
     {
         // 获取滚轮方向（向上为正，向下为负）
         var wheelDelta = (short)((hookStruct.mouseData >> 16) & 0xFFFF);
-        var buttonCode = wheelDelta > 0 ? LyKeysCode.VK_WHEELUP : LyKeysCode.VK_WHEELDOWN;
+        var buttonCode = wheelDelta > 0 ? VirtualKeyCode.VK_WHEELUP : VirtualKeyCode.VK_WHEELDOWN;
 
         var isHotkey = buttonCode == _pendingHotkey;
 
@@ -584,26 +584,26 @@ public class HotkeyService
     }
 
     // 获取鼠标按键代码
-    private LyKeysCode GetMouseButtonCode(int wParam, MSLLHOOKSTRUCT hookStruct)
+    private VirtualKeyCode GetMouseButtonCode(int wParam, MSLLHOOKSTRUCT hookStruct)
     {
         if (wParam == WM_MBUTTONDOWN || wParam == WM_MBUTTONUP)
         {
-            return LyKeysCode.VK_MBUTTON;
+            return VirtualKeyCode.VK_MBUTTON;
         }
         else if (wParam == WM_MOUSEWHEEL)
         {
             var wheelDelta = (short)((hookStruct.mouseData >> 16) & 0xFFFF);
-            return wheelDelta > 0 ? LyKeysCode.VK_WHEELUP : LyKeysCode.VK_WHEELDOWN;
+            return wheelDelta > 0 ? VirtualKeyCode.VK_WHEELUP : VirtualKeyCode.VK_WHEELDOWN;
         }
 
         var xButton = (int)((hookStruct.mouseData >> 16) & 0xFFFF);
-        return xButton == 1 ? LyKeysCode.VK_XBUTTON1 : LyKeysCode.VK_XBUTTON2;
+        return xButton == 1 ? VirtualKeyCode.VK_XBUTTON1 : VirtualKeyCode.VK_XBUTTON2;
     }
 
     // 工具方法
-    private int GetVirtualKeyFromLyKey(LyKeysCode lyKeyCode)
+    private int GetVirtualKeyFromLyKey(VirtualKeyCode lyKeyCode)
     {
-        // 直接使用LyKeysCode的值作为虚拟键码
+        // 直接使用VirtualKeyCode的值作为虚拟键码
         return (int)lyKeyCode;
     }
 
@@ -869,13 +869,13 @@ public class HotkeyService
     }
 
     // 判断是否为鼠标按键
-    public bool IsMouseButton(LyKeysCode keyCode)
+    public bool IsMouseButton(VirtualKeyCode keyCode)
     {
-        return keyCode == LyKeysCode.VK_LBUTTON ||
-               keyCode == LyKeysCode.VK_RBUTTON ||
-               keyCode == LyKeysCode.VK_MBUTTON ||
-               keyCode == LyKeysCode.VK_XBUTTON1 ||
-               keyCode == LyKeysCode.VK_XBUTTON2;
+        return keyCode == VirtualKeyCode.VK_LBUTTON ||
+               keyCode == VirtualKeyCode.VK_RBUTTON ||
+               keyCode == VirtualKeyCode.VK_MBUTTON ||
+               keyCode == VirtualKeyCode.VK_XBUTTON1 ||
+               keyCode == VirtualKeyCode.VK_XBUTTON2;
     }
 
     // 添加钩子安装方法

@@ -594,16 +594,16 @@ namespace WpfApp.Services.Core
         {
             return new KeyConfigData
             {
-                startKey = LyKeysCode.VK_F9,
+                startKey = VirtualKeyCode.VK_F9,
                 startMods = 0,
-                stopKey = LyKeysCode.VK_F9,
+                stopKey = VirtualKeyCode.VK_F9,
                 stopMods = 0,
                 keys = new List<KeyConfig>
                 {
-                    new KeyConfig(LyKeysCode.VK_F, true, 10),
-                    new KeyConfig(LyKeysCode.VK_1, true, 10),
-                    new KeyConfig(LyKeysCode.VK_2, true, 10),
-                    new KeyConfig(LyKeysCode.VK_3, true, 10)
+                    new KeyConfig(VirtualKeyCode.VK_F, true, 10),
+                    new KeyConfig(VirtualKeyCode.VK_1, true, 10),
+                    new KeyConfig(VirtualKeyCode.VK_2, true, 10),
+                    new KeyConfig(VirtualKeyCode.VK_3, true, 10)
                 },
                 keyMode = 0,
                 interval = 10,

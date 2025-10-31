@@ -10,7 +10,7 @@ namespace WpfApp.Services.Core;
 /// <summary>
 /// LyKeys驱动接口封装类
 /// </summary>
-public sealed class LyKeys : IDisposable
+public sealed class LyKeys : IDriver
 {
     #region 字段和属性
 
@@ -21,20 +21,6 @@ public sealed class LyKeys : IDisposable
     private readonly string _driverPath;
     private IntPtr _dllHandle = IntPtr.Zero;
     private DeviceStatus _lastStatus = DeviceStatus.Unknown;
-
-    #endregion
-
-    #region 驱动状态枚举
-
-    public enum DeviceStatus
-    {
-        Unknown = 0,     // 未知状态
-        Ready = 1,       // 准备就绪
-        Error = 2,       // 错误状态
-        NoKeyboard = 3,  // 无法找到键盘设备
-        NoMouse = 4,     // 无法找到鼠标设备
-        InitFailed = 5   // 初始化失败
-    }
 
     #endregion
 
@@ -463,17 +449,6 @@ public sealed class LyKeys : IDisposable
     #endregion
 
     #region 鼠标操作
-
-    public enum MouseButtonType
-    {
-        Left,
-        Right,
-        Middle,
-        XButton1,
-        XButton2,
-        WheelUp,
-        WheelDown
-    }
 
     /// <summary>
     /// 鼠标相对位移

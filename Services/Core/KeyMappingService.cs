@@ -12,7 +12,7 @@ public class KeyMappingService
     private readonly LyKeysService _lyKeysService;
     private readonly HotkeyService _hotkeyService;
     private ObservableCollection<KeyItem> _keyList;
-    private LyKeysCode? _hotkey;    // 触发热键-主按键
+    private VirtualKeyCode? _hotkey;    // 触发热键-主按键
     private ModifierKeys _modifiers = ModifierKeys.None; // 触发热键-修饰键
 
     public event Action<bool>? ExecutionStateChanged;
@@ -49,7 +49,7 @@ public class KeyMappingService
         _hotkeyService.StartHotkeyReleased += OnStartHotkeyReleased; // 订阅热键释放事件
     }
 
-    public void AddKey(LyKeysCode keyCode)
+    public void AddKey(VirtualKeyCode keyCode)
     {
         if (IsKeyInList(keyCode) || IsHotkeyConflict(keyCode))
         {
@@ -75,7 +75,7 @@ public class KeyMappingService
     }
 
     // 合并热键设置方法
-    public void SetHotkey(LyKeysCode keyCode, ModifierKeys modifiers)
+    public void SetHotkey(VirtualKeyCode keyCode, ModifierKeys modifiers)
     {
         if (IsKeyInList(keyCode))
         {
@@ -204,12 +204,12 @@ public class KeyMappingService
         return _keyList.Where(k => k.IsSelected).ToList();
     }
 
-    private bool IsKeyInList(LyKeysCode keyCode)
+    private bool IsKeyInList(VirtualKeyCode keyCode)
     {
         return _keyList.Any(k => k.Type == KeyItemType.Keyboard && k.KeyCode.Equals(keyCode));
     }
 
-    private bool IsHotkeyConflict(LyKeysCode keyCode)
+    private bool IsHotkeyConflict(VirtualKeyCode keyCode)
     {
         // 简化为只检查单一热键
         return _hotkey.HasValue && keyCode.Equals(_hotkey.Value);

@@ -15,20 +15,20 @@ namespace WpfApp.Services.Core
     public class LyKeysService : IDisposable
     {
         #region 私有字段
-        private LyKeys? _lyKeys;
+        private readonly IDriver _driver;
         private readonly SerilogManager _logger;
         private readonly IConfigManager _configManager;
         private bool _isInitialized;
         private bool _isHoldMode;
         internal readonly InputMethodService _inputMethodService;
         private readonly object _stateLock = new object();
-        
+
         private const int MIN_KEY_INTERVAL = 1;  // 最小按键间隔
         public const int DEFAULT_KEY_PRESS_INTERVAL = 5; // 默认按键按下时长
         private int _keyInterval = 10; // 按键间隔
         private int _keyPressInterval = DEFAULT_KEY_PRESS_INTERVAL; // 按键按下时长
         private bool _isDisposed;
-        private readonly Dictionary<int, LyKeysCode> _virtualKeyMap;
+        private readonly Dictionary<int, VirtualKeyCode> _virtualKeyMap;
         private bool _isReduceKeyStuck = false;
         #endregion
 
@@ -124,8 +124,9 @@ namespace WpfApp.Services.Core
         /// <summary>
         /// 初始化LyKeys服务
         /// </summary>
-        public LyKeysService()
+        public LyKeysService(IDriver driver)
         {
+            _driver = driver ?? throw new ArgumentNullException(nameof(driver));
             _logger = SerilogManager.Instance;
             _configManager = ConfigManager.Instance;
             _isInitialized = false;
@@ -153,66 +154,41 @@ namespace WpfApp.Services.Core
 
         #region 按键映射
         // 初始化虚拟键码映射
-        private Dictionary<int, LyKeysCode> InitializeVirtualKeyMap()
+        private Dictionary<int, VirtualKeyCode> InitializeVirtualKeyMap()
         {
-            var map = new Dictionary<int, LyKeysCode>();
+            var map = new Dictionary<int, VirtualKeyCode>();
             
             // 添加基本按键映射
-            foreach (LyKeysCode code in Enum.GetValues(typeof(LyKeysCode)))
+            foreach (VirtualKeyCode code in Enum.GetValues(typeof(VirtualKeyCode)))
             {
                 map[(int)code] = code;
             }
 
             // 添加特殊映射
-            map[0x10] = LyKeysCode.VK_SHIFT;    // Shift
-            map[0x11] = LyKeysCode.VK_CONTROL;  // Control
-            map[0x12] = LyKeysCode.VK_MENU;     // Alt
-            map[0x14] = LyKeysCode.VK_CAPITAL;  // Caps Lock
-            map[0x1B] = LyKeysCode.VK_ESCAPE;   // Escape
-            map[0x20] = LyKeysCode.VK_SPACE;    // Space
-            map[0x2E] = LyKeysCode.VK_DELETE;   // Delete
+            map[0x10] = VirtualKeyCode.VK_SHIFT;    // Shift
+            map[0x11] = VirtualKeyCode.VK_CONTROL;  // Control
+            map[0x12] = VirtualKeyCode.VK_MENU;     // Alt
+            map[0x14] = VirtualKeyCode.VK_CAPITAL;  // Caps Lock
+            map[0x1B] = VirtualKeyCode.VK_ESCAPE;   // Escape
+            map[0x20] = VirtualKeyCode.VK_SPACE;    // Space
+            map[0x2E] = VirtualKeyCode.VK_DELETE;   // Delete
 
             // 添加鼠标按键映射
-            map[0x01] = LyKeysCode.VK_LBUTTON;  // 左键
-            map[0x02] = LyKeysCode.VK_RBUTTON;  // 右键
-            map[0x04] = LyKeysCode.VK_MBUTTON;  // 中键
-            map[0x05] = LyKeysCode.VK_XBUTTON1; // 侧键1
-            map[0x06] = LyKeysCode.VK_XBUTTON2; // 侧键2
+            map[0x01] = VirtualKeyCode.VK_LBUTTON;  // 左键
+            map[0x02] = VirtualKeyCode.VK_RBUTTON;  // 右键
+            map[0x04] = VirtualKeyCode.VK_MBUTTON;  // 中键
+            map[0x05] = VirtualKeyCode.VK_XBUTTON1; // 侧键1
+            map[0x06] = VirtualKeyCode.VK_XBUTTON2; // 侧键2
 
             return map;
         }
 
         /// <summary>
-        /// 将虚拟键码转换为LyKeys键码
+        /// 检查是否为有效的虚拟键码
         /// </summary>
-        /// <param name="virtualKeyCode">虚拟键码</param>
-        /// <returns>对应的LyKeys键码，如果没有对应的键码则返回null</returns>
-        public LyKeysCode? GetLyKeysCode(int virtualKeyCode)
-        {
-            if (_virtualKeyMap.TryGetValue(virtualKeyCode, out LyKeysCode code))
-            {
-                return code;
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// 检查是否为有效的LyKeys键码
-        /// </summary>
-        /// <param name="code">要检查的键码</param>
-        /// <returns>是否有效</returns>
-        public bool IsValidLyKeysCode(LyKeysCode code)
+        public bool IsValidVirtualKeyCode(VirtualKeyCode code)
         {
             return _virtualKeyMap.ContainsValue(code);
-        }
-
-        /// <summary>
-        /// 获取所有支持的LyKeys键码
-        /// </summary>
-        /// <returns>支持的键码列表</returns>
-        public IEnumerable<LyKeysCode> GetSupportedKeyCodes()
-        {
-            return _virtualKeyMap.Values.Distinct();
         }
 
         /// <summary>
@@ -220,24 +196,24 @@ namespace WpfApp.Services.Core
         /// </summary>
         /// <param name="code">键码</param>
         /// <returns>描述信息</returns>
-        public string GetKeyDescription(LyKeysCode code)
+        public string GetKeyDescription(VirtualKeyCode code)
         {
             // 首先处理鼠标按键的特殊描述
             switch (code)
             {
-                case LyKeysCode.VK_LBUTTON:
+                case VirtualKeyCode.VK_LBUTTON:
                     return "鼠标左键";
-                case LyKeysCode.VK_RBUTTON:
+                case VirtualKeyCode.VK_RBUTTON:
                     return "鼠标右键";
-                case LyKeysCode.VK_MBUTTON:
+                case VirtualKeyCode.VK_MBUTTON:
                     return "鼠标中键";
-                case LyKeysCode.VK_XBUTTON1:
+                case VirtualKeyCode.VK_XBUTTON1:
                     return "鼠标侧键1";
-                case LyKeysCode.VK_XBUTTON2:
+                case VirtualKeyCode.VK_XBUTTON2:
                     return "鼠标侧键2";
             }
 
-            var field = typeof(LyKeysCode).GetField(code.ToString());
+            var field = typeof(VirtualKeyCode).GetField(code.ToString());
             if (field != null)
             {
                 var attributes = (System.ComponentModel.DescriptionAttribute[])field.GetCustomAttributes(typeof(System.ComponentModel.DescriptionAttribute), false);
@@ -254,7 +230,7 @@ namespace WpfApp.Services.Core
         /// <summary>
         /// 初始化驱动
         /// </summary>
-        /// <param name="driverPath">驱动文件路径</param>
+        /// <param name="driverPath">驱动文件路径（保留兼容性，实际由工厂创建）</param>
         /// <returns>是否初始化成功</returns>
         public bool Initialize(string driverPath)
         {
@@ -266,45 +242,22 @@ namespace WpfApp.Services.Core
                     return true;
                 }
 
-                _logger.Debug($"开始初始化LyKeys服务，驱动路径: {driverPath}");
+                _logger.Debug("开始初始化驱动服务");
 
-                // 验证驱动文件
-                if (!File.Exists(driverPath))
-                {
-                    _logger.Error($"驱动文件不存在: {driverPath}");
-                    SendStatusMessage($"初始化失败：驱动文件不存在({driverPath})", true);
-                    return false;
-                }
-
-                // 初始化驱动
-                _lyKeys = new LyKeys(driverPath);
                 try
                 {
-                    if (!_lyKeys.Initialize())
-                    {   
-                        // 获取并处理详细的错误信息
-                        var lastStatus = _lyKeys.GetLastStatus();
-                        string errorMessage;
-                        
-                        switch (lastStatus)
+                    if (!_driver.Initialize())
+                    {
+                        var lastStatus = _driver.GetLastStatus();
+                        string errorMessage = lastStatus switch
                         {
-                            case LyKeys.DeviceStatus.NoKeyboard:
-                                errorMessage = "找不到键盘设备，请检查您的键盘连接是否正常，且系统能识别到键盘设备。";
-                                break;
-                            case LyKeys.DeviceStatus.NoMouse:
-                                errorMessage = "找不到鼠标设备，请检查您的鼠标连接是否正常，且系统能识别到鼠标设备。";
-                                break;
-                            case LyKeys.DeviceStatus.InitFailed:
-                                errorMessage = "驱动初始化失败，请尝试重新启动计算机或重新安装驱动。";
-                                break;
-                            case LyKeys.DeviceStatus.Error:
-                                errorMessage = "设备发生错误，无法完成初始化。请尝试重新安装驱动或重启电脑。";
-                                break;
-                            default:
-                                errorMessage = $"驱动初始化失败 ({lastStatus})，请尝试重新安装驱动或重启电脑。";
-                                break;
-                        }
-                        
+                            DeviceStatus.NoKeyboard => "找不到键盘设备，请检查您的键盘连接是否正常，且系统能识别到键盘设备。",
+                            DeviceStatus.NoMouse => "找不到鼠标设备，请检查您的鼠标连接是否正常，且系统能识别到鼠标设备。",
+                            DeviceStatus.InitFailed => "驱动初始化失败，请尝试重新启动计算机或重新安装驱动。",
+                            DeviceStatus.Error => "设备发生错误，无法完成初始化。请尝试重新安装驱动或重启电脑。",
+                            _ => $"驱动初始化失败 ({lastStatus})，请尝试重新安装驱动或重启电脑。"
+                        };
+
                         _logger.Error($"驱动初始化失败: {errorMessage}");
                         SendStatusMessage($"初始化失败：{errorMessage}", true);
                         return false;
@@ -316,11 +269,11 @@ namespace WpfApp.Services.Core
                     SendStatusMessage($"初始化过程发生错误：{ex.Message}", true);
                     return false;
                 }
-                
+
                 _isInitialized = true;
                 InitializationStatusChanged?.Invoke(this, true);
                 SendStatusMessage("服务初始化成功");
-                _logger.Debug("LyKeys服务初始化完成");
+                _logger.Debug("驱动服务初始化完成");
                 return true;
             }
             catch (Exception ex)
@@ -338,10 +291,10 @@ namespace WpfApp.Services.Core
         /// </summary>
         /// <param name="keyCode">按键代码</param>
         /// <returns>是否成功</returns>
-        public bool SendKeyDown(LyKeysCode keyCode)
+        public bool SendKeyDown(VirtualKeyCode keyCode)
         {
             if (!CheckInitialization()) return false;
-            if (!IsValidLyKeysCode(keyCode))
+            if (!IsValidVirtualKeyCode(keyCode))
             {
                 _logger.Error($"无效的键码: {keyCode}");
                 return false;
@@ -352,10 +305,10 @@ namespace WpfApp.Services.Core
                 // 检查是否为鼠标按键
                 if (IsMouseButton(keyCode))
                 {
-                    return _lyKeys.SendMouseButton(ConvertToMouseButtonType(keyCode), true);
+                    return _driver.SendMouseButton(ConvertToMouseButtonType(keyCode), true);
                 }
-                
-                _lyKeys.SendKeyDown((ushort)keyCode);
+
+                _driver.SendKeyDown((ushort)keyCode);
                 return true;
             }
             catch (Exception ex)
@@ -370,10 +323,10 @@ namespace WpfApp.Services.Core
         /// </summary>
         /// <param name="keyCode">按键代码</param>
         /// <returns>是否成功</returns>
-        public bool SendKeyUp(LyKeysCode keyCode)
+        public bool SendKeyUp(VirtualKeyCode keyCode)
         {
             if (!CheckInitialization()) return false;
-            if (!IsValidLyKeysCode(keyCode))
+            if (!IsValidVirtualKeyCode(keyCode))
             {
                 _logger.Error($"无效的键码: {keyCode}");
                 return false;
@@ -384,10 +337,10 @@ namespace WpfApp.Services.Core
                 // 检查是否为鼠标按键
                 if (IsMouseButton(keyCode))
                 {
-                    return _lyKeys.SendMouseButton(ConvertToMouseButtonType(keyCode), false);
+                    return _driver.SendMouseButton(ConvertToMouseButtonType(keyCode), false);
                 }
-                
-                _lyKeys.SendKeyUp((ushort)keyCode);
+
+                _driver.SendKeyUp((ushort)keyCode);
                 return true;
             }
             catch (Exception ex)
@@ -397,28 +350,28 @@ namespace WpfApp.Services.Core
             }
         }
 
-        private bool IsMouseButton(LyKeysCode keyCode)
+        private bool IsMouseButton(VirtualKeyCode keyCode)
         {
-            return keyCode == LyKeysCode.VK_LBUTTON ||
-                   keyCode == LyKeysCode.VK_RBUTTON ||
-                   keyCode == LyKeysCode.VK_MBUTTON ||
-                   keyCode == LyKeysCode.VK_XBUTTON1 ||
-                   keyCode == LyKeysCode.VK_XBUTTON2 ||
-                   keyCode == LyKeysCode.VK_WHEELUP ||
-                   keyCode == LyKeysCode.VK_WHEELDOWN;
+            return keyCode == VirtualKeyCode.VK_LBUTTON ||
+                   keyCode == VirtualKeyCode.VK_RBUTTON ||
+                   keyCode == VirtualKeyCode.VK_MBUTTON ||
+                   keyCode == VirtualKeyCode.VK_XBUTTON1 ||
+                   keyCode == VirtualKeyCode.VK_XBUTTON2 ||
+                   keyCode == VirtualKeyCode.VK_WHEELUP ||
+                   keyCode == VirtualKeyCode.VK_WHEELDOWN;
         }
 
-        private LyKeys.MouseButtonType ConvertToMouseButtonType(LyKeysCode keyCode)
+        private MouseButtonType ConvertToMouseButtonType(VirtualKeyCode keyCode)
         {
             return keyCode switch
             {
-                LyKeysCode.VK_LBUTTON => LyKeys.MouseButtonType.Left,
-                LyKeysCode.VK_RBUTTON => LyKeys.MouseButtonType.Right,
-                LyKeysCode.VK_MBUTTON => LyKeys.MouseButtonType.Middle,
-                LyKeysCode.VK_XBUTTON1 => LyKeys.MouseButtonType.XButton1,
-                LyKeysCode.VK_XBUTTON2 => LyKeys.MouseButtonType.XButton2,
-                LyKeysCode.VK_WHEELUP => LyKeys.MouseButtonType.WheelUp,
-                LyKeysCode.VK_WHEELDOWN => LyKeys.MouseButtonType.WheelDown,
+                VirtualKeyCode.VK_LBUTTON => MouseButtonType.Left,
+                VirtualKeyCode.VK_RBUTTON => MouseButtonType.Right,
+                VirtualKeyCode.VK_MBUTTON => MouseButtonType.Middle,
+                VirtualKeyCode.VK_XBUTTON1 => MouseButtonType.XButton1,
+                VirtualKeyCode.VK_XBUTTON2 => MouseButtonType.XButton2,
+                VirtualKeyCode.VK_WHEELUP => MouseButtonType.WheelUp,
+                VirtualKeyCode.VK_WHEELDOWN => MouseButtonType.WheelDown,
                 _ => throw new ArgumentException($"非法的鼠标按键类型: {keyCode}")
             };
         }
@@ -429,10 +382,10 @@ namespace WpfApp.Services.Core
         /// <param name="keyCode">按键代码</param>
         /// <param name="duration">按下持续时间(毫秒)</param>
         /// <returns>是否成功</returns>
-        public bool SendKeyPress(LyKeysCode keyCode, int duration = 100)
+        public bool SendKeyPress(VirtualKeyCode keyCode, int duration = 100)
         {
             if (!CheckInitialization()) return false;
-            if (!IsValidLyKeysCode(keyCode))
+            if (!IsValidVirtualKeyCode(keyCode))
             {
                 _logger.Error($"无效的键码: {keyCode}");
                 return false;
@@ -478,10 +431,10 @@ namespace WpfApp.Services.Core
         /// 模拟组合键
         /// </summary>
         /// <param name="keyCodes">按键代码数组</param>
-        public void SimulateKeyCombo(params LyKeysCode[] keyCodes)
+        public void SimulateKeyCombo(params VirtualKeyCode[] keyCodes)
         {
             if (!CheckInitialization()) return;
-            if (keyCodes.Any(k => !IsValidLyKeysCode(k)))
+            if (keyCodes.Any(k => !IsValidVirtualKeyCode(k)))
             {
                 _logger.Error("组合键包含无效的键码");
                 return;
@@ -540,12 +493,8 @@ namespace WpfApp.Services.Core
 
             try
             {
-                if (_lyKeys != null)
-                {
-                    _logger.Debug($"移动鼠标到坐标: ({x}, {y})");
-                    return _lyKeys.MoveMouseAbsolute(x.Value, y.Value);
-                }
-                return false;
+                _logger.Debug($"移动鼠标到坐标: ({x}, {y})");
+                return _driver.MoveMouseAbsolute(x.Value, y.Value);
             }
             catch (Exception ex)
             {
@@ -590,8 +539,7 @@ namespace WpfApp.Services.Core
                 // 3. 释放驱动
                 try
                 {
-                    _lyKeys?.Dispose();
-                    _lyKeys = null;
+                    _driver?.Dispose();
                 }
                 catch (Exception ex)
                 {
