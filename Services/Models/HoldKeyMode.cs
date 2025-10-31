@@ -19,21 +19,16 @@ public class HoldKeyMode : KeyModeBase
     {
     }
 
-    public override void Start()
+    protected override void StartInternal()
     {
         lock (_stateLock)
         {
-            if (_isExecuting)
-            {
-                _logger.Warning("按压模式: 已有序列在执行中");
-                return;
-            }
+            if (_isExecuting) return;
             _isExecuting = true;
         }
 
         if (_operationList.Count == 0)
         {
-            _logger.Warning("按压模式: 操作列表为空");
             lock (_stateLock) { _isExecuting = false; }
             return;
         }
@@ -59,6 +54,7 @@ public class HoldKeyMode : KeyModeBase
             {
                 lock (_stateLock) { _isExecuting = false; }
                 _isRunning = false;
+                NotifyCompleted();
             }
         })
         {
@@ -74,7 +70,6 @@ public class HoldKeyMode : KeyModeBase
         if (!_isExecuting)
         {
             _isKeyHeld = true;
-            _logger.Debug("按压模式: 检测到按键按下");
             Start();
         }
     }
@@ -82,7 +77,6 @@ public class HoldKeyMode : KeyModeBase
     public void HandleKeyRelease()
     {
         _isKeyHeld = false;
-        _logger.Debug("按压模式: 检测到按键释放");
         Stop();
     }
 

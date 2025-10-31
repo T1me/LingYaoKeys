@@ -138,9 +138,6 @@ public class StatusToColorConverter : IValueConverter
         transformGroup.Children.Add(rotateTransform);
         brush.RelativeTransform = transformGroup;
         
-        // 冻结画刷以提高性能（如果不需要动态更改）
-        // brush.Freeze(); // 注意：不要冻结需要动画的画刷
-        
         return brush;
     }
 }

@@ -110,14 +110,16 @@ public partial class FloatingStatusWindow : Window
             {
                 _logger.Debug("硬件加速已禁用，跳过浮窗硬件加速设置");
             }
-            
-            // 初始化边框样式
-            UpdateBorderStyle();
-            
-            // 订阅数据上下文变化事件
+
+            // 订阅 ViewModel 事件
+            if (DataContext is INotifyPropertyChanged viewModel)
+            {
+                viewModel.PropertyChanged += ViewModel_PropertyChanged;
+            }
+
             DataContextChanged += FloatingStatusWindow_DataContextChanged;
-            
-            // 初始化完成日志
+            UpdateBorderStyle();
+
             _logger.Debug("浮窗动画和边框样式初始化完成");
         }
         catch (Exception ex)
@@ -169,147 +171,72 @@ public partial class FloatingStatusWindow : Window
             UpdateBorderStyle();
         }
     }
-    
+
     /// <summary>
     /// 更新浮窗边框样式
     /// </summary>
-    /// <param name="statusText">状态文本，如果为null则从DataContext获取</param>
-    public void UpdateBorderStyle(string statusText = null)
+    private void UpdateBorderStyle()
     {
         if (BorderContainer == null)
             return;
-            
+
         try
         {
-            // 如果未提供状态文本，从DataContext获取
-            if (statusText == null && DataContext != null)
-            {
-                statusText = GetStatusTextFromDataContext();
-            }
-            
-            // 如果仍然无法获取状态文本，直接返回
-            if (statusText == null)
+            var statusText = GetStatusText() ?? "已停止";
+
+            if (statusText == _currentStatus && BorderContainer.BorderBrush != null)
                 return;
-            
-            // 如果状态没变化，不需要更新
-            if (statusText == _currentStatus)
-                return;
-                
+
             _currentStatus = statusText;
-            
-            // 获取对应的颜色数组
-            var colors = GetBorderColorsByStatus(statusText);
-            
-            // 更新或创建边框画刷
-            UpdateOrCreateBorderBrush(colors, statusText);
+
+            var colorIndex = statusText switch
+            {
+                "运行中" => 0,
+                "已禁用" => 1,
+                _ => 2
+            };
+
+            var colors = StatusToColorConverter.GetBorderColors(colorIndex);
+
+            if (BorderContainer.BorderBrush is LinearGradientBrush brush && brush.GradientStops.Count == 3)
+            {
+                brush.GradientStops[0].Color = colors[0];
+                brush.GradientStops[1].Color = colors[1];
+                brush.GradientStops[2].Color = colors[2];
+            }
+            else
+            {
+                BorderContainer.BorderBrush = new LinearGradientBrush
+                {
+                    StartPoint = new System.Windows.Point(0, 0),
+                    EndPoint = new System.Windows.Point(1, 1),
+                    RelativeTransform = new RotateTransform { CenterX = 0.5, CenterY = 0.5 },
+                    GradientStops = new GradientStopCollection
+                    {
+                        new GradientStop(colors[0], 0.0),
+                        new GradientStop(colors[1], 0.5),
+                        new GradientStop(colors[2], 1.0)
+                    }
+                };
+            }
         }
         catch (Exception ex)
         {
             _logger.Error("更新边框样式时出错", ex);
         }
     }
-    
-    /// <summary>
-    /// 从DataContext获取状态文本
-    /// </summary>
-    private string GetStatusTextFromDataContext()
+
+    private string GetStatusText()
     {
         try
         {
-            // 尝试动态访问
             dynamic viewModel = DataContext;
             return viewModel?.StatusText as string;
         }
         catch
         {
-            // 如果动态访问失败，尝试使用反射
-            try
-            {
-                var property = DataContext.GetType().GetProperty("StatusText");
-                return property?.GetValue(DataContext) as string;
-            }
-            catch
-            {
-                _logger.Warning("无法获取StatusText属性值");
-                return null;
-            }
+            return null;
         }
-    }
-    
-    /// <summary>
-    /// 根据状态文本获取边框颜色
-    /// </summary>
-    private System.Windows.Media.Color[] GetBorderColorsByStatus(string statusText)
-    {
-        int colorIndex = statusText switch
-        {
-            "运行中" => 0,
-            "已禁用" => 1,
-            _ => 2 // 已停止或其他
-        };
-        
-        return StatusToColorConverter.GetBorderColors(colorIndex);
-    }
-    
-    /// <summary>
-    /// 更新或创建边框画刷
-    /// </summary>
-    private void UpdateOrCreateBorderBrush(System.Windows.Media.Color[] colors, string statusText)
-    {
-        if (BorderContainer.BorderBrush is LinearGradientBrush existingBrush)
-        {
-            // 更新现有画刷
-            UpdateExistingBrush(existingBrush, colors, statusText);
-        }
-        else
-        {
-            // 创建新画刷
-            CreateNewBrush(colors, statusText);
-        }
-    }
-    
-    /// <summary>
-    /// 更新现有的渐变画刷
-    /// </summary>
-    private void UpdateExistingBrush(LinearGradientBrush brush, System.Windows.Media.Color[] colors, string statusText)
-    {
-        if (brush.GradientStops.Count == 3)
-        {
-            // 直接更新颜色，保持动画和变换
-            brush.GradientStops[0].Color = colors[0];
-            brush.GradientStops[1].Color = colors[1];
-            brush.GradientStops[2].Color = colors[2];
-            _logger.Debug($"边框样式已更新（保留动画），状态: {statusText}");
-        }
-        else
-        {
-            // 重建GradientStops
-            brush.GradientStops.Clear();
-            brush.GradientStops.Add(new GradientStop(colors[0], 0.0));
-            brush.GradientStops.Add(new GradientStop(colors[1], 0.5));
-            brush.GradientStops.Add(new GradientStop(colors[2], 1.0));
-            _logger.Debug($"边框样式已重建，状态: {statusText}");
-        }
-    }
-    
-    /// <summary>
-    /// 创建新的渐变画刷
-    /// </summary>
-    private void CreateNewBrush(System.Windows.Media.Color[] colors, string statusText)
-    {
-        var gradientBrush = new LinearGradientBrush
-        {
-            StartPoint = new System.Windows.Point(0, 0),
-            EndPoint = new System.Windows.Point(1, 1),
-            RelativeTransform = new RotateTransform { CenterX = 0.5, CenterY = 0.5 }
-        };
-        
-        gradientBrush.GradientStops.Add(new GradientStop(colors[0], 0.0));
-        gradientBrush.GradientStops.Add(new GradientStop(colors[1], 0.5));
-        gradientBrush.GradientStops.Add(new GradientStop(colors[2], 1.0));
-        
-        BorderContainer.BorderBrush = gradientBrush;
-        _logger.Debug($"边框样式已创建新画刷，状态: {statusText}");
     }
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

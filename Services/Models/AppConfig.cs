@@ -17,28 +17,9 @@ public class LogFileSettings
 public class DebugConfig
 {
     public bool IsDebugMode { get; set; } = false;
-    public bool EnableLogging { get; set; } = false;
-    public string LogLevel { get; set; } = "Debug";
+    public string LogLevel { get; set; } = "Information";
     public LogFileSettings FileSettings { get; set; } = new();
-    public List<string> ExcludedTags { get; set; } = new();
-    public List<string> ExcludedSources { get; set; } = new();
-    public List<string> ExcludedMethods { get; set; } = new();
-    public List<string> ExcludedPatterns { get; set; } = new();
 
-    // 当调试模式开启或关闭时，更新所有调试功能的状态
-    public void UpdateDebugState()
-    {
-        if (IsDebugMode)
-        {
-            EnableLogging = true;
-            LogLevel = "Debug";
-        }
-        else
-        {
-            EnableLogging = false;
-            LogLevel = "Information";
-        }
-    }
 }
 
 public class UpdateInfo

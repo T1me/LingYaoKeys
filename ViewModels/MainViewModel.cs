@@ -192,9 +192,12 @@ public class MainViewModel : ViewModelBase
         
         // 必须在创建HotkeyService之前设置DataContext，因为HotkeyService需要访问MainViewModel
         mainWindow.DataContext = this;
-        
+
+        // 创建执行器
+        var executor = new KeySequenceExecutor(lyKeysService, lyKeysService._inputMethodService, App.AudioService, _configManager);
+
         // 初始化HotkeyService
-        _hotkeyService = new HotkeyService(mainWindow, lyKeysService, _configManager);
+        _hotkeyService = new HotkeyService(mainWindow, executor, lyKeysService, _configManager);
         
         // 先标记初始化完成，避免循环依赖问题
         _isInitializing = false;

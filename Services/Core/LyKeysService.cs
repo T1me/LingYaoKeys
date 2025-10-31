@@ -19,33 +19,17 @@ namespace WpfApp.Services.Core
         private readonly SerilogManager _logger;
         private readonly IConfigManager _configManager;
         private bool _isInitialized;
-        private bool _isEnabled;
         private bool _isHoldMode;
         internal readonly InputMethodService _inputMethodService;
         private readonly object _stateLock = new object();
-        private readonly Stopwatch _sequenceStopwatch = new Stopwatch();
-        // 新的统一操作列表
-        private List<KeyItemSettings> _operationList = new List<KeyItemSettings>();
         
         private const int MIN_KEY_INTERVAL = 1;  // 最小按键间隔
         public const int DEFAULT_KEY_PRESS_INTERVAL = 5; // 默认按键按下时长
         private int _keyInterval = 10; // 按键间隔
         private int _keyPressInterval = DEFAULT_KEY_PRESS_INTERVAL; // 按键按下时长
         private bool _isDisposed;
-        private CancellationTokenSource? _holdModeCts;
         private readonly Dictionary<int, LyKeysCode> _virtualKeyMap;
-        private volatile bool _emergencyStop;
-        private const int EMERGENCY_STOP_THRESHOLD = 100; // 100ms内未能停止则强制停止
-        private readonly object _emergencyStopLock = new object();
-        private bool _autoSwitchIME = true; // 是否自动切换输入法
-        // 是否正在执行SetOperationList
-        private bool _isSettingKeyList = false;
-        // 是否启用降低卡位功能
         private bool _isReduceKeyStuck = false;
-        // 按键模式实例
-        private SequenceKeyMode? _sequenceMode;
-        private HoldKeyMode? _holdMode;
-        private KeyModeBase? _currentMode;
         #endregion
 
         #region 事件定义
@@ -53,11 +37,6 @@ namespace WpfApp.Services.Core
         /// 初始化状态变更事件
         /// </summary>
         public event EventHandler<bool>? InitializationStatusChanged;
-
-        /// <summary>
-        /// 启用状态变更事件
-        /// </summary>
-        public event EventHandler<bool>? EnableStatusChanged;
 
         /// <summary>
         /// 按键间隔变更事件
@@ -73,11 +52,6 @@ namespace WpfApp.Services.Core
         /// 按键按下间隔变更事件
         /// </summary>
         public event EventHandler<int>? KeyPressIntervalChanged;
-
-        /// <summary>
-        /// 模式切换事件
-        /// </summary>
-        public event EventHandler<bool>? ModeSwitched;
         #endregion
 
         #region 属性
@@ -86,49 +60,6 @@ namespace WpfApp.Services.Core
         /// </summary>
         public bool IsInitialized => _isInitialized;
 
-        /// <summary>
-        /// 获取或设置服务是否启用
-        /// </summary>
-        public bool IsEnabled
-        {
-            get => _isEnabled;
-            set
-            {
-                if (_isEnabled != value)
-                {
-                    _isEnabled = value;
-                    EnableStatusChanged?.Invoke(this, value);
-                    
-                    if (_isEnabled)
-                    {
-                        if (_autoSwitchIME)
-                        {
-                            _inputMethodService.StoreCurrentLayout();
-                            _inputMethodService.SwitchToEnglish();
-                            _logger.Debug("服务启用：已切换到英文输入法");
-                        }
-                        else
-                        {
-                            _logger.Debug("服务启用：保持当前输入法不变");
-                        }
-
-                        _currentMode = _isHoldMode ? _holdMode : _sequenceMode;
-                        _currentMode?.SetOperationList(_operationList);
-                        _currentMode?.Start();
-                    }
-                    else
-                    {
-                        _currentMode?.Stop();
-                        _currentMode = null;
-                        }
-
-                        // 只在完全停止时恢复输入法
-                        RestoreIME();
-                        _logger.Debug("服务停用：已恢复输入法");
-                }
-            }
-        }
-        
 
         /// <summary>
         /// 获取或设置按键间隔
@@ -143,7 +74,6 @@ namespace WpfApp.Services.Core
                 {
                     _keyInterval = validValue;
                     KeyIntervalChanged?.Invoke(this, validValue);
-                    _logger.SequenceEvent($"按键间隔已更新为: {validValue}ms");
                 }
             }
         }
@@ -160,7 +90,6 @@ namespace WpfApp.Services.Core
                 {
                     _keyPressInterval = value;
                     KeyPressIntervalChanged?.Invoke(this, value);
-                    _logger.SequenceEvent($"按键按下时长已更新为: {value}ms");
                 }
             }
         }
@@ -171,25 +100,7 @@ namespace WpfApp.Services.Core
         public bool IsHoldMode
         {
             get => _isHoldMode;
-            set
-            {
-                if (_isHoldMode != value)
-                {
-                    bool wasEnabled = _isEnabled;
-                    if (wasEnabled)
-                    {
-                        IsEnabled = false;
-                    }
-
-                    _isHoldMode = value;
-                    ModeSwitched?.Invoke(this, value);
-
-                    if (wasEnabled)
-                    {
-                        IsEnabled = true;
-                    }
-                }
-            }
+            set => _isHoldMode = value;
         }
 
         /// <summary>
@@ -203,9 +114,7 @@ namespace WpfApp.Services.Core
                 if (_isReduceKeyStuck != value)
                 {
                     _isReduceKeyStuck = value;
-                    // 根据降低卡位状态更新按键按下时长
                     KeyPressInterval = _isReduceKeyStuck ? DEFAULT_KEY_PRESS_INTERVAL : 0;
-                    _logger.Debug($"降低卡位功能状态：{(_isReduceKeyStuck ? "开启" : "关闭")}，按键按下时长已调整为：{KeyPressInterval}ms");
                 }
             }
         }
@@ -220,37 +129,25 @@ namespace WpfApp.Services.Core
             _logger = SerilogManager.Instance;
             _configManager = ConfigManager.Instance;
             _isInitialized = false;
-            _isEnabled = false;
             _isHoldMode = false;
             _virtualKeyMap = InitializeVirtualKeyMap();
-            _inputMethodService = new InputMethodService();  // 初始化InputMethodService
+            _inputMethodService = new InputMethodService();
 
-            // 从配置中读取是否自动切换输入法
+            // 读取降低卡位配置
             try
             {
                 var globalConfig = _configManager.GlobalConfig;
-                _autoSwitchIME = globalConfig.AutoSwitchToEnglishIME ?? true;
-                _logger.Debug($"LyKeysService构造函数：输入法自动切换设置为 {(_autoSwitchIME ? "开启" : "关闭")}");
-                
-                // 读取降低卡位配置
                 _isReduceKeyStuck = globalConfig.IsReduceKeyStuck ?? false;
-                // 根据降低卡位状态设置按键按下时长
                 _keyPressInterval = _isReduceKeyStuck ? DEFAULT_KEY_PRESS_INTERVAL : 0;
-                _logger.Debug($"LyKeysService构造函数：降低卡位功能设置为 {(_isReduceKeyStuck ? "开启" : "关闭")}，按键按下时长：{_keyPressInterval}ms");
             }
             catch (Exception ex)
             {
-                _logger.Error("读取配置失败，使用默认值", ex);
-                _autoSwitchIME = true;
+                _logger.Error("读取配置失败", ex);
                 _isReduceKeyStuck = false;
                 _keyPressInterval = 0;
             }
 
-            // 初始化按键模式实例
-            _sequenceMode = new SequenceKeyMode(this);
-            _holdMode = new HoldKeyMode(this);
-
-            _logger.Debug("LyKeysService构造函数：已初始化InputMethodService和按键模式");
+            _logger.Debug("LyKeysService构造函数：已初始化");
         }
         #endregion
 
@@ -434,62 +331,6 @@ namespace WpfApp.Services.Core
             }
         }
 
-
-
-        /// <summary>
-        /// 设置按键列表 - 统一操作列表版本
-        /// </summary>
-        /// <param name="operations">操作列表，包括按键和坐标</param>
-        public void SetOperationList(List<KeyItemSettings> operations)
-        {
-            try
-            {
-                // 防循环调用保护
-                if (_isSettingKeyList)
-                {
-                    _logger.Warning("检测到SetOperationList正在执行中，跳过重复调用");
-                    return;
-                }
-
-                _isSettingKeyList = true;
-
-                // 验证输入
-                if (operations == null || operations.Count == 0)
-                {
-                    _logger.Warning("收到空的操作列表");
-                    if (_isEnabled) IsEnabled = false;
-                    _operationList.Clear();
-                    return;
-                }
-
-                // 验证键盘按键有效性
-                var keyboardOps = operations
-                    .Where(op => op.Type == KeyItemType.Keyboard && op.KeyCode.HasValue)
-                    .Select(op => op.KeyCode.Value)
-                    .ToList();
-
-                if (keyboardOps.Any(k => !IsValidLyKeysCode(k)))
-                {
-                    _logger.Warning("操作列表包含无效的键码");
-                    return;
-                }
-
-                // 直接更新操作列表
-                _operationList = operations.ToList();
-
-                _logger.Debug($"操作列表已更新 - 总操作数: {_operationList.Count}, 键盘按键数: {keyboardOps.Count}, 坐标点数: {operations.Count(op => op.Type == KeyItemType.Coordinates)}");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("设置操作列表异常", ex);
-                _operationList.Clear();
-                IsEnabled = false;
-            }
-            finally
-            {
-                _isSettingKeyList = false;
-            }
-        }
 
 
         /// <summary>
@@ -725,25 +566,6 @@ namespace WpfApp.Services.Core
             return true;
         }
 
-        public void EmergencyStop()
-        {
-            try
-            {
-                _logger.Debug("开始执行紧急停止");
-                _currentMode?.Stop();
-
-                foreach (var operation in _operationList)
-                    if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
-                        SendKeyUp(operation.KeyCode.Value);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("紧急停止异常", ex);
-                ForceStop();
-            }
-        }
-
-
         private void SendStatusMessage(string message, bool isError = false)
         {
             var args = new StatusMessageEventArgs(message, isError);
@@ -752,44 +574,6 @@ namespace WpfApp.Services.Core
                 _logger.Error(message);
             else
                 _logger.Debug(message);
-        }
-
-        private void ForceStop()
-        {
-            try
-            {
-                _isEnabled = false;
-                _isHoldMode = false;
-                
-                // 确保所有按键都被释放
-                foreach (var operation in _operationList)
-                {
-                    if (operation.Type == KeyItemType.Keyboard && operation.KeyCode.HasValue)
-                    {
-                        try
-                        {
-                            SendKeyUp(operation.KeyCode.Value);
-                            Thread.Sleep(1); // 给予系统短暂时间处理按键释放
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Error($"强制释放按键时发生异常: {operation.KeyCode}", ex);
-                        }
-                    }
-                }
-
-                // 重置所有状态
-                _emergencyStop = false;
-                EnableStatusChanged?.Invoke(this, false);
-                
-                // 恢复输入法
-                RestoreIME();
-                _logger.Debug("已强制停止所有按键操作，输入法已恢复");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("强制停止时发生异常", ex);
-            }
         }
         #endregion
 
@@ -802,20 +586,6 @@ namespace WpfApp.Services.Core
             try
             {
                 _logger.Debug("开始释放LyKeysService资源");
-
-                // 1. 停止所有操作
-                IsEnabled = false;
-                
-                // 2. 停止序列
-                try
-                {
-                    _currentMode?.Stop();
-                    RestoreIME();
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error("停止序列失败", ex);
-                }
 
                 // 3. 释放驱动
                 try
@@ -839,17 +609,7 @@ namespace WpfApp.Services.Core
         #endregion
 
 
-        #region 输入法管理
-        /// <summary>
-        /// 设置是否自动切换输入法
-        /// </summary>
-        /// <param name="autoSwitch">是否自动切换</param>
-        public void SetAutoSwitchIME(bool autoSwitch)
-        {
-            _autoSwitchIME = autoSwitch;
-            _logger.Debug($"输入法自动切换设置已更新: {(autoSwitch ? "开启" : "关闭")}");
-        }
-
+        #region 按键配置
         /// <summary>
         /// 根据降低卡位状态更新按键按下时长，确保与降低卡位功能状态保持一致
         /// </summary>
@@ -858,28 +618,6 @@ namespace WpfApp.Services.Core
             KeyPressInterval = _isReduceKeyStuck ? DEFAULT_KEY_PRESS_INTERVAL : 0;
             _logger.Debug($"根据降低卡位功能状态({(_isReduceKeyStuck ? "开启" : "关闭")})更新按键按下时长：{_keyPressInterval}ms");
         }
-
-        /// <summary>
-        /// 恢复输入法到之前的状态
-        /// </summary>
-        public void RestoreIME()
-        {
-            try
-            {
-                // 只有在自动切换输入法开启时才恢复
-                if (_autoSwitchIME)
-                {
-                    _inputMethodService.RestorePreviousLayout();
-                    _logger.Debug("已恢复原始输入法");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("恢复输入法失败", ex);
-            }
-        }
         #endregion
-
-
     }
 } 

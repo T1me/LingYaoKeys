@@ -39,7 +39,6 @@ public class InputMethodService
                 var threadId = GetWindowThreadProcessId(hwnd, IntPtr.Zero);
                 _previousLayout = GetKeyboardLayout(threadId);
                 _hasStoredLayout = true;
-                _logger.Debug($"已保存当前输入法状态: 0x{_previousLayout.ToInt64():X8}");
             }
         }
         catch (Exception ex)
@@ -63,9 +62,7 @@ public class InputMethodService
                 var layout = LoadKeyboardLayout("00000409", 1);
                 if (layout != IntPtr.Zero)
                 {
-                    // 发送切换输入法消息
                     PostMessage(hwnd, WM_INPUTLANGCHANGEREQUEST, (IntPtr)INPUTLANGCHANGE_FORWARD, layout);
-                    _logger.Debug("已切换到英文输入法");
                 }
             }
         }
@@ -80,18 +77,12 @@ public class InputMethodService
     {
         try
         {
-            if (!_hasStoredLayout)
-            {
-                _logger.Warning("没有保存的输入法状态可供恢复");
-                return;
-            }
+            if (!_hasStoredLayout) return;
 
             var hwnd = GetForegroundWindow();
             if (hwnd != IntPtr.Zero && _previousLayout != IntPtr.Zero)
             {
-                // 发送切换输入法消息，恢复到之前的状态
                 PostMessage(hwnd, WM_INPUTLANGCHANGEREQUEST, (IntPtr)INPUTLANGCHANGE_FORWARD, _previousLayout);
-                _logger.Debug($"已恢复到之前的输入法状态: 0x{_previousLayout.ToInt64():X8}");
                 _hasStoredLayout = false;
             }
         }

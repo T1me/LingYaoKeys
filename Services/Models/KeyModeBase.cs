@@ -13,6 +13,8 @@ public abstract class KeyModeBase
     protected CancellationTokenSource? _cts;
     protected int KeyPressInterval => _driverService.KeyPressInterval;
 
+    protected Action? _onCompleted;
+
     protected KeyModeBase(LyKeysService driverService)
     {
         _driverService = driverService;
@@ -25,7 +27,18 @@ public abstract class KeyModeBase
         _operationList = operations == null ? new List<KeyItemSettings>() : new List<KeyItemSettings>(operations);
     }
 
-    public abstract void Start();
+    public void Start(Action? onCompleted = null)
+    {
+        _onCompleted = onCompleted;
+        StartInternal();
+    }
+
+    protected abstract void StartInternal();
+
+    protected void NotifyCompleted()
+    {
+        _onCompleted?.Invoke();
+    }
 
     public virtual void Stop()
     {
@@ -87,8 +100,6 @@ public abstract class KeyModeBase
 
             _driverService.SendKeyUp(key);
 
-            _logger.Debug($"{GetType().Name} - 执行按键: {key}, 按下时长: {KeyPressInterval}ms, 间隔: {keyInterval}ms");
-
             if (keyInterval > 0)
             {
                 Thread.Sleep(keyInterval);
@@ -98,7 +109,7 @@ public abstract class KeyModeBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"执行按键异常: {key}, {ex.Message}", ex);
+            _logger.Error($"执行按键异常: {key}", ex);
             _driverService.SendKeyUp(key);
             return false;
         }
@@ -119,7 +130,7 @@ public abstract class KeyModeBase
         }
         catch (Exception ex)
         {
-            _logger.Error($"执行坐标异常: ({x}, {y}), {ex.Message}", ex);
+            _logger.Error($"执行坐标异常: ({x}, {y})", ex);
             return false;
         }
     }
@@ -127,12 +138,12 @@ public abstract class KeyModeBase
 
     protected virtual void LogModeStart()
     {
-        _logger.SequenceEvent("开始", $"模式: {GetType().Name} | 操作数: {_operationList.Count}");
+        _logger.Info($"{GetType().Name} 启动 - 操作数: {_operationList.Count}");
     }
 
     protected virtual void LogModeEnd()
     {
-        _logger.SequenceEvent("结束", $"模式: {GetType().Name} 已停止");
+        _logger.Info($"{GetType().Name} 停止");
     }
 
     public void Dispose()

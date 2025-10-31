@@ -108,14 +108,10 @@ public class KeyMappingService
             // 创建按键设置，支持不同类型
             var keySettings = CreateKeySettings(selectedItems);
 
-            // 设置统一操作列表到驱动服务
-            _lyKeysService.SetOperationList(keySettings);
-
             // 传递给HotkeyService所有类型的按键
             _hotkeyService.SetKeySequence(keySettings);
 
             _lyKeysService.IsHoldMode = isHoldMode;
-            _lyKeysService.IsEnabled = true;
 
             IsExecuting = true;
             ExecutionStateChanged?.Invoke(true);
@@ -135,7 +131,6 @@ public class KeyMappingService
         try
         {
             _hotkeyService.StopSequence();
-            _lyKeysService.IsEnabled = false;
             _lyKeysService.IsHoldMode = false;
 
             IsExecuting = false;
@@ -188,9 +183,6 @@ public class KeyMappingService
 
             // 创建KeyItemSettings
             var keySettings = CreateKeySettings(selectedItems);
-
-            // 设置统一操作列表到驱动服务
-            _lyKeysService.SetOperationList(keySettings);
 
             // 将所有设置（包括键盘和坐标）传递给HotkeyService
             _hotkeyService.SetKeySequence(keySettings);

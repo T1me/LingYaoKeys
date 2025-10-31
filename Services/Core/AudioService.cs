@@ -44,11 +44,10 @@ public class AudioService
                         try
                         {
                             _outputDevice.Volume = (float)_volume;
-                            _logger.Debug($"已设置音频音量: {_volume:P0} ({_volume:F2})");
                         }
                         catch (Exception ex)
                         {
-                            _logger.Error($"设置音频音量失败: {ex.Message}");
+                            _logger.Error("设置音频音量失败", ex);
                         }
                 }
             }
@@ -59,42 +58,30 @@ public class AudioService
     {
         try
         {
-            // 使用PathService获取音频文件路径
             _startSoundPath = _pathService.GetSoundFilePath("start.mp3");
             _stopSoundPath = _pathService.GetSoundFilePath("stop.mp3");
-            
-            _logger.Debug($"音频文件目录: {_pathService.SoundPath}");
 
-            // 确保音频文件存在
             EnsureAudioFileExists("start.mp3", _startSoundPath);
             EnsureAudioFileExists("stop.mp3", _stopSoundPath);
 
-            _logger.Debug($"音频文件初始化完成:");
-            _logger.Debug($"- 开始音效: {_startSoundPath}");
-            _logger.Debug($"- 结束音效: {_stopSoundPath}");
-
-            // 验证音频文件
             if (!File.Exists(_startSoundPath) || !File.Exists(_stopSoundPath))
             {
-                _logger.Error("音频文件初始化失败，文件不存在");
-                throw new FileNotFoundException("音频文件初始化失败，文件不存在");
+                _logger.Error("音频文件不存在");
+                throw new FileNotFoundException("音频文件不存在");
             }
 
-            // 检测音频设备，但不强制要求可用
             try
             {
                 using (var testReader = new MediaFoundationReader(_startSoundPath))
                 using (var testDevice = new WaveOutEvent())
                 {
                     testDevice.Init(testReader);
-                    _logger.Debug("音频设备初始化测试成功");
                 }
             }
             catch (Exception ex)
             {
-                // 捕获音频设备初始化异常，但不影响程序继续运行
                 _audioDeviceAvailable = false;
-                _logger.Warning($"音频设备初始化失败，应用将在无声模式下运行: {ex.Message}");
+                _logger.Error("音频设备不可用", ex);
             }
         }
         catch (Exception ex)
@@ -110,30 +97,23 @@ public class AudioService
         {
             if (!File.Exists(targetPath))
             {
-                _logger.Debug($"开始提取音频文件: {fileName}");
                 var resourceName = $"WpfApp.Resource.sound.{fileName}";
 
                 using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
                 {
                     if (stream is null)
                     {
-                        _logger.Error($"找不到音频资源：{resourceName}");
-                        throw new FileNotFoundException($"找不到音频资源：{resourceName}");
+                        _logger.Error($"找不到音频资源: {resourceName}");
+                        throw new FileNotFoundException($"找不到音频资源: {resourceName}");
                     }
 
-                    // 确保目录存在
                     Directory.CreateDirectory(Path.GetDirectoryName(targetPath));
 
                     using (var fileStream = File.Create(targetPath))
                     {
                         stream.CopyTo(fileStream);
-                        _logger.Debug($"音频文件提取成功: {targetPath}");
                     }
                 }
-            }
-            else
-            {
-                _logger.Debug($"音频文件已存在: {targetPath}");
             }
         }
         catch (Exception ex)
@@ -145,16 +125,10 @@ public class AudioService
 
     public void PlayStartSound()
     {
-        // 如果音频设备不可用，直接返回
-        if (!_audioDeviceAvailable)
-        {
-            _logger.Debug("音频设备不可用，跳过音效播放");
-            return;
-        }
+        if (!_audioDeviceAvailable) return;
 
         lock (_lockObject)
         {
-            // 如果正在播放停止音效，立即停止
             if (_isPlayingStopSound) DisposeCurrentSound();
         }
 
@@ -163,12 +137,7 @@ public class AudioService
 
     public void PlayStopSound()
     {
-        // 如果音频设备不可用，直接返回
-        if (!_audioDeviceAvailable)
-        {
-            _logger.Debug("音频设备不可用，跳过音效播放");
-            return;
-        }
+        if (!_audioDeviceAvailable) return;
 
         PlaySound(_stopSoundPath, false);
     }

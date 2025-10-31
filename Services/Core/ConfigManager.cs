@@ -568,7 +568,6 @@ namespace WpfApp.Services.Core
                 Debug = new DebugConfig
                 {
                     IsDebugMode = false,
-                    EnableLogging = false,
                     LogLevel = "Debug",
                     FileSettings = new LogFileSettings
                     {
@@ -576,17 +575,6 @@ namespace WpfApp.Services.Core
                         MaxFileCount = 10,
                         RollingInterval = "Day",
                         RetainDays = 7
-                    },
-                    ExcludedTags = new List<string>(),
-                    ExcludedSources = new List<string>
-                    {
-                        "*.xaml*",
-                        "ControlStyles.xaml"
-                    },
-                    ExcludedMethods = new List<string> { },
-                    ExcludedPatterns = new List<string>
-                    {
-                        "窗口初始化完成*"
                     }
                 },
                 soundEnabled = false,

@@ -62,6 +62,7 @@ public class HotkeyService
     public event Action<LyKeysCode>? KeyTriggered; // 触发按键事件
 
     // 核心字段
+    private readonly KeySequenceExecutor _executor;
     private readonly LyKeysService _lyKeysService;
     private readonly SerilogManager _logger = SerilogManager.Instance;
     private readonly IConfigManager _configManager;
@@ -70,13 +71,12 @@ public class HotkeyService
     private List<KeyItemSettings> _keySettings = new();
 
     // 热键状态
-    private int _hotkeyVirtualKey; // 热键虚拟键码 (简化为一个热键)
-    private LyKeysCode? _pendingHotkey; // LyKeys热键键码 (简化为一个热键)
-    private bool _isKeyHeld; // 防止全局热键的重复触发
-    private bool _isSequenceRunning; // 序列模式是否正在运行
-    private bool _isInputFocused; // 输入焦点是否在当前窗口
-    private bool _isHotkeyControlEnabled = true; // 热键总开关状态
-    private bool _isRegisteringHotkey = false; // 是否正在注册热键
+    private int _hotkeyVirtualKey;
+    private LyKeysCode? _pendingHotkey;
+    private bool _isKeyHeld;
+    private bool _isInputFocused;
+    private bool _isHotkeyControlEnabled = true;
+    private bool _isRegisteringHotkey = false;
 
     // 保持回调函数的引用
     private readonly HookProc _mouseProcDelegate; // 鼠标钩子回调函数
@@ -99,9 +99,10 @@ public class HotkeyService
     }
 
     // 构造函数
-    public HotkeyService(Window mainWindow, LyKeysService lyKeysService, IConfigManager configManager)
+    public HotkeyService(Window mainWindow, KeySequenceExecutor executor, LyKeysService lyKeysService, IConfigManager configManager)
     {
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+        _executor = executor ?? throw new ArgumentNullException(nameof(executor));
         _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
         _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
         _mainViewModel = mainWindow.DataContext as MainViewModel ??
@@ -113,18 +114,13 @@ public class HotkeyService
         _keyboardProcDelegate = KeyboardHookCallback;
 
         // 订阅事件
-        _lyKeysService.ModeSwitched += OnModeSwitched;
-        _lyKeysService.EnableStatusChanged += OnEnableStatusChanged;
         _configManager.ConfigChanged += OnConfigChanged;
         _mainWindow.Closed += (s, e) => Dispose();
 
         // 从配置加载初始状态
         LoadInitialState();
 
-        // 安装钩子
         InstallHooks();
-
-        _logger.Debug("HotkeyService初始化完成");
     }
 
     // 加载初始状态
@@ -160,7 +156,6 @@ public class HotkeyService
                 // 设置统一操作列表
                 SetKeySequence(operations);
                 
-                _logger.Debug($"初始化已加载操作列表 - 总数: {operations.Count}, 键盘按键: {operations.Count(o => o.Type == KeyItemType.Keyboard)}, 坐标操作: {operations.Count(o => o.Type == KeyItemType.Coordinates)}");
             }
         }
 
@@ -173,7 +168,6 @@ public class HotkeyService
     {
         lock (_hookLock)
         {
-            _logger.Debug("开始释放HotkeyService资源");
 
             // 1. 停止序列
             try
@@ -188,8 +182,6 @@ public class HotkeyService
             // 2. 移除事件订阅
             try
             {
-                _lyKeysService.ModeSwitched -= OnModeSwitched;
-                _lyKeysService.EnableStatusChanged -= OnEnableStatusChanged;
                 _configManager.ConfigChanged -= OnConfigChanged;
             }
             catch (Exception ex)
@@ -217,7 +209,6 @@ public class HotkeyService
                 _logger.Error("卸载钩子失败", ex);
             }
 
-            _logger.Debug("HotkeyService资源释放完成");
         }
     }
 
@@ -228,7 +219,6 @@ public class HotkeyService
         {
             _isRegisteringHotkey = true; // 进入热键注册模式
             
-            _logger.Debug($"注册热键: KeyCode={keyCode}, Modifiers={modifiers}, SaveToConfig={saveToConfig}");
             
             // 更新内部状态
             _hotkeyVirtualKey = GetVirtualKeyFromLyKey(keyCode);
@@ -237,16 +227,13 @@ public class HotkeyService
             // 根据参数决定是否保存到配置文件
             if (saveToConfig)
             {
-                _logger.Debug("保存热键配置到文件");
                 SaveHotkeyConfig(keyCode, modifiers);
             }
             else
             {
-                _logger.Debug("仅更新内部状态，不保存到配置文件");
             }
             
             _isRegisteringHotkey = false;
-            _logger.Debug($"热键注册成功: {keyCode}");
             return true;
         }
         catch (Exception ex)
@@ -267,7 +254,6 @@ public class HotkeyService
     {
         try 
         {
-            _logger.Debug($"开始保存热键配置: KeyCode={keyCode}, Modifiers={modifiers}");
             
             // 直接调用配置管理器保存热键配置
             _configManager.UpdateKeyConfig(keyConfig => {
@@ -277,7 +263,6 @@ public class HotkeyService
                 keyConfig.stopMods = modifiers;
             });
             
-            _logger.Debug($"热键配置已成功保存: {keyCode}");
         }
         catch (Exception ex)
         {
@@ -292,40 +277,27 @@ public class HotkeyService
     {
         try
         {
-            _logger.Debug("开始启动按键序列");
 
-            // 如果在注册热键模式，不进行窗口状态检查
             if (!_isRegisteringHotkey && !CanTriggerHotkey()) return;
 
-            // 检查是否有可执行项（键盘按键或坐标）
-            bool hasKeyboardKeys = _keySettings.Any(k => k.Type == KeyItemType.Keyboard);
-            bool hasCoordinates = _keySettings.Any(k => k.Type == KeyItemType.Coordinates);
-
-            if (!hasKeyboardKeys && !hasCoordinates)
+            if (_keySettings == null || _keySettings.Count == 0)
             {
-                _logger.Warning("按键和坐标列表均为空，无法启动序列");
+                _logger.Warning("按键列表为空，无法启动序列");
                 _mainViewModel.UpdateStatusMessage("请至少添加一个按键或坐标", true);
                 return;
             }
 
-            _isSequenceRunning = true;
-            _logger.Debug($"序列运行状态已设置为: {_isSequenceRunning}");
-
-            _lyKeysService.IsEnabled = true;
-
-            int keyboardCount = _keySettings.Count(k => k.Type == KeyItemType.Keyboard);
-            int coordinatesCount = _keySettings.Count(k => k.Type == KeyItemType.Coordinates);
-            _logger.Debug($"序列已启动 - 模式: {(_lyKeysService.IsHoldMode ? "按压" : "顺序")}, " +
-                          $"键盘按键数: {keyboardCount}, 坐标点数: {coordinatesCount}, " +
-                          $"目标窗口句柄: {_targetWindowHandle}");
 
             SequenceModeStarted?.Invoke();
+
+            _executor.Start(_keySettings, _lyKeysService.IsHoldMode, () =>
+            {
+                SequenceModeStopped?.Invoke();
+            });
         }
         catch (Exception ex)
         {
             _logger.Error("启动序列时发生异常", ex);
-            _isSequenceRunning = false;
-            _lyKeysService.IsEnabled = false;
             _mainViewModel.UpdateStatusMessage("启动序列失败，请检查日志", true);
         }
     }
@@ -333,25 +305,7 @@ public class HotkeyService
     // 停止序列控制
     public void StopSequence()
     {
-        if (!_isSequenceRunning) 
-        {
-            _logger.Debug("停止按键序列：序列已经处于停止状态，忽略此次调用");
-            return;
-        }
-
-        _logger.Debug("停止按键序列，当前序列状态：" + _isSequenceRunning);
-
-        // 确保按键服务先停止
-        _lyKeysService.IsEnabled = false;
-        _logger.Debug("已禁用按键服务");
-
-        // 更新内部运行状态
-        _isSequenceRunning = false;
-        
-        _logger.Debug("序列已停止，即将触发SequenceModeStopped事件");
-        // 触发外部事件通知
-        SequenceModeStopped?.Invoke();
-        _logger.Debug("SequenceModeStopped事件已触发");
+        _executor.Stop();
     }
 
     // 键盘钩子回调处理
@@ -393,10 +347,10 @@ public class HotkeyService
                 var windowState = GetWindowState();
 
                 // 如果序列正在运行，但窗口状态异常，则停止序列
-                if (_isSequenceRunning && windowState != WindowState.WindowActive &&
+                if (_executor.IsRunning && windowState != WindowState.WindowActive &&
                     windowState != WindowState.NoTargetWindow)
                 {
-                    _lyKeysService.EmergencyStop();
+                    _executor.EmergencyStop();
                     StopSequence();
                     return CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
                 }
@@ -418,7 +372,7 @@ public class HotkeyService
                         }
                         else
                         {
-                            if (_isSequenceRunning) StopSequence();
+                            if (_executor.IsRunning) StopSequence();
                             else StartSequence();
                         }
                     }
@@ -482,9 +436,9 @@ public class HotkeyService
                 var isTargetWindowActive = _targetWindowHandle == IntPtr.Zero || activeWindow == _targetWindowHandle;
 
                 // 如果目标窗口未激活，停止当前执行
-                if (!isTargetWindowActive && _isSequenceRunning)
+                if (!isTargetWindowActive && _executor.IsRunning)
                 {
-                    _lyKeysService.EmergencyStop(); // 使用紧急停止
+                    _executor.EmergencyStop();
                     StopSequence();
                     return CallNextHookEx(_mouseHookHandle, nCode, wParam, lParam);
                 }
@@ -555,15 +509,13 @@ public class HotkeyService
                 if (!_isKeyHeld)
                 {
                     _isKeyHeld = true;
-                    if (_isSequenceRunning)
+                    if (_executor.IsRunning)
                     {
-                        // 如果序列已在运行，则停止
                         StartHotkeyPressed?.Invoke();
                         StopSequence();
                     }
                     else
                     {
-                        // 否则启动序列
                         StartHotkeyPressed?.Invoke();
                         StartSequence();
                     }
@@ -626,7 +578,7 @@ public class HotkeyService
             _isKeyHeld = true;
             StartHotkeyPressed?.Invoke();
 
-            if (_isSequenceRunning) StopSequence();
+            if (_executor.IsRunning) StopSequence();
             else StartSequence();
         }
     }
@@ -655,68 +607,12 @@ public class HotkeyService
         return (int)lyKeyCode;
     }
 
-    // 模式切换事件处理
-    private void OnModeSwitched(object? sender, bool isHoldMode)
-    {
-        try
-        {
-            _logger.Debug($"模式切换事件: {(isHoldMode ? "按压模式" : "顺序模式")}");
-
-            StopSequence();
-
-            // 重新注册热键（不保存到配置，因为只是模式切换）
-            if (_pendingHotkey.HasValue)
-            {
-                _logger.Debug($"重新注册热键: {_pendingHotkey.Value}");
-                RegisterHotkey(_pendingHotkey.Value, ModifierKeys.None, saveToConfig: false);
-            }
-
-            // 关键修复：模式切换后重新设置操作列表到 LyKeysService
-            // 这样新模式才能获取到操作列表
-            if (_keySettings != null && _keySettings.Count > 0)
-            {
-                _logger.Debug($"模式切换后重新设置操作列表: {_keySettings.Count} 个操作");
-                _lyKeysService.SetOperationList(_keySettings);
-            }
-            else
-            {
-                _logger.Warning("模式切换时操作列表为空，无法设置到新模式");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("处理模式切换事件时发生异常", ex);
-            // 不抛出异常，避免影响模式切换流程
-        }
-    }
-
-    // 服务启用状态变更事件处理
-    private void OnEnableStatusChanged(object? sender, bool isEnabled)
-    {
-        try
-        {
-            _logger.Debug($"服务启用状态变更: {isEnabled}");
-
-            // 当服务被禁用且当前序列正在运行时，重置序列运行状态
-            if (!isEnabled && _isSequenceRunning)
-            {
-                _logger.Debug("顺序模式执行完成，重置序列运行状态");
-                _isSequenceRunning = false;
-                SequenceModeStopped?.Invoke();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("处理服务启用状态变更事件时发生异常", ex);
-        }
-    }
 
     // 配置变更事件处理
     private void OnConfigChanged(object? sender, ConfigEventArgs e)
     {
         try
         {
-            _logger.Debug($"收到配置变更事件: {e.ChangeType}");
 
             switch (e.ChangeType)
             {
@@ -730,7 +626,6 @@ public class HotkeyService
 
                 case ConfigChangeType.ConfigFile:
                     // 配置文件切换 - 停止当前序列
-                    _logger.Debug("配置文件切换，停止当前序列");
                     StopSequence();
                     // 注意：Key事件会紧随其后触发，届时会重新加载配置
                     break;
@@ -757,7 +652,6 @@ public class HotkeyService
 
                 case ConfigChangeType.ConfigList:
                     // 配置列表变更 - 不需要特殊处理
-                    _logger.Debug("配置列表已变更");
                     break;
 
                 default:
@@ -782,17 +676,14 @@ public class HotkeyService
 
         try
         {
-            _logger.Debug("开始重新加载热键配置");
 
             // 1. 重新注册热键
             if (keyConfig.startKey.HasValue)
             {
-                _logger.Debug($"重新注册热键: {keyConfig.startKey.Value}");
                 RegisterHotkey(keyConfig.startKey.Value, keyConfig.startMods, saveToConfig: false);
             }
             else
             {
-                _logger.Debug("未设置启动热键");
                 _pendingHotkey = null;
                 _hotkeyVirtualKey = 0;
             }
@@ -819,17 +710,14 @@ public class HotkeyService
                     }
 
                     SetKeySequence(operations);
-                    _logger.Debug($"已更新按键序列 - 总操作数: {operations.Count}, 键盘按键: {operations.Count(o => o.Type == KeyItemType.Keyboard)}, 坐标操作: {operations.Count(o => o.Type == KeyItemType.Coordinates)}");
                 }
                 else
                 {
-                    _logger.Debug("没有选中的按键或坐标");
                     SetKeySequence(new List<KeyItemSettings>());
                 }
             }
             else
             {
-                _logger.Debug("按键列表为空");
                 SetKeySequence(new List<KeyItemSettings>());
             }
 
@@ -838,9 +726,7 @@ public class HotkeyService
 
             // 4. 更新按键模式
             _lyKeysService.IsHoldMode = keyConfig.keyMode != 0;
-            _logger.Debug($"按键模式已更新: {(keyConfig.keyMode != 0 ? "按压模式" : "顺序模式")}");
 
-            _logger.Debug("热键配置重新加载完成");
         }
         catch (Exception ex)
         {
@@ -857,7 +743,6 @@ public class HotkeyService
             // 更新目标窗口进程名称到ViewModel（用于显示和窗口查找）
             if (!string.IsNullOrEmpty(keyConfig.TargetWindowProcessName))
             {
-                _logger.Debug($"目标窗口进程: {keyConfig.TargetWindowProcessName}");
                 
                 // 注意：这里不直接设置窗口句柄，因为窗口句柄的查找和设置
                 // 应该由MainViewModel或KeyMappingViewModel负责
@@ -865,7 +750,6 @@ public class HotkeyService
             }
             else
             {
-                _logger.Debug("未设置目标窗口");
                 _targetWindowHandle = IntPtr.Zero;
             }
         }
@@ -886,7 +770,6 @@ public class HotkeyService
 
         try
         {
-            _logger.Debug("开始更新全局设置");
 
             // 更新热键总开关状态
             var previousState = _isHotkeyControlEnabled;
@@ -894,18 +777,15 @@ public class HotkeyService
 
             if (previousState != _isHotkeyControlEnabled)
             {
-                _logger.Debug($"热键总开关已更新: {(_isHotkeyControlEnabled ? "启用" : "禁用")}");
 
                 // 如果热键总开关被禁用，停止当前运行的序列
-                if (!_isHotkeyControlEnabled && _isSequenceRunning)
+                if (!_isHotkeyControlEnabled && _executor.IsRunning)
                 {
-                    _logger.Debug("热键总开关已禁用，停止当前序列");
-                    _lyKeysService.EmergencyStop();
+                    _executor.EmergencyStop();
                     StopSequence();
                 }
             }
 
-            _logger.Debug("全局设置更新完成");
         }
         catch (Exception ex)
         {
@@ -930,14 +810,12 @@ public class HotkeyService
             if (_isHotkeyControlEnabled != value)
             {
                 _isHotkeyControlEnabled = value;
-                _logger.Debug($"热键服务总开关已{(value ? "启用" : "禁用")}");
 
                 // 如果禁用热键总开关，同时停止当前执行的序列
-                if (!value && _isSequenceRunning)
+                if (!value && _executor.IsRunning)
                 {
-                    _lyKeysService.EmergencyStop();
+                    _executor.EmergencyStop();
                     StopSequence();
-                    _logger.Debug("因热键总开关关闭，已停止当前按键序列");
                 }
             }
         }
@@ -979,15 +857,10 @@ public class HotkeyService
             if (keySettings == null)
                 keySettings = new List<KeyItemSettings>();
 
-            // 传递给LyKeysService统一的操作列表
-            _lyKeysService.SetOperationList(keySettings);
-
-            // 保存完整的按键设置
             _keySettings = keySettings.ToList();
 
             int keyboardCount = keySettings.Count(k => k.Type == KeyItemType.Keyboard);
             int coordinatesCount = keySettings.Count(k => k.Type == KeyItemType.Coordinates);
-            _logger.Debug($"设置按键序列: 总操作数={keySettings.Count}, 键盘按键={keyboardCount}, 坐标点={coordinatesCount}");
         }
         catch (Exception ex)
         {
@@ -1033,7 +906,6 @@ public class HotkeyService
                     throw new Win32Exception(Marshal.GetLastWin32Error());
             }
 
-            _logger.Debug("成功安装键盘和鼠标钩子");
         }
         catch (Exception ex)
         {
@@ -1051,14 +923,12 @@ public class HotkeyService
             if (_targetWindowHandle != value)
             {
                 _targetWindowHandle = value;
-                _logger.Debug($"热键服务窗口句柄已更新: {value}");
 
                 // 如果句柄变为0，停止当前执行
-                if (value == IntPtr.Zero && _isSequenceRunning)
+                if (value == IntPtr.Zero && _executor.IsRunning)
                 {
-                    _lyKeysService.EmergencyStop();
+                    _executor.EmergencyStop();
                     StopSequence();
-                    _logger.Debug("目标窗口已关闭，停止当前执行");
                 }
             }
         }
@@ -1103,7 +973,6 @@ public class HotkeyService
     // 总开关：判断是否可以触发热键
     private bool CanTriggerHotkey()
     {
-        _logger.Debug("检查是否可以触发热键");
         // 如果正在注册热键，跳过窗口状态检查
         if (_isRegisteringHotkey)
             return true;
@@ -1111,7 +980,6 @@ public class HotkeyService
         // 首先检查热键总开关是否启用
         if (!_isHotkeyControlEnabled)
         {
-            _logger.Debug("热键总开关已关闭，忽略热键触发");
             return false;
         }
 
@@ -1132,7 +1000,6 @@ public class HotkeyService
                 return false;
 
             case WindowState.WindowInactive:
-                _logger.Debug("目标窗口未激活，忽略热键触发");
                 _mainViewModel.UpdateStatusMessage("请先激活目标窗口", true);
                 return false;
 

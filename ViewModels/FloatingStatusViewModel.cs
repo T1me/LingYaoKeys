@@ -2,36 +2,16 @@ namespace WpfApp.ViewModels;
 
 public class FloatingStatusViewModel : ViewModelBase
 {
-    private string _statusText = "已停止";
     private bool _isExecuting = false;
     private bool _isHotkeyControlEnabled = true;
 
-    // 当前状态文本
+    // 当前状态文本（只读计算属性）
     public string StatusText
     {
         get
         {
-            // 根据热键总开关和执行状态决定显示的状态文本
             if (!_isHotkeyControlEnabled) return "已禁用";
-
             return _isExecuting ? "运行中" : "已停止";
-        }
-        set
-        {
-            // 兼容旧的设置方式，根据值判断执行状态
-            if (value == "运行中")
-            {
-                SetExecutingState(true);
-            }
-            else if (value == "已停止")
-            {
-                SetExecutingState(false);
-            }
-            else if (value != _statusText)
-            {
-                _statusText = value;
-                OnPropertyChanged();
-            }
         }
     }
 
@@ -39,7 +19,15 @@ public class FloatingStatusViewModel : ViewModelBase
     public bool IsExecuting
     {
         get => _isExecuting;
-        set => SetExecutingState(value);
+        set
+        {
+            if (_isExecuting != value)
+            {
+                _isExecuting = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusText));
+            }
+        }
     }
 
     // 热键总开关状态
@@ -52,19 +40,8 @@ public class FloatingStatusViewModel : ViewModelBase
             {
                 _isHotkeyControlEnabled = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(StatusText)); // 通知状态文本更新
+                OnPropertyChanged(nameof(StatusText));
             }
-        }
-    }
-
-    // 设置执行状态
-    private void SetExecutingState(bool isExecuting)
-    {
-        if (_isExecuting != isExecuting)
-        {
-            _isExecuting = isExecuting;
-            OnPropertyChanged(nameof(IsExecuting));
-            OnPropertyChanged(nameof(StatusText)); // 通知状态文本更新
         }
     }
 }

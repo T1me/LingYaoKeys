@@ -24,151 +24,54 @@ public class SerilogManager : ILogger, IDisposable
 
         try
         {
-            // 如果调试模式未启用且日志未启用，则不初始化日志系统
-            if (!debugConfig.IsDebugMode && !debugConfig.EnableLogging) return;
+            if (!debugConfig.IsDebugMode) return;
 
-            // 1. 设置日志级别
             var logLevel = debugConfig.LogLevel.ToLower() switch
             {
                 "debug" => LogEventLevel.Debug,
                 "information" => LogEventLevel.Information,
                 "warning" => LogEventLevel.Warning,
                 "error" => LogEventLevel.Error,
-                _ => LogEventLevel.Debug // 默认使用 Debug 级别
+                _ => LogEventLevel.Information
             };
 
-            // 2. 创建日志过滤器
-            var logFilter = new LoggingLevelSwitch(logLevel);
-
-            // 3. 配置日志输出
             var loggerConfig = new LoggerConfiguration()
-                .MinimumLevel.ControlledBy(logFilter)
+                .MinimumLevel.Is(logLevel)
                 .Enrich.WithThreadId()
-                .Enrich.FromLogContext()
-                .Filter.ByIncludingOnly(evt =>
-                {
-                    // 获取源上下文和消息模板
-                    var messageTemplate = evt.MessageTemplate.Text;
-                    var sourceContext = evt.Properties.ContainsKey("SourceContext")
-                        ? evt.Properties["SourceContext"].ToString()
-                        : string.Empty;
-                    var callerMember = evt.Properties.ContainsKey("CallerMember")
-                        ? evt.Properties["CallerMember"].ToString()
-                        : string.Empty;
+                .Enrich.FromLogContext();
 
-                    // 如果是调试模式，不过滤任何日志
-                    if (debugConfig.IsDebugMode)
-                        return true;
-
-                    // 1. 检查是否在排除的源上下文列表中
-                    if (debugConfig.ExcludedSources?.Any(source =>
-                            sourceContext.Contains(source, StringComparison.OrdinalIgnoreCase)) == true)
-                        return false;
-
-                    // 2. 检查是否在排除的方法列表中
-                    if (debugConfig.ExcludedMethods?.Any(method =>
-                            callerMember.Equals(method, StringComparison.OrdinalIgnoreCase)) == true)
-                        return false;
-
-                    // 3. 检查是否匹配排除的消息模式
-                    if (debugConfig.ExcludedPatterns?.Any(pattern =>
-                        {
-                            // 将通配符模式转换为正则表达式
-                            var regex = new System.Text.RegularExpressions.Regex(
-                                "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
-                                    .Replace("\\*", ".*") + "$",
-                                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                            return regex.IsMatch(messageTemplate);
-                        }) == true)
-                        return false;
-
-                    // 4. 检查是否在排除的标签列表中
-                    if (debugConfig.ExcludedTags?.Any(tag =>
-                            messageTemplate.Contains($"[{tag}]", StringComparison.OrdinalIgnoreCase)) == true)
-                        return false;
-
-                    return true;
-                });
-
-            // 4. 添加输出目标
             const string outputTemplate =
-                "[{Timestamp:HH:mm:ss.fff}] [{Level:u3}] [{ThreadId}] [{SourceContext}.{CallerMember}:{LineNumber}] {Message}{NewLine}{Exception}";
+                "[{Timestamp:HH:mm:ss.fff}] [{Level:u3}] [{SourceContext}.{CallerMember}:{LineNumber}] {Message}{NewLine}{Exception}";
 
-            // 添加Debug输出（合并两处输出条件，避免重复）
-            if (debugConfig.IsDebugMode || debugConfig.EnableLogging)
+            loggerConfig = loggerConfig.WriteTo.Debug(outputTemplate: outputTemplate);
+
+            if (!string.IsNullOrEmpty(_baseDirectory))
             {
-                loggerConfig = loggerConfig.WriteTo.Debug(
-                    outputTemplate: outputTemplate,
-                    restrictedToMinimumLevel: LogEventLevel.Debug
-                );
+                var logPath = Path.Combine(_baseDirectory, "logs", "app.log");
+                var logDir = Path.GetDirectoryName(logPath);
 
-                // 输出一条测试日志
-                if (debugConfig.IsDebugMode)
+                if (!string.IsNullOrEmpty(logDir))
+                    Directory.CreateDirectory(logDir);
+
+                if (debugConfig.FileSettings.RetainDays > 0 && Directory.Exists(logDir))
                 {
-                    System.Diagnostics.Debug.WriteLine("Serilog 调试输出已初始化");
+                    var cutoff = DateTime.Now.AddDays(-debugConfig.FileSettings.RetainDays);
+                    foreach (var file in Directory.GetFiles(logDir, "app*.log"))
+                        if (File.GetLastWriteTime(file) < cutoff)
+                            try { File.Delete(file); } catch { }
                 }
+
+                loggerConfig = loggerConfig.WriteTo.File(
+                    logPath,
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: debugConfig.FileSettings.MaxFileCount,
+                    fileSizeLimitBytes: debugConfig.FileSettings.MaxFileSize * 1024 * 1024,
+                    rollOnFileSizeLimit: true,
+                    outputTemplate: outputTemplate);
             }
 
-            // 如果启用了日志记录，添加文件输出目标
-            if (debugConfig.EnableLogging)
-            {
-                // 文件输出
-                if (!string.IsNullOrEmpty(_baseDirectory))
-                {
-                    const string LOG_DIRECTORY = "logs";
-                    var logPath = Path.Combine(_baseDirectory, LOG_DIRECTORY, "app.log");
-                    var logDir = Path.GetDirectoryName(logPath);
-
-                    // 确保日志目录存在
-                    if (!string.IsNullOrEmpty(logDir))
-                        Directory.CreateDirectory(logDir);
-
-                    // 清理旧日志
-                    if (debugConfig.FileSettings.RetainDays > 0)
-                        try
-                        {
-                            var cutoff = DateTime.Now.AddDays(-debugConfig.FileSettings.RetainDays);
-                            if (Directory.Exists(logDir))
-                                foreach (var file in Directory.GetFiles(logDir, "app*.log"))
-                                    if (File.GetLastWriteTime(file) < cutoff)
-                                        try
-                                        {
-                                            File.Delete(file);
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            System.Diagnostics.Debug.WriteLine($"删除旧日志文件失败: {ex.Message}");
-                                        }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"清理旧日志文件失败: {ex.Message}");
-                        }
-
-                    // 设置文件输出
-                    const string fileOutputTemplate =
-                        "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] [{SourceContext}.{CallerMember}:{LineNumber}] {Message}{NewLine}{Exception}";
-
-                    loggerConfig = loggerConfig.WriteTo.File(
-                        logPath,
-                        rollingInterval: RollingInterval.Day,
-                        retainedFileCountLimit: debugConfig.FileSettings.MaxFileCount,
-                        fileSizeLimitBytes: debugConfig.FileSettings.MaxFileSize * 1024 * 1024,
-                        rollOnFileSizeLimit: true,
-                        outputTemplate: fileOutputTemplate);
-                }
-            }
-
-            // 5. 创建日志实例
             _logger = loggerConfig.CreateLogger();
             _initialized = true;
-
-            // 输出初始化成功日志
-            if (debugConfig.IsDebugMode)
-            {
-                _logger.Debug("Serilog 日志系统初始化成功");
-                _logger.Debug($"日志级别: {logLevel}, 调试模式: {debugConfig.IsDebugMode}, 日志记录: {debugConfig.EnableLogging}");
-            }
         }
         catch (Exception ex)
         {

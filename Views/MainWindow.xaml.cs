@@ -107,71 +107,35 @@ public partial class MainWindow : Window
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine("MainWindow: 开始初始化");
-            
-            // 初始化组件
-            System.Diagnostics.Debug.WriteLine("MainWindow: 调用 InitializeComponent");
             InitializeComponent();
-            System.Diagnostics.Debug.WriteLine("MainWindow: InitializeComponent 完成");
-            
-            // 初始化 ConfigManager
-            System.Diagnostics.Debug.WriteLine("MainWindow: 初始化 ConfigManager");
             _configManager = App.ConfigService ?? ConfigManager.Instance;
-            
-            // 初始化ViewModel（会在构造函数内部设置DataContext）
-            System.Diagnostics.Debug.WriteLine("MainWindow: 创建 MainViewModel");
-            try
-            {
-                _viewModel = new MainViewModel(App.LyKeysDriver, this);
-                System.Diagnostics.Debug.WriteLine("MainWindow: MainViewModel 创建成功");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"MainWindow: MainViewModel 创建失败 - {ex.Message}");
-                throw;
-            }
-            
-            // 确保导航栏默认为收起状态
+            _viewModel = new MainViewModel(App.LyKeysDriver, this);
             _viewModel.IsNavExpanded = false;
 
-            // 初始化托盘图标
-            System.Diagnostics.Debug.WriteLine("MainWindow: 初始化托盘图标");
             try
             {
                 InitializeTrayIcon();
-                System.Diagnostics.Debug.WriteLine("MainWindow: 托盘图标初始化成功");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"MainWindow: 托盘图标初始化失败 - {ex.Message}");
-                // 托盘图标初始化失败不应该阻止窗口显示
                 _logger.Warning($"托盘图标初始化失败: {ex.Message}");
             }
 
-            // 更新最大化按钮状态
-            System.Diagnostics.Debug.WriteLine("MainWindow: 更新最大化按钮状态");
             UpdateMaximizeButtonState();
-
-            // 注册窗口状态改变事件
             StateChanged += MainWindow_StateChanged;
 
-            // 设置 MainWindow 引用到 KeyMappingViewModel
-            if (_viewModel.KeyMappingViewModel != null) 
+            if (_viewModel.KeyMappingViewModel != null)
             {
-                System.Diagnostics.Debug.WriteLine("MainWindow: 设置 KeyMappingViewModel 引用");
                 _viewModel.KeyMappingViewModel.SetMainWindow(this);
             }
 
             _logger.Debug($"窗口初始化完成 - 尺寸: {Width}x{Height}");
-            System.Diagnostics.Debug.WriteLine($"MainWindow: 初始化完成 - 尺寸: {Width}x{Height}");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"MainWindow: 初始化失败 - {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"MainWindow: 堆栈跟踪 - {ex.StackTrace}");
             _logger.Error("窗口初始化失败", ex);
             System.Windows.MessageBox.Show($"窗口初始化失败: {ex.Message}\n\n{ex.StackTrace}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            throw; // 重新抛出异常，让 App.xaml.cs 处理
+            throw;
         }
     }
 

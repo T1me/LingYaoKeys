@@ -322,139 +322,80 @@ public partial class App : Application
 
         try
         {
-            System.Diagnostics.Debug.WriteLine("=== 应用程序启动开始 ===");
-            
-            // 1. 创建并显示启动屏幕
-            System.Diagnostics.Debug.WriteLine("1. 创建启动屏幕");
+            System.Diagnostics.Debug.WriteLine("=== 应用启动 ===");
+
             splashWindow = new Views.SplashWindow();
             splashWindow.Show();
             splashWindow.UpdateProgress("正在初始化应用程序...", 0);
 
-            // 2. 确保用户数据目录存在
-            System.Diagnostics.Debug.WriteLine("2. 创建用户数据目录");
             Directory.CreateDirectory(_pathService.AppDataPath);
 
-            // 3. 初始化配置服务
-            System.Diagnostics.Debug.WriteLine("3. 初始化配置服务");
             splashWindow.UpdateProgress("正在初始化配置服务...", 20);
             ConfigManager.Instance.Initialize();
             ConfigService = ConfigManager.Instance;
 
-            // 3.5 配置硬件加速（在配置加载后）
-            System.Diagnostics.Debug.WriteLine("3.5 配置硬件加速");
             ConfigureHardwareAcceleration();
 
-            // 4. 初始化日志系统
-            System.Diagnostics.Debug.WriteLine("4. 初始化日志系统");
             splashWindow.UpdateProgress("正在初始化日志系统...", 30);
             _logger.SetBaseDirectory(_pathService.LogPath);
             _logger.Initialize(ConfigManager.Instance.GlobalConfig.Debug);
 
-            // 5. 注册全局异常处理
-            System.Diagnostics.Debug.WriteLine("5. 注册全局异常处理");
             RegisterGlobalExceptionHandlers();
 
-            // 6. 设置配置变更监听
-            System.Diagnostics.Debug.WriteLine("6. 设置配置变更监听");
             ConfigManager.Instance.ConfigChanged += (sender, args) =>
             {
-                if (args.ChangeType == ConfigChangeType.Global) 
+                if (args.ChangeType == ConfigChangeType.Global)
                     _logger.UpdateLoggerConfig(args.GlobalConfigData.Debug);
             };
 
-            // 7. 准备驱动文件
-            System.Diagnostics.Debug.WriteLine("7. 准备驱动文件");
             splashWindow.UpdateProgress("正在准备驱动文件...", 40);
             var driverFile = PrepareDriverFiles();
 
-            // 8. 清理已存在的驱动服务（仅在必要时）
             if (CheckServiceExists("lykeys"))
             {
-                System.Diagnostics.Debug.WriteLine("8. 清理旧驱动");
                 splashWindow.UpdateProgress("正在清理旧驱动...", 50);
                 CleanupExistingService();
             }
 
-            // 9. 初始化驱动服务
-            System.Diagnostics.Debug.WriteLine("9. 初始化驱动服务");
             splashWindow.UpdateProgress("正在初始化驱动服务...", 60);
             LyKeysDriver = new LyKeysService();
-            
-            System.Diagnostics.Debug.WriteLine("9.1 开始初始化驱动");
+
             if (!LyKeysDriver.Initialize(driverFile))
             {
-                System.Diagnostics.Debug.WriteLine("9.2 驱动初始化失败");
+                System.Diagnostics.Debug.WriteLine("驱动初始化失败");
                 _logger.Error("驱动加载失败");
                 MessageBox.Show("驱动加载失败，请检查是否以管理员身份运行", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 Current.Shutdown();
                 return;
             }
-            
-            System.Diagnostics.Debug.WriteLine("9.2 驱动初始化成功");
 
-            // 10. 初始化音频服务
-            System.Diagnostics.Debug.WriteLine("10. 初始化音频服务");
             splashWindow.UpdateProgress("正在初始化音频服务...", 80);
             AudioService = new AudioService();
 
-            // 11. 创建主窗口
-            System.Diagnostics.Debug.WriteLine("11. 创建主窗口");
             splashWindow.UpdateProgress("正在启动主界面...", 90);
-            
-            Views.MainWindow? mainWindow = null;
-            try
-            {
-                mainWindow = new Views.MainWindow();
-                System.Diagnostics.Debug.WriteLine("11.1 主窗口创建成功");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"11.1 主窗口创建失败: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"堆栈跟踪: {ex.StackTrace}");
-                throw;
-            }
-            
+            var mainWindow = new Views.MainWindow();
             Current.MainWindow = mainWindow;
-            System.Diagnostics.Debug.WriteLine("11.2 主窗口已设置为应用程序主窗口");
 
-            // 12. 预加载常用页面
-            System.Diagnostics.Debug.WriteLine("12. 预加载常用页面");
             if (mainWindow.DataContext is MainViewModel mainViewModel)
             {
                 try
                 {
                     mainViewModel.PreloadCommonPages();
-                    System.Diagnostics.Debug.WriteLine("12.1 页面预加载成功");
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"12.1 页面预加载失败: {ex.Message}");
-                    // 预加载失败不影响启动
+                    System.Diagnostics.Debug.WriteLine($"页面预加载失败: {ex.Message}");
                 }
             }
 
-            // 13. 显示主窗口并关闭启动屏幕
-            System.Diagnostics.Debug.WriteLine("13. 显示主窗口");
             splashWindow.UpdateProgress("启动完成", 100);
             Thread.Sleep(300);
-            
-            try
-            {
-                mainWindow.Show();
-                System.Diagnostics.Debug.WriteLine("13.1 主窗口显示成功");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"13.1 主窗口显示失败: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"堆栈跟踪: {ex.StackTrace}");
-                throw;
-            }
-            
+
+            mainWindow.Show();
             splashWindow.Close();
-            System.Diagnostics.Debug.WriteLine("13.2 启动屏幕已关闭");
-            
+
             _logger.Debug("应用程序启动完成");
-            System.Diagnostics.Debug.WriteLine("=== 应用程序启动完成 ===");
+            System.Diagnostics.Debug.WriteLine("=== 启动完成 ===");
         }
         catch (Exception ex)
         {

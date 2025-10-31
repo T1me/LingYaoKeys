@@ -61,7 +61,6 @@ public class SettingsViewModel : ViewModelBase
                 ConfigManager.UpdateGlobalConfig(config =>
                 {
                     config.Debug.IsDebugMode = !currentDebugMode;
-                    config.Debug.UpdateDebugState();
                 });
 
                 UpdateDebugModeStatus();

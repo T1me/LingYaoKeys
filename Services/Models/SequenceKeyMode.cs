@@ -14,13 +14,9 @@ public class SequenceKeyMode : KeyModeBase
     {
     }
 
-    public override void Start()
+    protected override void StartInternal()
     {
-        if (_operationList.Count == 0)
-        {
-            _logger.Warning("顺序模式: 操作列表为空，无法启动");
-            return;
-        }
+        if (_operationList.Count == 0) return;
 
         _isRunning = true;
         _emergencyStop = false;
@@ -42,7 +38,7 @@ public class SequenceKeyMode : KeyModeBase
             finally
             {
                 _isRunning = false;
-                _driverService.IsEnabled = false;
+                NotifyCompleted();
             }
         })
         {
