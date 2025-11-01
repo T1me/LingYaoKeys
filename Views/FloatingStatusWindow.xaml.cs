@@ -26,13 +26,12 @@ public partial class FloatingStatusWindow : Window
     private readonly GlobalConfig _config;
     private System.Windows.Point _dragStartPoint;
     private bool _isDragging;
-    private const double DRAG_THRESHOLD = 5.0; // 拖拽阈值（像素）
+    private const double DRAG_THRESHOLD = 5.0;
     private MainWindow _mainWindow;
     private DateTime _lastClickTime;
-    private const double DOUBLE_CLICK_THRESHOLD = 300; // 双击时间阈值（毫秒）
+    private const double DOUBLE_CLICK_THRESHOLD = 300;
     private readonly SerilogManager _logger = SerilogManager.Instance;
     private readonly IConfigManager _configManager = ConfigManager.Instance;
-    private RotateTransform _borderRotateTransform;
     private string _currentStatus;
 
     public FloatingStatusWindow(MainWindow mainWindow)
@@ -40,7 +39,6 @@ public partial class FloatingStatusWindow : Window
         InitializeComponent();
         _config = _configManager.GlobalConfig;
         _mainWindow = mainWindow;
-        _logger.Debug("浮窗初始化完成");
 
         // 设置为工具窗口
         SourceInitialized += (s, e) =>
@@ -48,7 +46,6 @@ public partial class FloatingStatusWindow : Window
             var hwnd = new WindowInteropHelper(this).Handle;
             var extendedStyle = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
             Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, extendedStyle | Win32.WS_EX_TOOLWINDOW);
-            _logger.Debug("浮窗工具窗口样式设置完成");
         };
 
         // 加载上次保存的位置
@@ -120,7 +117,6 @@ public partial class FloatingStatusWindow : Window
             DataContextChanged += FloatingStatusWindow_DataContextChanged;
             UpdateBorderStyle();
 
-            _logger.Debug("浮窗动画和边框样式初始化完成");
         }
         catch (Exception ex)
         {
@@ -307,7 +303,6 @@ public partial class FloatingStatusWindow : Window
             config.UI.FloatingWindow.Left = Math.Round(Left, 2);
             config.UI.FloatingWindow.Top = Math.Round(Top, 2);
         });
-        _logger.Debug($"保存浮窗位置: Left={Left}, Top={Top}");
     }
     
     /// <summary>
@@ -376,7 +371,6 @@ public partial class FloatingStatusWindow : Window
         try
         {
             SaveWindowPosition();
-            _logger.Debug("浮窗关闭前位置已保存");
         }
         catch (Exception ex)
         {
@@ -436,8 +430,7 @@ public partial class FloatingStatusWindow : Window
             {
                 Dispatcher.Thread.Priority = ThreadPriority.AboveNormal;
             }
-            
-            _logger.Debug("浮窗硬件加速配置完成");
+
         }
         catch (Exception ex)
         {

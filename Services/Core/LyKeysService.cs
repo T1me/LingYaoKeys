@@ -15,7 +15,7 @@ namespace WpfApp.Services.Core
     public class LyKeysService : IDisposable
     {
         #region 私有字段
-        private readonly IDriver _driver;
+        private IDriver _driver;
         private readonly SerilogManager _logger;
         private readonly IConfigManager _configManager;
         private bool _isInitialized;
@@ -148,7 +148,6 @@ namespace WpfApp.Services.Core
                 _keyPressInterval = 0;
             }
 
-            _logger.Debug("LyKeysService构造函数：已初始化");
         }
         #endregion
 
@@ -238,11 +237,8 @@ namespace WpfApp.Services.Core
             {
                 if (_isInitialized)
                 {
-                    _logger.Warning("服务已经初始化");
                     return true;
                 }
-
-                _logger.Debug("开始初始化驱动服务");
 
                 try
                 {
@@ -284,6 +280,30 @@ namespace WpfApp.Services.Core
             }
         }
 
+        public bool ReloadDriver(IDriver newDriver, string driverPath)
+        {
+            try
+            {
+                // 释放旧驱动
+                if (_isInitialized)
+                {
+                    _driver?.Dispose();
+                    _isInitialized = false;
+                }
+
+                // 更新驱动实例
+                _driver = newDriver ?? throw new ArgumentNullException(nameof(newDriver));
+
+                // 初始化新驱动
+                return Initialize(driverPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error("重新加载驱动失败", ex);
+                return false;
+            }
+        }
+
 
 
         /// <summary>
@@ -293,7 +313,7 @@ namespace WpfApp.Services.Core
         /// <returns>是否成功</returns>
         public bool SendKeyDown(VirtualKeyCode keyCode)
         {
-            if (!CheckInitialization()) return false;
+            if (!_isInitialized) return false;
             if (!IsValidVirtualKeyCode(keyCode))
             {
                 _logger.Error($"无效的键码: {keyCode}");
@@ -325,7 +345,7 @@ namespace WpfApp.Services.Core
         /// <returns>是否成功</returns>
         public bool SendKeyUp(VirtualKeyCode keyCode)
         {
-            if (!CheckInitialization()) return false;
+            if (!_isInitialized) return false;
             if (!IsValidVirtualKeyCode(keyCode))
             {
                 _logger.Error($"无效的键码: {keyCode}");
@@ -384,7 +404,7 @@ namespace WpfApp.Services.Core
         /// <returns>是否成功</returns>
         public bool SendKeyPress(VirtualKeyCode keyCode, int duration = 100)
         {
-            if (!CheckInitialization()) return false;
+            if (!_isInitialized) return false;
             if (!IsValidVirtualKeyCode(keyCode))
             {
                 _logger.Error($"无效的键码: {keyCode}");
@@ -433,7 +453,7 @@ namespace WpfApp.Services.Core
         /// <param name="keyCodes">按键代码数组</param>
         public void SimulateKeyCombo(params VirtualKeyCode[] keyCodes)
         {
-            if (!CheckInitialization()) return;
+            if (!_isInitialized) return;
             if (keyCodes.Any(k => !IsValidVirtualKeyCode(k)))
             {
                 _logger.Error("组合键包含无效的键码");
@@ -478,18 +498,8 @@ namespace WpfApp.Services.Core
         /// <returns>操作是否成功</returns>
         public bool MoveMouseToPosition(int? x, int? y)
         {
-            if (!CheckInitialization())
-            {
-                _logger.Error($"鼠标移动失败：驱动未初始化，坐标: ({x}, {y})");
+            if (!_isInitialized || x == null || y == null)
                 return false;
-            }
-
-            // 处理null值
-            if (x == null || y == null)
-            {
-                _logger.Warning("坐标移动失败：坐标包含null值");
-                return false;
-            }
 
             try
             {
@@ -505,16 +515,6 @@ namespace WpfApp.Services.Core
         #endregion
 
         #region 私有方法
-        private bool CheckInitialization()
-        {
-            if (!_isInitialized)
-            {
-                _logger.Error("服务未初始化");
-                return false;
-            }
-            return true;
-        }
-
         private void SendStatusMessage(string message, bool isError = false)
         {
             var args = new StatusMessageEventArgs(message, isError);
@@ -534,9 +534,7 @@ namespace WpfApp.Services.Core
 
             try
             {
-                _logger.Debug("开始释放LyKeysService资源");
 
-                // 3. 释放驱动
                 try
                 {
                     _driver?.Dispose();
@@ -547,7 +545,6 @@ namespace WpfApp.Services.Core
                 }
 
                 _isInitialized = false;
-                _logger.Debug("LyKeysService资源释放完成");
             }
             catch (Exception ex)
             {

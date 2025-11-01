@@ -68,10 +68,6 @@ public static class DriverFactory
             extractResource("WpfApp.Resource.lykeysdll.lykeysdll.dll", dllFile);
             _logger.Debug("驱动文件提取完成");
         }
-        else
-        {
-            _logger.Debug("驱动文件已存在");
-        }
 
         if (!File.Exists(driverFile) || !File.Exists(dllFile))
         {

@@ -269,20 +269,21 @@ public partial class App : Application
 
         try
         {
-            _logger.Debug("清理已存在的lykeys服务");
 
-            // 停止服务（减少等待时间）
-            if (StopService(serviceName))
+            if (!CheckServiceExists(serviceName))
             {
-                _logger.Debug("停止lykeys服务");
-                Thread.Sleep(200); // 减少等待时间
+                _logger.Debug("lykeys服务不存在，无需清理");
+                return;
             }
-
-            // 删除服务
-            if (DeleteService(serviceName))
+            else
             {
-                _logger.Debug("删除lykeys服务");
-                Thread.Sleep(200);
+                // 停止服务
+                StopService(serviceName);
+
+                // 删除服务
+                DeleteService(serviceName);
+
+                _logger.Debug("已清理的lykeys服务");
             }
 
             // 快速清理进程
@@ -476,7 +477,7 @@ public partial class App : Application
                     bool isHardwareAccelerated = RenderOptions.ProcessRenderMode != RenderMode.SoftwareOnly;
                     _logger.Debug($"渲染能力: Tier{tier}, 硬件加速状态: {isHardwareAccelerated}");
                     
-                    // 不在启动阶段访问MainWindow，以避免初始化顺序问题
+                    // 不在启动阶段访问MainWindow，避免初始化顺序问题
                     // 改为通过Loaded事件为各窗口单独设置硬件加速
                 }
                 catch (Exception ex)

@@ -130,7 +130,6 @@ public sealed class LyKeys : IDriver
     public LyKeys(string driverPath)
     {
         _driverPath = driverPath ?? throw new ArgumentNullException(nameof(driverPath));
-        _logger.Debug($"LyKeys实例化，驱动路径: {driverPath}");
     }
 
     public bool Initialize()
@@ -163,15 +162,8 @@ public sealed class LyKeys : IDriver
             // 检查文件权限
             try
             {
-                using (var fs = File.OpenRead(_driverPath))
-                {
-                    _logger.Debug("成功验证驱动文件访问权限");
-                }
-
-                using (var fs = File.OpenRead(dllPath))
-                {
-                    _logger.Debug("成功验证DLL文件访问权限");
-                }
+                File.OpenRead(_driverPath).Dispose();
+                File.OpenRead(dllPath).Dispose();
             }
             catch (Exception ex)
             {
@@ -193,7 +185,7 @@ public sealed class LyKeys : IDriver
             _logger.Debug("DLL加载成功");
 
             // 加载驱动
-            _logger.Debug($"开始加载驱动: {DriverName}, 路径: {_driverPath}");
+            _logger.Debug($"======开始初始化加载驱动: {DriverName}======");
             var loadResult = LoadNTDriver(DriverName, _driverPath);
             if (!loadResult)
             {
@@ -215,10 +207,7 @@ public sealed class LyKeys : IDriver
                 throw new InvalidOperationException($"初始化设备句柄失败: {errorMessage}");
             }
 
-            _logger.Debug("设备句柄初始化成功");
-
             // 检查设备状态
-            _logger.Debug("开始检查设备状态");
             CheckDeviceStatus();
             var status = GetDriverStatus();
             _lastStatus = status;
@@ -230,12 +219,6 @@ public sealed class LyKeys : IDriver
                 _logger.Debug("设备状态不正确，尝试重新初始化句柄");
                 if (!SetHandle()) 
                     throw new InvalidOperationException("重新初始化设备句柄失败");
-
-                Thread.Sleep(500);
-                CheckDeviceStatus();
-                status = GetDriverStatus();
-                _lastStatus = status;
-                _logger.Debug($"重新初始化后的设备状态: {status}");
 
                 // 根据设备状态提供不同的错误信息
                 if (status != DeviceStatus.Ready)
@@ -260,15 +243,13 @@ public sealed class LyKeys : IDriver
                     throw new InvalidOperationException(errorMessage);
                 }
             }
-
-            _logger.Debug("设备句柄初始化成功");
+            _logger.Debug("======驱动初始化成功======");
             _isInitialized = true;
-            _logger.InitLog("LyKeys驱动初始化成功");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.Error($"LyKeys驱动初始化失败: {ex.Message}", ex);
+            _logger.Error($"驱动初始化失败: {ex.Message}", ex);
             return false;
         }
     }
@@ -321,7 +302,6 @@ public sealed class LyKeys : IDriver
         {
             if (_isInitialized)
             {
-                // 同步卸载驱动，因为这是Dispose方法
                 UnloadNTDriver(DriverName);
                 _isInitialized = false;
             }

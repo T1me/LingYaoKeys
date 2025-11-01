@@ -70,14 +70,12 @@ public class SettingsViewModel : ViewModelBase
         try
         {
             SetDriverStatus("🟠 加载中...", System.Windows.Media.Brushes.Orange);
-            App.LyKeysDriver?.Dispose();
 
             var pathService = Services.Utils.PathService.Instance;
             var driverFile = DriverFactory.PrepareDriverFiles(driverType, pathService, App.ExtractEmbeddedResource);
             var driver = DriverFactory.CreateDriver(driverType, driverFile);
-            App.LyKeysDriver = new LyKeysService(driver);
 
-            if (!App.LyKeysDriver.Initialize(driverFile))
+            if (!App.LyKeysDriver.ReloadDriver(driver, driverFile))
             {
                 SetDriverStatus("🔴 加载失败", System.Windows.Media.Brushes.Red);
                 MessageBox.Show($"驱动加载失败({driverType})", "错误", MessageBoxButton.OK, MessageBoxImage.Error);

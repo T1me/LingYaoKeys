@@ -37,7 +37,6 @@ public partial class MainWindow : Window
     private double _startHeight;
     private double _startLeft;
     private double _startTop;
-    private System.Threading.Timer _resizeSaveTimer;
 
     // Windows Hook API
     private const int WH_MOUSE_LL = 14;
@@ -127,8 +126,6 @@ public partial class MainWindow : Window
             {
                 _viewModel.KeyMappingViewModel.SetMainWindow(this);
             }
-
-            _logger.Debug($"窗口初始化完成 - 尺寸: {Width}x{Height}");
         }
         catch (Exception ex)
         {
@@ -317,7 +314,6 @@ public partial class MainWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        _logger.Debug($"窗口源初始化 - 实际尺寸: {Width}x{Height}");
     }
 
     private void MainWindow_StateChanged(object sender, EventArgs e)

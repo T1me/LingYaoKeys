@@ -709,8 +709,12 @@
                                                 Height="24"
                                                 VerticalAlignment="Center"
                                                 Style="{StaticResource CircleButtonStyle}"
-                                                Click="DeleteKeyButton_Click"
                                                 Tag="{Binding}">
+                                            <b:Interaction.Behaviors>
+                                                <behaviors:DeleteConfirmationBehavior
+                                                    ConfirmedCommand="{Binding DataContext.DeleteKeyCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                    CommandParameter="{Binding}" />
+                                            </b:Interaction.Behaviors>
                                             <Path
                                                 Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
                                                 Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
@@ -872,9 +876,12 @@
                                 <!-- 清除窗口句柄按钮 -->
                                 <Button Style="{StaticResource CircleButtonStyle}"
                                         Width="32" Height="32"
-                                        Click="ClearWindowHandle_Click"
                                         DockPanel.Dock="Left"
                                         ToolTip="清除窗口句柄">
+                                    <b:Interaction.Behaviors>
+                                        <behaviors:DeleteConfirmationBehavior
+                                            ConfirmedCommand="{Binding ClearWindowHandleCommand}" />
+                                    </b:Interaction.Behaviors>
                                     <Path
                                         Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
                                         Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"

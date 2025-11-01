@@ -452,7 +452,7 @@ namespace WpfApp.Services.Core
             {
                 if (_globalConfig == null)
                 {
-                    _logger.Warning("全局配置为空，无法更新");
+                    _logger.Warning("Global配置为空，无法更新");
                     return;
                 }
                 updateAction(_globalConfig);
@@ -461,7 +461,7 @@ namespace WpfApp.Services.Core
             
             SaveGlobalConfig();
             RaiseConfigChanged(ConfigChangeType.Global, configSnapshot, null);
-            _logger.Debug("全局配置已更新并保存");
+            _logger.Debug("Global配置已更新并保存");
         }
         
         /// <summary>
@@ -479,7 +479,7 @@ namespace WpfApp.Services.Core
             {
                 if (_currentKeyConfig == null)
                 {
-                    _logger.Warning("按键配置为空，无法更新");
+                    _logger.Warning("Key配置为空，无法更新");
                     return;
                 }
                 updateAction(_currentKeyConfig);
@@ -488,7 +488,7 @@ namespace WpfApp.Services.Core
 
             SaveCurrentKeyConfig();
             RaiseConfigChanged(ConfigChangeType.Key, null, configSnapshot);
-            _logger.Debug("按键配置已更新并保存");
+            _logger.Debug("Key配置已更新并保存");
         }
         
         #endregion
