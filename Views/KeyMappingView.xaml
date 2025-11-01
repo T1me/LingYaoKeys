@@ -708,12 +708,9 @@
                                                 Width="24"
                                                 Height="24"
                                                 VerticalAlignment="Center"
-                                                Style="{StaticResource CircleButtonStyle}"
-                                                Tag="{Binding}">
+                                                Style="{StaticResource CircleButtonStyle}">
                                             <b:Interaction.Behaviors>
-                                                <behaviors:DeleteConfirmationBehavior
-                                                    ConfirmedCommand="{Binding DataContext.DeleteKeyCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                                    CommandParameter="{Binding}" />
+                                                <behaviors:DeleteConfirmationBehavior CommandParameter="{Binding}" />
                                             </b:Interaction.Behaviors>
                                             <Path
                                                 Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"

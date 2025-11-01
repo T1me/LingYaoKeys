@@ -56,6 +56,24 @@ public class DeleteConfirmationBehavior : Behavior<Button>
     {
         base.OnAttached();
         AssociatedObject.Click += OnButtonClick;
+
+        if (ConfirmedCommand == null)
+        {
+            AssociatedObject.Loaded += (s, e) =>
+            {
+                var listBox = FindParent<System.Windows.Controls.ListBox>(AssociatedObject);
+                if (listBox != null)
+                    AssociatedObject.Tag = listBox.DataContext;
+            };
+        }
+    }
+
+    private static T FindParent<T>(DependencyObject child) where T : DependencyObject
+    {
+        var parent = VisualTreeHelper.GetParent(child);
+        while (parent != null && parent is not T)
+            parent = VisualTreeHelper.GetParent(parent);
+        return parent as T;
     }
 
     protected override void OnDetaching()
@@ -80,8 +98,9 @@ public class DeleteConfirmationBehavior : Behavior<Button>
 
             button.SetValue(ConfirmStateProperty, false);
 
-            if (ConfirmedCommand?.CanExecute(CommandParameter) == true)
-                ConfirmedCommand.Execute(CommandParameter);
+            var command = ConfirmedCommand ?? (button.Tag as dynamic)?.DeleteKeyCommand as ICommand;
+            if (command?.CanExecute(CommandParameter) == true)
+                command.Execute(CommandParameter);
 
             ResetButton(button);
         }
