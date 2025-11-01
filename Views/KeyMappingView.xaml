@@ -712,7 +712,7 @@
                                                 Tag="{Binding}">
                                             <b:Interaction.Behaviors>
                                                 <behaviors:DeleteConfirmationBehavior
-                                                    ConfirmedCommand="{Binding DataContext.DeleteKeyCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                    ConfirmedCommand="{Binding DataContext.DeleteKeyCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                                     CommandParameter="{Binding}" />
                                             </b:Interaction.Behaviors>
                                             <Path
@@ -983,7 +983,7 @@
                                                        Text="热键模式决定了按键的触发方式：" />
                                             <TextBlock Style="{StaticResource HelpTextStyle}"
                                                        Margin="0,8,0,0">
-                                                <Run Text="• 顺序模式" FontWeight="SemiBold" />
+                                                <Run Text="• 单次模式" FontWeight="SemiBold" />
                                                 <LineBreak />
                                                 <Run Text="  按一次热键开始，再按一次热键结束" />
                                                 <LineBreak />

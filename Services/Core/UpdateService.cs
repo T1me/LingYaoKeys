@@ -24,19 +24,19 @@ public class UpdateService : IDisposable
     /// 检查更新
     /// </summary>
     /// <returns>如果有新版本返回版本信息，否则返回null</returns>
-    public async Task<UpdateInfo?> CheckForUpdateAsync()
+    public UpdateInfo? CheckForUpdate()
     {
         try
         {
             // 获取版本信息
-            var response = await _httpClient.GetAsync(VERSION_FILE_URL);
+            var response = _httpClient.GetAsync(VERSION_FILE_URL).Result;
             if (!response.IsSuccessStatusCode)
             {
                 _logger.Warning($"获取版本信息失败: HTTP {(int)response.StatusCode} {response.StatusCode}");
                 throw new InvalidOperationException("无法连接到更新服务器，请检查网络连接");
             }
 
-            var versionContent = await response.Content.ReadAsStringAsync();
+            var versionContent = response.Content.ReadAsStringAsync().Result;
             _logger.Debug($"获取的版本信息: {versionContent}");
 
             // 使用 JsonSerializerOptions 确保大小写不敏感

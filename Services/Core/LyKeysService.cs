@@ -255,27 +255,27 @@ namespace WpfApp.Services.Core
                         };
 
                         _logger.Error($"驱动初始化失败: {errorMessage}");
-                        SendStatusMessage($"初始化失败：{errorMessage}", true);
+                        SendStatusMessage($"驱动初始化失败：{errorMessage}", true);
                         return false;
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.Error($"驱动初始化过程发生异常: {ex.Message}", ex);
-                    SendStatusMessage($"初始化过程发生错误：{ex.Message}", true);
+                    SendStatusMessage($"驱动服务初始化过程发生错误：{ex.Message}", true);
                     return false;
                 }
 
                 _isInitialized = true;
                 InitializationStatusChanged?.Invoke(this, true);
-                SendStatusMessage("服务初始化成功");
+                SendStatusMessage("驱动服务初始化完成");
                 _logger.Debug("驱动服务初始化完成");
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.Error("服务初始化异常", ex);
-                SendStatusMessage($"初始化过程发生异常：{ex.Message}", true);
+                _logger.Error("驱动服务初始化异常", ex);
+                SendStatusMessage($"驱动服务过程发生异常：{ex.Message}", true);
                 return false;
             }
         }

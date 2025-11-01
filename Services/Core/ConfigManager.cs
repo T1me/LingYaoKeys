@@ -92,7 +92,7 @@ namespace WpfApp.Services.Core
         {
             _configDir = _pathService.ConfigPath;
             _globalConfigPath = _pathService.GetGlobalConfigPath();
-            _keyConfigPath = Path.Combine(_configDir, "default_keyconfig.json");
+            _keyConfigPath = _pathService.GetKeyConfigPath();
         }
         
         #endregion

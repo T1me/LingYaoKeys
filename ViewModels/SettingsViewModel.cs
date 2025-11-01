@@ -108,7 +108,7 @@ public class SettingsViewModel : ViewModelBase
         _updateService = new UpdateService();
 
         // 使用统一的命令初始化模式
-        CheckUpdateCommand = CreateCommand(async () => await CheckForUpdateAsync(), () => !_isCheckingUpdate);
+        CheckUpdateCommand = CreateCommand(CheckForUpdate, () => !_isCheckingUpdate);
         ToggleDebugModeCommand = CreateCommand(ToggleDebugMode);
         ExportConfigCommand = CreateCommand(ExportConfig);
         ImportConfigCommand = CreateCommand(ImportConfig);
@@ -155,7 +155,7 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    private async void ToggleDebugMode()
+    private void ToggleDebugMode()
     {
         ExceptionHandler.Execute(
             () =>
@@ -194,15 +194,15 @@ public class SettingsViewModel : ViewModelBase
             "重启应用程序");
     }
 
-    private async Task CheckForUpdateAsync()
+    private void CheckForUpdate()
     {
-        await ExceptionHandler.ExecuteAsync(
-            async () =>
+        ExceptionHandler.Execute(
+            () =>
             {
                 _isCheckingUpdate = true;
                 UpdateStatus = "正在检查...";
 
-                var updateInfo = await _updateService.CheckForUpdateAsync();
+                var updateInfo = _updateService.CheckForUpdate();
                 if (updateInfo != null)
                 {
                     var result = MessageBox.Show(

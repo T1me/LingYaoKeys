@@ -3,7 +3,7 @@ using WpfApp.Services.Core;
 namespace WpfApp.Services.Models;
 
 /// <summary>
-/// 顺序模式 - 按一次热键执行一次完整序列
+/// 单次模式 - 按一次热键执行一次完整序列
 /// </summary>
 public class SequenceKeyMode : KeyModeBase
 {
@@ -33,7 +33,7 @@ public class SequenceKeyMode : KeyModeBase
             }
             catch (Exception ex)
             {
-                _logger.Error($"顺序模式执行异常: {ex.Message}", ex);
+                _logger.Error($"单次模式执行异常: {ex.Message}", ex);
             }
             finally
             {

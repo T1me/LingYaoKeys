@@ -148,7 +148,7 @@ public class KeyMappingService
         // 根据当前模式决定是启动还是停止
         if (!_lyKeysService.IsHoldMode)
         {
-            // 顺序模式下，根据当前执行状态决定启动或停止
+            // 单次模式下，根据当前执行状态决定启动或停止
             if (IsExecuting)
             {
                 StopKeyMapping();

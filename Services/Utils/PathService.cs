@@ -144,23 +144,23 @@ public class PathService
     {
         return Path.Combine(_configPath, fileName);
     }
-    
+
     /// <summary>
-    /// 获取全局配置文件GlobalConfig.json路径
+    /// 获取全局配置文件global_config.json路径
     /// </summary>
-    /// <returns>GlobalConfig.json的完整路径</returns>
+    /// <returns>global_config.json的完整路径</returns>
     public string GetGlobalConfigPath()
     {
-        return Path.Combine(_configPath, "GlobalConfig.json");
+        return Path.Combine(_configPath, "global_config.json");
     }
-    
+
     /// <summary>
-    /// 获取按键配置文件KeyConfig.json路径
+    /// 获取按键配置文件key_config.json路径
     /// </summary>
-    /// <returns>KeyConfig.json的完整路径</returns>
+    /// <returns>key_config.json的完整路径</returns>
     public string GetKeyConfigPath()
     {
-        return Path.Combine(_configPath, "KeyConfig.json");
+        return Path.Combine(_configPath, "key_config.json");
     }
     
     /// <summary>

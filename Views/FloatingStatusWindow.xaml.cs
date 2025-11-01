@@ -266,7 +266,7 @@ public partial class FloatingStatusWindow : Window
         }
     }
 
-    private async void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void Window_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         ReleaseMouseCapture();
 

@@ -185,7 +185,7 @@
                                                   FontSize="14" 
                                                   Foreground="#333333"
                                                   Margin="0,0,0,6"/>
-                                        <TextBlock Text="支持顺序模式和按压模式，满足不同场景的操作需求" 
+                                        <TextBlock Text="支持单次模式和按压模式，满足不同场景的操作需求" 
                                                   TextWrapping="Wrap"
                                                   FontSize="12" 
                                                   Foreground="#666666"/>

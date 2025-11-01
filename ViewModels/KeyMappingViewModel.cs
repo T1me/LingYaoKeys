@@ -92,7 +92,7 @@ namespace WpfApp.ViewModels
             set => SetProperty(ref _keyPressInterval, value);
         }
 
-        public List<string> KeyModes { get; } = new List<string> { "顺序模式", "按压模式" };
+        public List<string> KeyModes { get; } = new List<string> { "单次模式", "按压模式" };
 
         public int SelectedKeyMode
         {
@@ -104,7 +104,7 @@ namespace WpfApp.ViewModels
                     if (IsExecuting) StopKeyMapping();
                     IsSequenceMode = value == 0;
                     SaveConfig();
-                    Logger.Debug($"按键模式已切换为: {(value == 0 ? "顺序模式" : "按压模式")}");
+                    Logger.Debug($"按键模式已切换为: {(value == 0 ? "单次模式" : "按压模式")}");
                 }
             }
         }
@@ -118,7 +118,6 @@ namespace WpfApp.ViewModels
                 {
                     _lyKeysService.IsHoldMode = !value;
                     _keyListService.SyncToHotkeyService(KeyList);
-                    SaveConfig();
                 }
             }
         }
@@ -641,7 +640,7 @@ namespace WpfApp.ViewModels
                 _hotkeyService.StartSequence();
                 IsExecuting = true;
 
-                Logger.Debug($"按键映射已启动 - 模式: {(IsSequenceMode ? "顺序" : "按压")}, 按键数: {selectedKeys.Count}");
+                Logger.Debug($"按键映射已启动 - 模式: {(IsSequenceMode ? "单次" : "按压")}, 按键数: {selectedKeys.Count}");
             }
             catch (Exception ex)
             {
