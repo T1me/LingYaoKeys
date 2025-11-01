@@ -624,12 +624,6 @@ public class HotkeyService
                     }
                     break;
 
-                case ConfigChangeType.ConfigFile:
-                    // 配置文件切换 - 停止当前序列
-                    StopSequence();
-                    // 注意：Key事件会紧随其后触发，届时会重新加载配置
-                    break;
-
                 case ConfigChangeType.Global:
                     // 全局配置变更 - 更新全局设置
                     if (e.GlobalConfigData != null)
@@ -648,10 +642,6 @@ public class HotkeyService
                     {
                         ReloadKeyConfiguration(e.KeyConfigData);
                     }
-                    break;
-
-                case ConfigChangeType.ConfigList:
-                    // 配置列表变更 - 不需要特殊处理
                     break;
 
                 default:

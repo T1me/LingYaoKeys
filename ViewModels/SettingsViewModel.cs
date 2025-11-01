@@ -42,8 +42,6 @@ public class SettingsViewModel : ViewModelBase
     }
 
     public ICommand CheckUpdateCommand { get; }
-    public ICommand ImportConfigCommand { get; }
-    public ICommand ExportConfigCommand { get; }
     public ICommand ToggleDebugModeCommand { get; }
 
     public SettingsViewModel()
@@ -52,8 +50,6 @@ public class SettingsViewModel : ViewModelBase
 
         // 使用统一的命令初始化模式
         CheckUpdateCommand = CreateCommand(async () => await CheckForUpdateAsync(), () => !_isCheckingUpdate);
-        ImportConfigCommand = CreateCommand(ImportConfig);
-        ExportConfigCommand = CreateCommand(ExportConfig);
         ToggleDebugModeCommand = CreateCommand(ToggleDebugMode);
 
         UpdateDebugModeStatus();
@@ -169,49 +165,4 @@ public class SettingsViewModel : ViewModelBase
         _isCheckingUpdate = false;
     }
 
-    private void ImportConfig()
-    {
-        ExceptionHandler.Execute(
-            () =>
-            {
-                var dialog = new Microsoft.Win32.OpenFileDialog
-                {
-                    Title = "选择配置文件",
-                    Filter = "JSON 文件 (*.json)|*.json",
-                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
-                };
-
-                if (dialog.ShowDialog() == true)
-                {
-                    ConfigManager.ImportKeyConfig(dialog.FileName);
-                    MessageBox.Show("配置导入成功，需要重启程序才能生效。是否立即重启？",
-                        "重启提示",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Question);
-                }
-            },
-            "导入配置");
-    }
-
-    private void ExportConfig()
-    {
-        ExceptionHandler.Execute(
-            () =>
-            {
-                var dialog = new Microsoft.Win32.SaveFileDialog
-                {
-                    Title = "保存配置文件",
-                    Filter = "JSON 文件 (*.json)|*.json",
-                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    FileName = $"AppConfig_{DateTime.Now:yyyyMMdd}.json"
-                };
-
-                if (dialog.ShowDialog() == true)
-                {
-                    ConfigManager.ExportKeyConfig(dialog.FileName);
-                    MessageBox.Show("配置导出成功", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            },
-            "导出配置");
-    }
 }

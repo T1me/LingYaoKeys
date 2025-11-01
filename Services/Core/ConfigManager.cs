@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
-using System.Linq;
-using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using WpfApp.Services.Models;
 using WpfApp.Services.Utils;
@@ -15,14 +12,7 @@ namespace WpfApp.Services.Core
     /// 负责管理全局配置、按键配置和配置文件的加载、保存、切换等操作
     /// 采用实时保存策略，所有配置更改立即持久化到磁盘
     /// </summary>
-    /// <remarks>
-    /// 设计要点：
-    /// 1. 单例模式：确保全局唯一的配置管理器实例
-    /// 2. 实时保存：配置修改后立即异步保存，无需手动保存
-    /// 3. 线程安全：使用锁保护共享状态，I/O操作在锁外执行
-    /// 4. 事件驱动：通过 ConfigChanged 事件通知订阅者配置变更
-    /// 5. 异步优先：所有 I/O 操作使用异步方法，避免阻塞 UI 线程
-    /// </remarks>
+
     public class ConfigManager : IConfigManager
     {
         #region 私有字段
@@ -38,22 +28,16 @@ namespace WpfApp.Services.Core
         
         private readonly SerilogManager _logger = SerilogManager.Instance;
         private readonly PathService _pathService = PathService.Instance;
-        
+
         private string _configDir;
         private string _globalConfigPath;
-        private const string CONFIG_INDEX_FILE = "config_index.json";
-        
+        private string _keyConfigPath;
+
         /// <summary>全局配置实例</summary>
         private GlobalConfig _globalConfig;
-        
+
         /// <summary>当前按键配置实例</summary>
         private KeyConfigData _currentKeyConfig;
-        
-        /// <summary>所有配置文件列表</summary>
-        private ObservableCollection<ConfigFileInfo> _configFiles;
-        
-        /// <summary>当前选中的配置文件</summary>
-        private ConfigFileInfo _currentConfig;
         
         #endregion
         
@@ -70,23 +54,12 @@ namespace WpfApp.Services.Core
         /// 包含 UI 设置、调试设置、音频设置等应用级配置
         /// </summary>
         public GlobalConfig GlobalConfig => _globalConfig;
-        
+
         /// <summary>
         /// 获取当前按键配置
         /// 包含热键、按键序列、目标窗口等按键相关配置
         /// </summary>
         public KeyConfigData CurrentKeyConfig => _currentKeyConfig;
-        
-        /// <summary>
-        /// 获取所有配置文件列表
-        /// 用于 UI 显示和配置切换
-        /// </summary>
-        public ObservableCollection<ConfigFileInfo> ConfigFiles => _configFiles;
-        
-        /// <summary>
-        /// 获取当前选中的配置文件
-        /// </summary>
-        public ConfigFileInfo CurrentConfig => _currentConfig;
         
         #endregion
         
@@ -113,13 +86,13 @@ namespace WpfApp.Services.Core
         
         /// <summary>
         /// 私有构造函数，确保单例模式
-        /// 初始化配置文件列表和路径信息
+        /// 初始化配置路径信息
         /// </summary>
         private ConfigManager()
         {
-            _configFiles = new ObservableCollection<ConfigFileInfo>();
             _configDir = _pathService.ConfigPath;
             _globalConfigPath = _pathService.GetGlobalConfigPath();
+            _keyConfigPath = Path.Combine(_configDir, "default_keyconfig.json");
         }
         
         #endregion
@@ -134,67 +107,44 @@ namespace WpfApp.Services.Core
             try
             {
                 _logger.Debug("开始初始化配置管理器");
-                
+
                 // 确保配置目录存在
                 if (!Directory.Exists(_configDir))
                 {
                     Directory.CreateDirectory(_configDir);
                     _logger.Debug($"已创建配置目录: {_configDir}");
                 }
-                
-                // 初始化配置文件列表
-                InitializeConfigFiles();
-                
+
                 // 加载全局配置
                 LoadGlobalConfig();
-                
+
                 // 加载当前按键配置
                 LoadCurrentKeyConfig();
-                
+
                 _logger.Debug("配置管理器初始化完成");
             }
             catch (Exception ex)
             {
                 _logger.Error($"初始化配置管理器失败: {ex.Message}", ex);
-                
+
                 try
                 {
                     _logger.Warning("尝试使用默认配置初始化配置管理器");
-                    
+
                     // 确保配置目录存在
                     if (!Directory.Exists(_configDir))
                     {
                         Directory.CreateDirectory(_configDir);
                     }
-                    
+
                     // 创建默认配置
                     _globalConfig = CreateDefaultGlobalConfig();
                     _currentKeyConfig = CreateDefaultKeyConfig();
-                    
-                    // 创建默认配置文件信息
-                    if (_currentConfig == null)
-                    {
-                        var defaultConfig = new ConfigFileInfo
-                        {
-                            Name = "默认配置",
-                            FilePath = Path.Combine(_configDir, "default_keyconfig.json"),
-                            IsDefault = true,
-                            LastEditTime = DateTime.Now
-                        };
-                        
-                        lock (_configLock)
-                        {
-                            _configFiles.Clear();
-                            _configFiles.Add(defaultConfig);
-                            _currentConfig = defaultConfig;
-                        }
-                    }
-                    
+
                     // 保存默认配置
                     SaveGlobalConfig();
                     SaveCurrentKeyConfig();
-                    SaveConfigIndex();
-                    
+
                     _logger.Warning("已使用默认配置初始化配置管理器");
                 }
                 catch (Exception fallbackEx)
@@ -205,139 +155,9 @@ namespace WpfApp.Services.Core
             }
         }
         
-        private void InitializeConfigFiles()
-        {
-            try
-            {
-                var indexPath = Path.Combine(_configDir, CONFIG_INDEX_FILE);
-                
-                if (!File.Exists(indexPath))
-                {
-                    CreateDefaultConfigIndex();
-                    return;
-                }
-                
-                var json = File.ReadAllText(indexPath);
-                var files = JsonConvert.DeserializeObject<List<ConfigFileInfo>>(json);
-                
-                if (files == null || files.Count == 0)
-                {
-                    _logger.Warning("配置索引文件为空或无效，将创建默认配置");
-                    CreateDefaultConfigIndex();
-                    return;
-                }
-                
-                var validFiles = files.Where(f => File.Exists(f.FilePath)).ToList();
-                
-                if (validFiles.Count < files.Count)
-                {
-                    _logger.Warning($"发现 {files.Count - validFiles.Count} 个配置文件不存在，已从列表中移除");
-                }
-                
-                if (validFiles.Count == 0)
-                {
-                    _logger.Warning("没有找到有效的配置文件，将创建默认配置");
-                    CreateDefaultConfigIndex();
-                    return;
-                }
-                
-                lock (_configLock)
-                {
-                    _configFiles.Clear();
-                    foreach (var file in validFiles)
-                    {
-                        _configFiles.Add(file);
-                    }
-                    
-                    if (!_configFiles.Any(c => c.IsDefault) && _configFiles.Count > 0)
-                    {
-                        _configFiles[0].IsDefault = true;
-                        _logger.Debug($"设置第一个配置为默认: {_configFiles[0].Name}");
-                    }
-                    
-                    _currentConfig = _configFiles.FirstOrDefault(c => c.IsDefault) ?? _configFiles.FirstOrDefault();
-                }
-                
-                if (!validFiles.Any(c => c.IsDefault))
-                {
-                    SaveConfigIndex();
-                }
-                
-                _logger.Debug($"配置文件列表初始化完成，当前配置：{_currentConfig?.Name ?? "无"}");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"初始化配置文件列表失败: {ex.Message}", ex);
-                _logger.Warning("将创建新的默认配置索引");
-                CreateDefaultConfigIndex();
-            }
-        }
-        
-        /// <summary>
-        /// 创建默认配置文件索引
-        /// 当配置索引文件不存在或无效时调用
-        /// 创建一个名为"默认配置"的配置文件并设置为当前配置
-        /// </summary>
-        private void CreateDefaultConfigIndex()
-        {
-            try
-            {
-                // 创建默认配置对象
-                var defaultConfig = new ConfigFileInfo
-                {
-                    Name = "默认配置",
-                    FilePath = Path.Combine(_configDir, "default_keyconfig.json"),
-                    IsDefault = true,
-                    LastEditTime = DateTime.Now
-                };
-                
-                // 只在更新共享状态时使用锁
-                lock (_configLock)
-                {
-                    _configFiles.Clear();
-                    _configFiles.Add(defaultConfig);
-                    _currentConfig = defaultConfig;
-                }
-                
-                // 确保默认配置文件存在
-                if (!File.Exists(defaultConfig.FilePath))
-                {
-                    var defaultKeyConfig = CreateDefaultKeyConfig();
-                    var json = JsonConvert.SerializeObject(defaultKeyConfig, Formatting.Indented);
-                    File.WriteAllText(defaultConfig.FilePath, json);
-                    _logger.Debug($"已创建默认配置文件: {defaultConfig.FilePath}");
-                }
-                
-                // I/O操作在锁外执行
-                SaveConfigIndex();
-                
-                _logger.Debug("已创建默认配置文件索引");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"创建默认配置文件索引失败: {ex.Message}", ex);
-                throw;
-            }
-        }
-        
         #endregion
         
         #region 配置保存和加载方法
-        
-        private void SaveConfigIndex()
-        {
-            List<ConfigFileInfo> configFilesSnapshot;
-            
-            lock (_configLock)
-            {
-                configFilesSnapshot = _configFiles.ToList();
-            }
-            
-            var indexPath = Path.Combine(_configDir, CONFIG_INDEX_FILE);
-            var json = JsonConvert.SerializeObject(configFilesSnapshot, Formatting.Indented);
-            File.WriteAllText(indexPath, json);
-            _logger.Debug("配置文件索引已保存");
-        }
         
         private void LoadGlobalConfig()
         {
@@ -385,72 +205,54 @@ namespace WpfApp.Services.Core
         {
             try
             {
-                ConfigFileInfo currentConfigSnapshot;
-                
-                lock (_configLock)
-                {
-                    currentConfigSnapshot = _currentConfig;
-                }
-                
-                // 如果没有当前配置，创建默认配置
-                if (currentConfigSnapshot == null)
-                {
-                    _logger.Warning("当前配置为空，创建默认配置");
-                    lock (_configLock)
-                    {
-                        _currentKeyConfig = CreateDefaultKeyConfig();
-                    }
-                    return;
-                }
-                
                 KeyConfigData loadedConfig;
                 bool needsSave = false;
-                
-                if (File.Exists(currentConfigSnapshot.FilePath))
+
+                if (File.Exists(_keyConfigPath))
                 {
                     try
                     {
-                        var json = File.ReadAllText(currentConfigSnapshot.FilePath);
-                        
+                        var json = File.ReadAllText(_keyConfigPath);
+
                         if (string.IsNullOrWhiteSpace(json))
                         {
-                            _logger.Warning($"配置文件为空: {currentConfigSnapshot.FilePath}");
+                            _logger.Warning($"配置文件为空: {_keyConfigPath}");
                             loadedConfig = CreateDefaultKeyConfig();
                             needsSave = true;
                         }
                         else
                         {
                             loadedConfig = JsonConvert.DeserializeObject<KeyConfigData>(json) ?? CreateDefaultKeyConfig();
-                            
+
                             if (loadedConfig.keys == null || loadedConfig.keys.Count == 0)
                             {
                                 var defaultConfig = CreateDefaultKeyConfig();
                                 loadedConfig.keys = defaultConfig.keys;
                                 needsSave = true;
                             }
-                            
-                            _logger.Debug($"已加载按键配置: {currentConfigSnapshot.Name}, 按键数量: {loadedConfig.keys.Count}");
+
+                            _logger.Debug($"已加载按键配置，按键数量: {loadedConfig.keys.Count}");
                         }
                     }
                     catch (JsonException jsonEx)
                     {
-                        _logger.Error($"配置文件格式错误: {currentConfigSnapshot.FilePath}", jsonEx);
+                        _logger.Error($"配置文件格式错误: {_keyConfigPath}", jsonEx);
                         loadedConfig = CreateDefaultKeyConfig();
                         needsSave = true;
                     }
                 }
                 else
                 {
-                    _logger.Warning($"配置文件不存在: {currentConfigSnapshot.FilePath}，创建默认配置");
+                    _logger.Warning($"配置文件不存在: {_keyConfigPath}，创建默认配置");
                     loadedConfig = CreateDefaultKeyConfig();
                     needsSave = true;
                 }
-                
+
                 lock (_configLock)
                 {
                     _currentKeyConfig = loadedConfig;
                 }
-                
+
                 if (needsSave)
                 {
                     SaveCurrentKeyConfig();
@@ -460,12 +262,12 @@ namespace WpfApp.Services.Core
             {
                 _logger.Error($"加载按键配置失败: {ex.Message}", ex);
                 _logger.Warning("将使用默认按键配置");
-                
+
                 lock (_configLock)
                 {
                     _currentKeyConfig = CreateDefaultKeyConfig();
                 }
-                
+
                 try
                 {
                     SaveCurrentKeyConfig();
@@ -494,50 +296,36 @@ namespace WpfApp.Services.Core
         private void SaveCurrentKeyConfig()
         {
             KeyConfigData configSnapshot;
-            ConfigFileInfo currentConfigSnapshot;
-            
+
             lock (_configLock)
             {
-                if (_currentConfig == null)
-                {
-                    _logger.Warning("当前配置为空，无法保存按键配置");
-                    return;
-                }
-                
                 if (_currentKeyConfig == null)
                 {
                     _logger.Warning("按键配置数据为空，无法保存");
                     return;
                 }
-                
+
                 configSnapshot = _currentKeyConfig;
-                currentConfigSnapshot = _currentConfig;
             }
-            
+
             try
             {
                 // 确保目录存在
-                var directory = Path.GetDirectoryName(currentConfigSnapshot.FilePath);
+                var directory = Path.GetDirectoryName(_keyConfigPath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
                     Directory.CreateDirectory(directory);
                     _logger.Debug($"创建配置目录: {directory}");
                 }
-                
+
                 var json = JsonConvert.SerializeObject(configSnapshot, Formatting.Indented);
-                File.WriteAllText(currentConfigSnapshot.FilePath, json);
-                
-                lock (_configLock)
-                {
-                    currentConfigSnapshot.LastEditTime = DateTime.Now;
-                }
-                
-                SaveConfigIndex();
-                _logger.Debug($"按键配置已保存: {currentConfigSnapshot.Name}");
+                File.WriteAllText(_keyConfigPath, json);
+
+                _logger.Debug("按键配置已保存");
             }
             catch (Exception ex)
             {
-                _logger.Error($"保存按键配置失败: {currentConfigSnapshot.FilePath}", ex);
+                _logger.Error($"保存按键配置失败: {_keyConfigPath}", ex);
                 throw;
             }
         }
@@ -625,22 +413,19 @@ namespace WpfApp.Services.Core
         /// <param name="changeType">变更类型</param>
         /// <param name="globalConfig">全局配置（仅在 Global 类型时传递）</param>
         /// <param name="keyConfig">按键配置（仅在 Key 类型时传递）</param>
-        /// <param name="configFile">配置文件信息（在 ConfigFile 和 ConfigList 类型时传递）</param>
         /// <remarks>
         /// 事件触发规则：
         /// - Global: 仅传递 globalConfig，用于通知全局设置变更
-        /// - Key: 传递 keyConfig 和可选的 configFile，用于通知按键配置变更
-        /// - ConfigFile: 传递 configFile，用于通知配置切换（如停止序列等操作）
-        /// - ConfigList: 传递 configFile，用于通知配置列表变更（UI 更新）
+        /// - Key: 传递 keyConfig，用于通知按键配置变更
         /// </remarks>
-        private void RaiseConfigChanged(ConfigChangeType changeType, GlobalConfig globalConfig = null, 
-            KeyConfigData keyConfig = null, ConfigFileInfo configFile = null)
+        private void RaiseConfigChanged(ConfigChangeType changeType, GlobalConfig globalConfig = null,
+            KeyConfigData keyConfig = null)
         {
             try
             {
-                var args = new ConfigEventArgs(changeType, globalConfig, keyConfig, configFile);
+                var args = new ConfigEventArgs(changeType, globalConfig, keyConfig);
                 ConfigChanged?.Invoke(this, args);
-                _logger.Debug($"触发配置变更事件: {changeType}, ConfigFile: {configFile?.Name ?? "null"}");
+                _logger.Debug($"触发配置变更事件: {changeType}");
             }
             catch (Exception ex)
             {
@@ -675,7 +460,7 @@ namespace WpfApp.Services.Core
             }
             
             SaveGlobalConfig();
-            RaiseConfigChanged(ConfigChangeType.Global, configSnapshot, null, null);
+            RaiseConfigChanged(ConfigChangeType.Global, configSnapshot, null);
             _logger.Debug("全局配置已更新并保存");
         }
         
@@ -687,10 +472,9 @@ namespace WpfApp.Services.Core
         {
             if (updateAction == null)
                 throw new ArgumentNullException(nameof(updateAction));
-            
+
             KeyConfigData configSnapshot;
-            ConfigFileInfo currentConfigSnapshot;
-            
+
             lock (_configLock)
             {
                 if (_currentKeyConfig == null)
@@ -700,11 +484,10 @@ namespace WpfApp.Services.Core
                 }
                 updateAction(_currentKeyConfig);
                 configSnapshot = _currentKeyConfig;
-                currentConfigSnapshot = _currentConfig;
             }
-            
+
             SaveCurrentKeyConfig();
-            RaiseConfigChanged(ConfigChangeType.Key, null, configSnapshot, currentConfigSnapshot);
+            RaiseConfigChanged(ConfigChangeType.Key, null, configSnapshot);
             _logger.Debug("按键配置已更新并保存");
         }
         
@@ -712,350 +495,13 @@ namespace WpfApp.Services.Core
         
         #region 配置切换方法
         
-        /// <summary>
-        /// 切换当前配置文件
-        /// </summary>
-        public void SwitchConfig(ConfigFileInfo configInfo)
-        {
-            if (configInfo == null)
-                throw new ArgumentNullException(nameof(configInfo));
-            
-            if (_currentConfig == configInfo)
-            {
-                _logger.Debug($"配置已是当前配置，无需切换: {configInfo.Name}");
-                return;
-            }
-            
-            _logger.Debug($"切换配置: {_currentConfig?.Name} -> {configInfo.Name}");
-            
-            RaiseConfigChanged(ConfigChangeType.ConfigFile, null, null, configInfo);
-            
-            lock (_configLock)
-            {
-                foreach (var config in _configFiles)
-                {
-                    config.IsDefault = (config == configInfo);
-                }
-                _currentConfig = configInfo;
-            }
-            
-            SaveConfigIndex();
-            LoadCurrentKeyConfig();
-            
-            KeyConfigData keyConfigSnapshot;
-            lock (_configLock)
-            {
-                keyConfigSnapshot = _currentKeyConfig;
-            }
-            RaiseConfigChanged(ConfigChangeType.Key, null, keyConfigSnapshot, configInfo);
-            
-            _logger.Debug($"配置切换完成: {configInfo.Name}");
-        }
-        
         #endregion
         
         #region 配置文件操作方法
         
-        /// <summary>
-        /// 创建新配置文件
-        /// </summary>
-        public ConfigFileInfo CreateNewConfig(string configName, bool copyFromCurrent = true)
-        {
-            if (string.IsNullOrWhiteSpace(configName))
-                throw new ArgumentException("配置名称不能为空", nameof(configName));
-            
-            string validName;
-            string newConfigPath;
-            ConfigFileInfo newConfig;
-            string sourceFilePath = null;
-            
-            lock (_configLock)
-            {
-                validName = ValidateConfigName(configName);
-                newConfigPath = Path.Combine(_configDir, $"{validName}.json");
-                newConfig = new ConfigFileInfo(validName, newConfigPath);
-                
-                if (copyFromCurrent && _currentConfig != null)
-                {
-                    sourceFilePath = _currentConfig.FilePath;
-                }
-                
-                newConfig.LastEditTime = DateTime.Now;
-                _configFiles.Add(newConfig);
-            }
-            
-            try
-            {
-                if (sourceFilePath != null && File.Exists(sourceFilePath))
-                {
-                    File.Copy(sourceFilePath, newConfigPath, true);
-                }
-                else
-                {
-                    var emptyConfig = CreateDefaultKeyConfig();
-                    var json = JsonConvert.SerializeObject(emptyConfig, Formatting.Indented);
-                    File.WriteAllText(newConfigPath, json);
-                }
-            }
-            catch (Exception ex)
-            {
-                lock (_configLock)
-                {
-                    _configFiles.Remove(newConfig);
-                }
-                _logger.Error($"创建配置文件失败: {ex.Message}", ex);
-                throw;
-            }
-            
-            SaveConfigIndex();
-            RaiseConfigChanged(ConfigChangeType.ConfigList, null, null, newConfig);
-            _logger.Debug($"创建新配置: {newConfig.Name}");
-            
-            return newConfig;
-        }
-        
-        /// <summary>
-        /// 重命名配置文件
-        /// </summary>
-        public void RenameConfig(ConfigFileInfo configInfo, string newName)
-        {
-            if (configInfo == null)
-                throw new ArgumentNullException(nameof(configInfo));
-            
-            if (string.IsNullOrWhiteSpace(newName))
-                throw new ArgumentException("新配置名称不能为空", nameof(newName));
-            
-            string validatedName;
-            string oldFilePath;
-            string newFilePath;
-            
-            lock (_configLock)
-            {
-                validatedName = ValidateConfigName(newName, configInfo);
-                oldFilePath = configInfo.FilePath;
-                newFilePath = Path.Combine(_configDir, $"{validatedName}.json");
-            }
-            
-            if (File.Exists(oldFilePath) && !string.Equals(oldFilePath, newFilePath, StringComparison.OrdinalIgnoreCase))
-            {
-                if (File.Exists(newFilePath))
-                    throw new IOException($"目标文件已存在: {newFilePath}");
-                
-                File.Move(oldFilePath, newFilePath);
-                _logger.Debug($"重命名文件: {oldFilePath} -> {newFilePath}");
-            }
-            
-            lock (_configLock)
-            {
-                configInfo.Name = validatedName;
-                configInfo.FilePath = newFilePath;
-                configInfo.UpdateEditTime();
-            }
-            
-            SaveConfigIndex();
-            RaiseConfigChanged(ConfigChangeType.ConfigList, null, null, configInfo);
-            _logger.Debug($"重命名配置: {configInfo.Name}");
-        }
-        
-        /// <summary>
-        /// 删除配置文件
-        /// </summary>
-        public void DeleteConfig(ConfigFileInfo configInfo)
-        {
-            if (configInfo == null)
-                throw new ArgumentNullException(nameof(configInfo));
-            
-            if (configInfo.IsDefault)
-                throw new InvalidOperationException("无法删除默认配置");
-            
-            string fileToDelete;
-            bool isCurrentConfig;
-            ConfigFileInfo newCurrentConfig = null;
-            
-            lock (_configLock)
-            {
-                fileToDelete = configInfo.FilePath;
-                isCurrentConfig = (_currentConfig == configInfo);
-                _configFiles.Remove(configInfo);
-                
-                if (isCurrentConfig)
-                {
-                    newCurrentConfig = _configFiles.FirstOrDefault(c => c.IsDefault) ?? _configFiles.FirstOrDefault();
-                    if (newCurrentConfig == null)
-                        throw new InvalidOperationException("删除配置后没有可用的配置文件");
-                    
-                    _currentConfig = newCurrentConfig;
-                }
-            }
-            
-            SaveConfigIndex();
-            
-            if (File.Exists(fileToDelete))
-            {
-                File.Delete(fileToDelete);
-                _logger.Debug($"物理文件已删除: {fileToDelete}");
-            }
-            
-            if (isCurrentConfig && newCurrentConfig != null)
-            {
-                LoadCurrentKeyConfig();
-                _logger.Debug($"删除配置完成: {configInfo.Name}，当前配置已切换到: {newCurrentConfig.Name}");
-                
-                RaiseConfigChanged(ConfigChangeType.ConfigFile, null, null, newCurrentConfig);
-                
-                KeyConfigData keyConfigSnapshot;
-                lock (_configLock)
-                {
-                    keyConfigSnapshot = _currentKeyConfig;
-                }
-                RaiseConfigChanged(ConfigChangeType.Key, null, keyConfigSnapshot, newCurrentConfig);
-            }
-            
-            RaiseConfigChanged(ConfigChangeType.ConfigList, null, null, configInfo);
-            _logger.Debug($"删除配置完成: {configInfo.Name}");
-        }
-        
-        /// <summary>
-        /// 设置配置文件快捷键
-        /// </summary>
-        public void SetConfigHotkey(ConfigFileInfo configInfo, string hotkeyText)
-        {
-            if (configInfo == null)
-                throw new ArgumentNullException(nameof(configInfo));
-            
-            lock (_configLock)
-            {
-                configInfo.ConfigHotkey = hotkeyText;
-            }
-            
-            SaveConfigIndex();
-            RaiseConfigChanged(ConfigChangeType.ConfigList, null, null, configInfo);
-            _logger.Debug($"设置配置快捷键: {configInfo.Name} -> {hotkeyText}");
-        }
-        
         #endregion
         
         #region 配置导入导出方法
-        
-        /// <summary>
-        /// 导入配置文件
-        /// </summary>
-        public ConfigFileInfo ImportKeyConfig(string sourceFile, string configName = null)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(sourceFile))
-                    throw new ArgumentException("源文件路径不能为空", nameof(sourceFile));
-                
-                if (!File.Exists(sourceFile))
-                    throw new FileNotFoundException($"找不到源文件: {sourceFile}");
-                
-                _logger.Debug($"开始导入配置文件: {sourceFile}");
-                
-                var json = File.ReadAllText(sourceFile);
-                
-                if (string.IsNullOrWhiteSpace(json))
-                    throw new InvalidDataException("配置文件内容为空");
-                
-                var importedConfig = JsonConvert.DeserializeObject<KeyConfigData>(json);
-                
-                if (importedConfig == null)
-                    throw new InvalidDataException("配置文件格式无效");
-                
-                if (importedConfig.keys == null)
-                {
-                    _logger.Warning("导入的配置文件缺少按键列表，将使用空列表");
-                    importedConfig.keys = new List<KeyConfig>();
-                }
-                
-                _logger.Debug($"配置文件格式验证通过，包含 {importedConfig.keys.Count} 个按键");
-                
-                if (string.IsNullOrEmpty(configName))
-                {
-                    configName = Path.GetFileNameWithoutExtension(sourceFile);
-                }
-                
-                string validName;
-                string newConfigPath;
-                ConfigFileInfo newConfig;
-                
-                lock (_configLock)
-                {
-                    validName = ValidateConfigName(configName);
-                    newConfigPath = Path.Combine(_configDir, $"{validName}.json");
-                    newConfig = new ConfigFileInfo(validName, newConfigPath);
-                    newConfig.LastEditTime = DateTime.Now;
-                    _configFiles.Add(newConfig);
-                }
-                
-                try
-                {
-                    var configJson = JsonConvert.SerializeObject(importedConfig, Formatting.Indented);
-                    File.WriteAllText(newConfigPath, configJson);
-                }
-                catch (Exception ex)
-                {
-                    lock (_configLock)
-                    {
-                        _configFiles.Remove(newConfig);
-                    }
-                    _logger.Error($"写入配置文件失败: {newConfigPath}", ex);
-                    throw;
-                }
-                
-                SaveConfigIndex();
-                RaiseConfigChanged(ConfigChangeType.ConfigList, null, null, newConfig);
-                _logger.Debug($"导入配置成功: {newConfig.Name}");
-                
-                return newConfig;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"导入配置失败: {sourceFile}", ex);
-                throw;
-            }
-        }
-        
-        /// <summary>
-        /// 导出配置文件
-        /// </summary>
-        public void ExportKeyConfig(string targetFile, ConfigFileInfo configInfo = null)
-        {
-            if (string.IsNullOrWhiteSpace(targetFile))
-                throw new ArgumentException("目标文件路径不能为空", nameof(targetFile));
-            
-            var targetDir = Path.GetDirectoryName(targetFile);
-            if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
-            {
-                Directory.CreateDirectory(targetDir);
-                _logger.Debug($"创建目标目录: {targetDir}");
-            }
-            
-            ConfigFileInfo sourceConfig;
-            string sourceFilePath;
-            
-            lock (_configLock)
-            {
-                sourceConfig = configInfo ?? _currentConfig;
-                if (sourceConfig == null)
-                    throw new InvalidOperationException("没有可导出的配置");
-                
-                sourceFilePath = sourceConfig.FilePath;
-            }
-            
-            if (!File.Exists(sourceFilePath))
-                throw new FileNotFoundException($"配置文件不存在: {sourceConfig.Name}");
-            
-            _logger.Debug($"开始导出配置: {sourceConfig.Name} -> {targetFile}");
-            
-            var json = File.ReadAllText(sourceFilePath);
-            var config = JsonConvert.DeserializeObject<KeyConfigData>(json);
-            if (config == null)
-                throw new InvalidDataException("配置文件内容无效");
-            
-            File.WriteAllText(targetFile, json);
-            _logger.Debug($"导出配置成功: {sourceConfig.Name}");
-        }
         
         #endregion
         
@@ -1082,38 +528,6 @@ namespace WpfApp.Services.Core
             {
                 _logger.Error("清理配置管理器资源失败", ex);
             }
-        }
-        
-        /// <summary>
-        /// 验证配置名称，确保唯一性
-        /// 自动移除非法字符，处理重复名称
-        /// </summary>
-        /// <param name="name">原始配置名称</param>
-        /// <param name="excludeConfig">排除的配置（用于重命名时排除自身）</param>
-        /// <returns>验证后的唯一配置名称</returns>
-        private string ValidateConfigName(string name, ConfigFileInfo excludeConfig = null)
-        {
-            // 移除不允许的字符
-            var validName = Regex.Replace(name, @"[\\/:*?""<>|]", "_");
-            validName = validName.Trim();
-            
-            // 如果为空，使用默认名称
-            if (string.IsNullOrWhiteSpace(validName))
-            {
-                validName = "新配置";
-            }
-            
-            // 检查名称是否存在（排除自身）
-            string baseName = validName;
-            int suffix = 1;
-            
-            while (_configFiles.Any(c => c != excludeConfig && c.Name.Equals(validName, StringComparison.OrdinalIgnoreCase)))
-            {
-                validName = $"{baseName} ({suffix})";
-                suffix++;
-            }
-            
-            return validName;
         }
         
         #endregion
