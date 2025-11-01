@@ -4,6 +4,7 @@ public class FloatingStatusViewModel : ViewModelBase
 {
     private bool _isExecuting = false;
     private bool _isHotkeyControlEnabled = true;
+    private double _opacity = 1.0;
 
     // 当前状态文本（只读计算属性）
     public string StatusText
@@ -43,5 +44,12 @@ public class FloatingStatusViewModel : ViewModelBase
                 OnPropertyChanged(nameof(StatusText));
             }
         }
+    }
+
+    // 浮窗透明度
+    public double Opacity
+    {
+        get => _opacity;
+        set => SetProperty(ref _opacity, value);
     }
 }

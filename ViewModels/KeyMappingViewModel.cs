@@ -506,7 +506,7 @@ namespace WpfApp.ViewModels
         }
 
         private bool _enableHardwareAcceleration = true;
-        
+
         /// <summary>
         /// 获取或设置是否启用硬件加速
         /// </summary>
@@ -519,6 +519,28 @@ namespace WpfApp.ViewModels
                 {
                     SaveConfig();
                     Logger.Info($"硬件加速已{(value ? "启用" : "禁用")}，重启应用后生效");
+                }
+            }
+        }
+
+        private double _floatingWindowOpacity = 0.8;
+
+        /// <summary>
+        /// 获取或设置浮窗透明度
+        /// </summary>
+        public double FloatingWindowOpacity
+        {
+            get => _floatingWindowOpacity;
+            set
+            {
+                if (SetProperty(ref _floatingWindowOpacity, value))
+                {
+                    // 同步到浮窗 ViewModel
+                    if (_floatingViewModel != null)
+                    {
+                        _floatingViewModel.Opacity = value;
+                    }
+                    SaveConfig();
                 }
             }
         }
@@ -588,6 +610,7 @@ namespace WpfApp.ViewModels
                 // 初始化ViewModel属性
                 _floatingViewModel.IsHotkeyControlEnabled = _isHotkeyControlEnabled;
                 _floatingViewModel.IsExecuting = _isExecuting;
+                _floatingViewModel.Opacity = _floatingWindowOpacity;
 
                 // 创建浮窗
                 _floatingWindow = new FloatingStatusWindow(_mainWindow);
@@ -1335,12 +1358,13 @@ namespace WpfApp.ViewModels
                     globalConfig.soundEnabled = IsSoundEnabled;
                     globalConfig.IsReduceKeyStuck = IsReduceKeyStuck;
                     globalConfig.UI.FloatingWindow.IsEnabled = IsFloatingWindowEnabled;
+                    globalConfig.UI.FloatingWindow.Opacity = FloatingWindowOpacity;
                     globalConfig.AutoSwitchToEnglishIME = AutoSwitchToEnglishIME;
                     globalConfig.isHotkeyControlEnabled = IsHotkeyControlEnabled;
                     globalConfig.SoundVolume = SoundVolume;
                     globalConfig.EnableHardwareAcceleration = EnableHardwareAcceleration;
                 });
-                
+
                  Logger.Debug("全局配置已保存");
             }
             catch (Exception ex)
@@ -2150,20 +2174,22 @@ namespace WpfApp.ViewModels
                 _isSoundEnabled = globalConfig.soundEnabled ?? true;
                 _isReduceKeyStuck = globalConfig.IsReduceKeyStuck ?? true;
                 _isFloatingWindowEnabled = globalConfig.UI.FloatingWindow.IsEnabled;
+                _floatingWindowOpacity = globalConfig.UI.FloatingWindow.Opacity;
                 _autoSwitchToEnglishIME = globalConfig.AutoSwitchToEnglishIME ?? true;
                 _isHotkeyControlEnabled = globalConfig.isHotkeyControlEnabled ?? true;
                 _soundVolume = globalConfig.SoundVolume ?? 0.8;
                 _enableHardwareAcceleration = globalConfig.EnableHardwareAcceleration ?? true;
-                
+
                 // 通知UI更新这些属性
                 OnPropertyChanged(nameof(IsSoundEnabled));
                 OnPropertyChanged(nameof(IsReduceKeyStuck));
                 OnPropertyChanged(nameof(IsFloatingWindowEnabled));
+                OnPropertyChanged(nameof(FloatingWindowOpacity));
                 OnPropertyChanged(nameof(AutoSwitchToEnglishIME));
                 OnPropertyChanged(nameof(IsHotkeyControlEnabled));
                 OnPropertyChanged(nameof(SoundVolume));
                 OnPropertyChanged(nameof(EnableHardwareAcceleration));
-                
+
                 // 同步设置到服务
                 SyncConfigToServices();
 

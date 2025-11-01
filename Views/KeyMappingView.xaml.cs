@@ -1919,6 +1919,29 @@ public partial class KeyMappingView : Page
         }
     }
 
+    private void FloatingOpacitySettings_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (floatingOpacityPopup == null)
+            {
+                _logger.Warning("浮窗透明度设置弹出窗口未初始化");
+                return;
+            }
+
+            // 切换弹出窗口的显示状态
+            floatingOpacityPopup.IsOpen = !floatingOpacityPopup.IsOpen;
+            _logger.Debug($"浮窗透明度设置弹出窗口状态: {floatingOpacityPopup.IsOpen}");
+
+            // 如果弹出窗口打开，设置焦点到透明度滑块
+            if (floatingOpacityPopup.IsOpen && opacitySlider != null) opacitySlider.Focus();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("处理浮窗透明度设置按钮点击事件时发生异常", ex);
+        }
+    }
+
     /// <summary>
     /// 删除按键按钮点击事件处理
     /// </summary>

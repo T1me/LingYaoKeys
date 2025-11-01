@@ -12,6 +12,7 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
+        Opacity="{Binding Opacity, Mode=OneWay}"
         Topmost="True"
         ShowInTaskbar="False"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"

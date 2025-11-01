@@ -197,4 +197,5 @@ public class FloatingWindowConfig
     public double Left { get; set; }
     public double Top { get; set; }
     public bool IsEnabled { get; set; } = true;
+    public double Opacity { get; set; } = 0.8;
 }
