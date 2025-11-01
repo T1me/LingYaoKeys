@@ -1601,7 +1601,7 @@ namespace WpfApp.ViewModels
                 };
         }
 
-        private void LoadWindowConfig()
+        private void LoadWindowConfig(bool saveConfig = true)
         {
             try
             {
@@ -1619,7 +1619,19 @@ namespace WpfApp.ViewModels
                 {
                     // 找到匹配的窗口，使用第一个匹配的窗口
                     var window = windows[0];
-                    UpdateSelectedWindow(window.Handle, window.Title, window.ClassName, window.ProcessName);
+                    if (saveConfig)
+                    {
+                        UpdateSelectedWindow(window.Handle, window.Title, window.ClassName, window.ProcessName);
+                    }
+                    else
+                    {
+                        // 仅更新UI，不保存配置
+                        SelectedWindowHandle = window.Handle;
+                        SelectedWindowClassName = window.ClassName;
+                        SelectedWindowProcessName = window.ProcessName;
+                        SelectedWindowTitle = $"{window.Title} (句柄: {window.Handle.ToInt64()})";
+                        _hotkeyService.TargetWindowHandle = window.Handle;
+                    }
                      Logger.Debug($"已找到并更新窗口信息 - 句柄: {window.Handle}, 标题: {window.Title}");
                 }
                 else
@@ -2208,9 +2220,9 @@ namespace WpfApp.ViewModels
                     _selectedWindowClassName = keyConfig.TargetWindowClassName;
                     _selectedWindowTitle = keyConfig.TargetWindowTitle ?? "";
                     _selectedWindowProcessName = keyConfig.TargetWindowProcessName ?? "";
-                    
-                    // 尝试加载窗口
-                    LoadWindowConfig();
+
+                    // 尝试加载窗口（不保存配置，避免循环）
+                    LoadWindowConfig(saveConfig: false);
                 }
                 else
                 {
