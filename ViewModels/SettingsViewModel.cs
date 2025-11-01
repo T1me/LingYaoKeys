@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using WpfApp.Services.Core;
+using WpfApp.Services.Models;
 using MessageBox = System.Windows.MessageBox;
 using Application = System.Windows.Application;
 
@@ -43,6 +44,8 @@ public class SettingsViewModel : ViewModelBase
 
     public ICommand CheckUpdateCommand { get; }
     public ICommand ToggleDebugModeCommand { get; }
+    public ICommand ExportConfigCommand { get; }
+    public ICommand ImportConfigCommand { get; }
 
     public SettingsViewModel()
     {
@@ -51,6 +54,8 @@ public class SettingsViewModel : ViewModelBase
         // 使用统一的命令初始化模式
         CheckUpdateCommand = CreateCommand(async () => await CheckForUpdateAsync(), () => !_isCheckingUpdate);
         ToggleDebugModeCommand = CreateCommand(ToggleDebugMode);
+        ExportConfigCommand = CreateCommand(ExportConfig);
+        ImportConfigCommand = CreateCommand(ImportConfig);
 
         UpdateDebugModeStatus();
         UpdateDriverStatus();
@@ -163,6 +168,95 @@ public class SettingsViewModel : ViewModelBase
             });
 
         _isCheckingUpdate = false;
+    }
+
+    private void ExportConfig()
+    {
+        ExceptionHandler.Execute(
+            () =>
+            {
+                var dialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "JSON 文件|*.json",
+                    FileName = $"LingYaoKeys_Config_{DateTime.Now:yyyyMMdd_HHmmss}.json",
+                    DefaultExt = ".json"
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    var config = new
+                    {
+                        GlobalConfig = ConfigManager.GlobalConfig,
+                        KeyConfig = ConfigManager.CurrentKeyConfig
+                    };
+
+                    var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
+                    System.IO.File.WriteAllText(dialog.FileName, json);
+
+                    MessageBox.Show("配置导出成功！", "导出配置", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            },
+            "导出配置");
+    }
+
+    private void ImportConfig()
+    {
+        ExceptionHandler.Execute(
+            () =>
+            {
+                var dialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Filter = "JSON 文件|*.json",
+                    DefaultExt = ".json"
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    var json = System.IO.File.ReadAllText(dialog.FileName);
+                    var config = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(json, new
+                    {
+                        GlobalConfig = (GlobalConfig)null,
+                        KeyConfig = (KeyConfigData)null
+                    });
+
+                    if (config?.GlobalConfig != null)
+                    {
+                        ConfigManager.UpdateGlobalConfig(gc =>
+                        {
+                            gc.UI = config.GlobalConfig.UI;
+                            gc.Debug = config.GlobalConfig.Debug;
+                            gc.soundEnabled = config.GlobalConfig.soundEnabled;
+                            gc.SoundVolume = config.GlobalConfig.SoundVolume;
+                            gc.AutoSwitchToEnglishIME = config.GlobalConfig.AutoSwitchToEnglishIME;
+                            gc.SelectedDriver = config.GlobalConfig.SelectedDriver;
+                        });
+                    }
+
+                    if (config?.KeyConfig != null)
+                    {
+                        ConfigManager.UpdateKeyConfig(kc =>
+                        {
+                            kc.startKey = config.KeyConfig.startKey;
+                            kc.startMods = config.KeyConfig.startMods;
+                            kc.stopKey = config.KeyConfig.stopKey;
+                            kc.stopMods = config.KeyConfig.stopMods;
+                            kc.keys = config.KeyConfig.keys;
+                            kc.keyMode = config.KeyConfig.keyMode;
+                            kc.interval = config.KeyConfig.interval;
+                            kc.KeyPressInterval = config.KeyConfig.KeyPressInterval;
+                            kc.TargetWindowTitle = config.KeyConfig.TargetWindowTitle;
+                            kc.TargetWindowClassName = config.KeyConfig.TargetWindowClassName;
+                            kc.TargetWindowProcessName = config.KeyConfig.TargetWindowProcessName;
+                        });
+                    }
+
+                    MessageBox.Show("配置导入成功！部分设置可能需要重启应用生效。", "导入配置", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    UpdateDebugModeStatus();
+                    UpdateDriverStatus();
+                }
+            },
+            "导入配置");
     }
 
 }
