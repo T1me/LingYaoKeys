@@ -85,14 +85,13 @@ public class HotkeyService
     private IntPtr _keyboardHookHandle; // 键盘钩子句柄
     private readonly object _hookLock = new(); // 钩子锁
 
-    private IntPtr _targetWindowHandle;
+    private HashSet<IntPtr> _targetWindowHandles = new();
     private bool _isTargetWindowActive;
 
     // 窗口状态枚举
     private enum WindowState
     {
         NoTargetWindow, // 未选择目标窗口
-        ProcessNotRunning, // 进程未运行
         WindowInvalid, // 窗口无效
         WindowInactive, // 窗口未激活
         WindowActive // 窗口激活
@@ -161,6 +160,14 @@ public class HotkeyService
 
         // 直接设置模式，不触发事件
         _lyKeysService.IsHoldMode = keyConfig.keyMode != 0;
+    }
+
+    /// <summary>
+    /// 统一的消息显示接口
+    /// </summary>
+    private void ShowMessage(string message, bool isError = false)
+    {
+        _mainViewModel.UpdateStatusMessage(message, isError);
     }
 
     // 释放资源
@@ -242,7 +249,7 @@ public class HotkeyService
             _isRegisteringHotkey = false;
             
             // 通知用户热键注册失败
-            _mainViewModel?.UpdateStatusMessage($"热键注册失败: {ex.Message}", true);
+            ShowMessage($"热键注册失败: {ex.Message}", true);
             
             // 抛出异常以便调用者处理
             throw new InvalidOperationException($"无法注册热键 {keyCode}", ex);
@@ -277,13 +284,20 @@ public class HotkeyService
     {
         try
         {
+            // 检查是否在坐标编辑模式
+            if (_mainViewModel.KeyMappingViewModel?.IsCoordinateEditMode == true)
+            {
+                ShowMessage("坐标编辑模式下禁止触发热键", true);
+                _logger.Debug("坐标编辑模式下禁止触发热键");
+                return;
+            }
 
             if (!_isRegisteringHotkey && !CanTriggerHotkey()) return;
 
             if (_keySettings == null || _keySettings.Count == 0)
             {
-                _logger.Warning("按键列表为空，无法启动序列");
-                _mainViewModel.UpdateStatusMessage("请至少添加一个按键或坐标", true);
+                _logger.Warning("按键列表为空，无法启动序列，请至少添加一个按键或坐标");
+                ShowMessage("按键列表为空，无法启动序列，请至少添加一个按键或坐标", true);
                 return;
             }
 
@@ -298,7 +312,7 @@ public class HotkeyService
         catch (Exception ex)
         {
             _logger.Error("启动序列时发生异常", ex);
-            _mainViewModel.UpdateStatusMessage("启动序列失败，请检查日志", true);
+            ShowMessage("启动序列失败，请检查日志", true);
         }
     }
 
@@ -433,7 +447,7 @@ public class HotkeyService
                 // 获取当前活动窗口
                 var activeWindow = GetForegroundWindow();
                 // 修改判断逻辑：如果没有设置目标窗口，则允许在任何窗口触发
-                var isTargetWindowActive = _targetWindowHandle == IntPtr.Zero || activeWindow == _targetWindowHandle;
+                var isTargetWindowActive = _targetWindowHandles.Count == 0 || _targetWindowHandles.Contains(activeWindow);
 
                 // 如果目标窗口未激活，停止当前执行
                 if (!isTargetWindowActive && _executor.IsRunning)
@@ -730,18 +744,8 @@ public class HotkeyService
     {
         try
         {
-            // 更新目标窗口进程名称到ViewModel（用于显示和窗口查找）
-            if (!string.IsNullOrEmpty(keyConfig.TargetWindowProcessName))
-            {
-                
-                // 注意：这里不直接设置窗口句柄，因为窗口句柄的查找和设置
-                // 应该由MainViewModel或KeyMappingViewModel负责
-                // HotkeyService只负责使用已设置的窗口句柄
-            }
-            else
-            {
-                _targetWindowHandle = IntPtr.Zero;
-            }
+            // 多窗口配置由 WindowManagementService 处理
+            // HotkeyService 只负责使用已设置的窗口句柄集合
         }
         catch (Exception ex)
         {
@@ -904,23 +908,16 @@ public class HotkeyService
         }
     }
 
-    // 目标窗口句柄
-    public IntPtr TargetWindowHandle
+    // 设置目标窗口句柄集合
+    public void SetTargetWindows(IEnumerable<IntPtr> handles)
     {
-        get => _targetWindowHandle;
-        set
-        {
-            if (_targetWindowHandle != value)
-            {
-                _targetWindowHandle = value;
+        _targetWindowHandles = new HashSet<IntPtr>(handles.Where(h => h != IntPtr.Zero));
 
-                // 如果句柄变为0，停止当前执行
-                if (value == IntPtr.Zero && _executor.IsRunning)
-                {
-                    _executor.EmergencyStop();
-                    StopSequence();
-                }
-            }
+        // 如果没有有效窗口且正在执行，停止执行
+        if (_targetWindowHandles.Count == 0 && _executor.IsRunning)
+        {
+            _executor.EmergencyStop();
+            StopSequence();
         }
     }
 
@@ -936,22 +933,21 @@ public class HotkeyService
     {
         try
         {
-            // 1. 检查是否选择了窗口
-            if (_targetWindowHandle == IntPtr.Zero &&
-                string.IsNullOrEmpty(_mainViewModel.KeyMappingViewModel.SelectedWindowProcessName))
+            // 1. 如果没有目标窗口，允许全局触发
+            if (_targetWindowHandles.Count == 0)
                 return WindowState.NoTargetWindow;
 
-            // 2. 检查进程是否运行
-            if (_targetWindowHandle == IntPtr.Zero &&
-                !string.IsNullOrEmpty(_mainViewModel.KeyMappingViewModel.SelectedWindowProcessName))
-                return WindowState.ProcessNotRunning;
-
-            // 3. 检查窗口是否有效
-            if (!IsWindow(_targetWindowHandle)) return WindowState.WindowInvalid;
-
-            // 4. 检查窗口是否激活
+            // 2. 检查是否有任意一个窗口激活
             var activeWindow = GetForegroundWindow();
-            return activeWindow == _targetWindowHandle ? WindowState.WindowActive : WindowState.WindowInactive;
+            if (_targetWindowHandles.Contains(activeWindow))
+                return WindowState.WindowActive;
+
+            // 3. 检查是否有窗口有效
+            bool anyValid = _targetWindowHandles.Any(h => IsWindow(h));
+            if (!anyValid)
+                return WindowState.WindowInvalid;
+
+            return WindowState.WindowInactive;
         }
         catch (Exception ex)
         {
@@ -981,16 +977,13 @@ public class HotkeyService
             case WindowState.NoTargetWindow:
                 return true; // 未选择窗口时允许全局触发
 
-            case WindowState.ProcessNotRunning:
-                _mainViewModel.UpdateStatusMessage("目标进程未运行，请等待程序启动", true);
-                return false;
 
             case WindowState.WindowInvalid:
-                _mainViewModel.UpdateStatusMessage("目标窗口无效，请重新选择窗口", true);
+                ShowMessage("目标窗口无效，请重新选择窗口", true);
                 return false;
 
             case WindowState.WindowInactive:
-                _mainViewModel.UpdateStatusMessage("请先激活目标窗口", true);
+                ShowMessage("请先激活目标窗口", true);
                 return false;
 
             case WindowState.WindowActive:

@@ -292,44 +292,4 @@ public class KeyMappingService
         UpdateHotkeyServiceKeyList();
     }
 
-    public void SaveConfiguration(KeyConfigData config)
-    {
-        // 保存为相同的启动和停止热键
-        config.startKey = _hotkey;
-        config.startMods = _modifiers;
-        config.stopKey = _hotkey;
-        config.stopMods = _modifiers;
-
-        config.keys = new List<KeyConfig>();
-        
-        // 根据不同类型创建不同的KeyConfig
-        foreach (var item in _keyList)
-        {
-            KeyConfig keyConfig;
-            
-            if (item.Type == KeyItemType.Keyboard)
-            {
-                // 创建键盘按键配置
-                keyConfig = new KeyConfig(item.KeyCode, item.IsSelected)
-                {
-                    KeyInterval = item.KeyInterval,
-                    Type = KeyItemType.Keyboard
-                };
-            }
-            else // KeyItemType.Coordinates
-            {
-                // 创建坐标配置
-                int xValue = item.X ?? 1;
-                int yValue = item.Y ?? 1;
-                
-                keyConfig = new KeyConfig(xValue, yValue, item.IsSelected)
-                {
-                    KeyInterval = item.KeyInterval,
-                    Type = KeyItemType.Coordinates
-                };
-            }
-            
-            config.keys.Add(keyConfig);
-        }
-    }
 }

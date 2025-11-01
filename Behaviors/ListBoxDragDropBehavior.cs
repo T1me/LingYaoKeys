@@ -238,10 +238,10 @@ public class ListBoxDragDropBehavior : Behavior<System.Windows.Controls.ListBox>
                             ClearAllDragTargets(listBox);
 
                             // 更新HotkeyService的按键列表并触发保存
-                            if (listBox.DataContext is KeyMappingViewModel viewModel) 
+                            if (listBox.DataContext is KeyMappingViewModel viewModel)
                             {
                                 viewModel.SyncKeyListToHotkeyService();
-                                viewModel.SaveConfig();
+                                viewModel.SaveKeyConfig();
                             }
                         }
                     }

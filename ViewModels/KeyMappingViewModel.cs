@@ -11,7 +11,7 @@ using Application = System.Windows.Application;
 namespace WpfApp.ViewModels
 {
     /// <summary>
-    /// 按键映射视图模型 - 重构后的精简版本
+    /// 按键映射视图模型
     /// 职责: 协调各个服务,处理UI绑定和用户命令
     /// </summary>
     public class KeyMappingViewModel : ViewModelBase
@@ -47,6 +47,9 @@ namespace WpfApp.ViewModels
         private int? _currentY;
         private KeyItem? _selectedKeyItem;
         private bool _enableHardwareAcceleration = true;
+        private bool _isLoadingConfig = false;
+
+        public bool IsCoordinateEditMode { get; set; }
 
         // 常量
         public const string EMPTY_WINDOW_PLACEHOLDER = "空";
@@ -103,7 +106,6 @@ namespace WpfApp.ViewModels
                 {
                     if (IsExecuting) StopKeyMapping();
                     IsSequenceMode = value == 0;
-                    SaveConfig();
                     Logger.Debug($"按键模式已切换为: {(value == 0 ? "单次模式" : "按压模式")}");
                 }
             }
@@ -130,7 +132,7 @@ namespace WpfApp.ViewModels
                 if (SetProperty(ref _isSoundEnabled, value))
                 {
                     OnPropertyChanged(nameof(CanAdjustVolume));
-                    SaveConfig();
+                    SaveGlobalConfig();
                 }
             }
         }
@@ -158,7 +160,7 @@ namespace WpfApp.ViewModels
                 if (SetProperty(ref _isReduceKeyStuck, value))
                 {
                     _lyKeysService.KeyPressInterval = value ? LyKeysService.DEFAULT_KEY_PRESS_INTERVAL : 0;
-                    SaveConfig();
+                    SaveGlobalConfig();
                 }
             }
         }
@@ -187,7 +189,7 @@ namespace WpfApp.ViewModels
                 {
                     _floatingService.IsEnabled = value;
                     OnPropertyChanged();
-                    SaveConfig();
+                    SaveGlobalConfig();
                 }
             }
         }
@@ -198,7 +200,7 @@ namespace WpfApp.ViewModels
             set
             {
                 if (SetProperty(ref _autoSwitchToEnglishIME, value))
-                    SaveConfig();
+                    SaveGlobalConfig();
             }
         }
 
@@ -224,7 +226,7 @@ namespace WpfApp.ViewModels
             {
                 if (SetProperty(ref _enableHardwareAcceleration, value))
                 {
-                    SaveConfig();
+                    SaveGlobalConfig();
                     Logger.Info($"硬件加速已{(value ? "启用" : "禁用")}，重启应用后生效");
                 }
             }
@@ -239,7 +241,7 @@ namespace WpfApp.ViewModels
                 {
                     _floatingService.Opacity = value;
                     OnPropertyChanged();
-                    SaveConfig();
+                    SaveGlobalConfig();
                 }
             }
         }
@@ -262,12 +264,9 @@ namespace WpfApp.ViewModels
             set => SetProperty(ref _currentY, value);
         }
 
-        // 窗口相关属性(委托给 WindowManagementService)
-        public string SelectedWindowTitle => _windowService.SelectedWindowTitle;
-        public IntPtr SelectedWindowHandle => _windowService.SelectedWindowHandle;
-        public string SelectedWindowClassName => _windowService.SelectedWindowClassName;
-        public string SelectedWindowProcessName => _windowService.SelectedWindowProcessName;
-        public bool IsTargetWindowActive => _windowService.IsTargetWindowActive;
+        // 多窗口支持
+        public ObservableCollection<WindowItemViewModel> SelectedWindows { get; } = new();
+        public bool IsAnyTargetWindowActive => _windowService.IsAnyTargetWindowActive;
 
         #endregion
 
@@ -278,13 +277,14 @@ namespace WpfApp.ViewModels
         public ICommand StartKeyMappingCommand { get; }
         public ICommand StopKeyMappingCommand { get; }
         public ICommand DeleteKeyCommand { get; }
-        public ICommand ClearWindowHandleCommand { get; }
+        public ICommand AddWindowCommand { get; }
+        public ICommand RemoveWindowCommand { get; }
+        public ICommand ClearAllWindowsCommand { get; }
 
         #endregion
 
         #region 事件
 
-        public event Action<IntPtr>? WindowHandleChanged;
         public event EventHandler? CoordinateIndicesNeedUpdate;
 
         #endregion
@@ -313,7 +313,9 @@ namespace WpfApp.ViewModels
             StartKeyMappingCommand = CreateCommand(StartKeyMapping);
             StopKeyMappingCommand = CreateCommand(StopKeyMapping);
             DeleteKeyCommand = CreateCommand<KeyItem>(DeleteKey);
-            ClearWindowHandleCommand = CreateCommand(ClearSelectedWindow);
+            AddWindowCommand = CreateCommand(AddWindow);
+            RemoveWindowCommand = CreateCommand<Guid>(RemoveWindow);
+            ClearAllWindowsCommand = CreateCommand(ClearAllWindows);
 
             // 订阅事件
             SubscribeToEvents();
@@ -331,32 +333,20 @@ namespace WpfApp.ViewModels
             _hotkeyService.SequenceModeStarted += () =>
             {
                 IsExecuting = true;
-                _mainViewModel.UpdateStatusMessage("已开始按键序列", false);
+                ShowMessage("已开始按键序列");
             };
 
             _hotkeyService.SequenceModeStopped += () =>
             {
                 IsExecuting = false;
-                _mainViewModel.UpdateStatusMessage("已停止按键序列", false);
+                ShowMessage("已停止按键序列");
             };
 
             // 窗口服务事件
-            _windowService.WindowHandleChanged += handle =>
-            {
-                OnPropertyChanged(nameof(SelectedWindowHandle));
-                WindowHandleChanged?.Invoke(handle);
-            };
-
-            _windowService.WindowInfoChanged += (handle, title, className, processName) =>
-            {
-                OnPropertyChanged(nameof(SelectedWindowTitle));
-                OnPropertyChanged(nameof(SelectedWindowClassName));
-                OnPropertyChanged(nameof(SelectedWindowProcessName));
-            };
-
+            _windowService.WindowListChanged += OnWindowListChanged;
             _windowService.TargetWindowActiveChanged += isActive =>
             {
-                OnPropertyChanged(nameof(IsTargetWindowActive));
+                OnPropertyChanged(nameof(IsAnyTargetWindowActive));
                 if (!isActive && IsExecuting)
                 {
                     StopKeyMapping();
@@ -372,8 +362,8 @@ namespace WpfApp.ViewModels
             // 按键列表服务事件
             _keyListService.KeyListChanged += (s, e) =>
             {
-                SaveConfig();
                 _keyListService.SyncToHotkeyService(KeyList);
+                SaveKeyConfig();
             };
 
             // 配置变更事件
@@ -387,9 +377,17 @@ namespace WpfApp.ViewModels
         {
             ExceptionHandler.Execute(() =>
             {
-                LoadGlobalConfig(ConfigManager.GlobalConfig);
-                LoadKeyConfig(ConfigManager.CurrentKeyConfig);
-                Logger.Debug("全局配置和按键配置加载完成");
+                _isLoadingConfig = true;
+                try
+                {
+                    LoadGlobalConfig(ConfigManager.GlobalConfig);
+                    LoadKeyConfig(ConfigManager.CurrentKeyConfig);
+                    Logger.Debug("全局配置和按键配置加载完成");
+                }
+                finally
+                {
+                    _isLoadingConfig = false;
+                }
             }, "加载配置", showMessageBox: false);
         }
 
@@ -448,13 +446,9 @@ namespace WpfApp.ViewModels
             KeyInterval = keyConfig.interval;
             KeyPressInterval = keyConfig.KeyPressInterval ?? 5;
 
-            // 加载窗口信息
-            if (!string.IsNullOrEmpty(keyConfig.TargetWindowClassName))
-            {
-                _windowService.LoadWindowFromConfig(
-                    keyConfig.TargetWindowProcessName ?? "",
-                    keyConfig.TargetWindowTitle ?? "");
-            }
+            // 加载多窗口配置
+            _windowService.LoadWindowsFromConfig(keyConfig.TargetWindows);
+            LoadWindowsToUI();
 
             // 加载按键列表
             _keyListService.LoadFromConfig(keyConfig.keys, KeyList);
@@ -505,20 +499,20 @@ namespace WpfApp.ViewModels
             {
                 if (!_currentKey.HasValue)
                 {
-                    _mainViewModel.UpdateStatusMessage("没有有效的按键可添加", true);
+                    ShowMessage("没有有效的按键可添加", true);
                     return;
                 }
 
                 _keyListService.AddKeyboardKey(_currentKey.Value, _keyInterval, KeyList, _hotkey);
 
-                _mainViewModel.UpdateStatusMessage($"已添加按键: {_lyKeysService.GetKeyDescription(_currentKey.Value)}", false);
+                ShowMessage($"已添加按键: {_lyKeysService.GetKeyDescription(_currentKey.Value)}");
                 _currentKey = null;
                 OnPropertyChanged(nameof(CurrentKeyText));
             }
             catch (Exception ex)
             {
                 Logger.Error("添加按键失败", ex);
-                _mainViewModel.UpdateStatusMessage($"添加按键失败: {ex.Message}", true);
+                ShowMessage($"添加按键失败: {ex.Message}", true);
             }
         }
 
@@ -533,13 +527,13 @@ namespace WpfApp.ViewModels
             {
                 if (!_coordinateService.ValidateCoordinate(_currentX, _currentY, out var errorMessage))
                 {
-                    _mainViewModel.UpdateStatusMessage(errorMessage, true);
+                    ShowMessage(errorMessage, true);
                     return;
                 }
 
                 _keyListService.AddCoordinate(_currentX!.Value, _currentY!.Value, _keyInterval, KeyList);
 
-                _mainViewModel.UpdateStatusMessage($"已添加坐标: ({_currentX}, {_currentY})", false);
+                ShowMessage($"已添加坐标: ({_currentX}, {_currentY})");
                 _currentX = null;
                 _currentY = null;
                 OnPropertyChanged(nameof(CurrentX));
@@ -548,7 +542,7 @@ namespace WpfApp.ViewModels
             catch (Exception ex)
             {
                 Logger.Error("添加坐标失败", ex);
-                _mainViewModel.UpdateStatusMessage($"添加坐标失败: {ex.Message}", true);
+                ShowMessage($"添加坐标失败: {ex.Message}", true);
             }
         }
 
@@ -575,7 +569,7 @@ namespace WpfApp.ViewModels
             // 检查冲突
             if (KeyList.Any(k => k.Type == KeyItemType.Keyboard && k.KeyCode.Equals(keyCode)))
             {
-                _mainViewModel.UpdateStatusMessage("热键与按键序列冲突", true);
+                ShowMessage("热键与按键序列冲突", true);
                 return false;
             }
 
@@ -586,13 +580,13 @@ namespace WpfApp.ViewModels
             try
             {
                 _hotkeyService.RegisterHotkey(keyCode, modifiers, saveToConfig: true);
-                _mainViewModel.UpdateStatusMessage("热键设置成功", false);
+                ShowMessage("热键设置成功");
                 return true;
             }
             catch (Exception ex)
             {
                 Logger.Error($"热键注册失败: {ex.Message}", ex);
-                _mainViewModel.UpdateStatusMessage($"热键设置失败: {ex.Message}", true);
+                ShowMessage($"热键设置失败: {ex.Message}", true);
                 return false;
             }
         }
@@ -623,16 +617,10 @@ namespace WpfApp.ViewModels
 
             try
             {
-                if (SelectedWindowHandle == IntPtr.Zero)
-                {
-                    _mainViewModel.UpdateStatusMessage("请先选择目标窗口", true);
-                    return;
-                }
-
                 var selectedKeys = KeyList.Where(k => k.IsSelected).ToList();
                 if (!selectedKeys.Any())
                 {
-                    _mainViewModel.UpdateStatusMessage("请至少选择一个按键", true);
+                    ShowMessage("请至少选择一个按键", true);
                     return;
                 }
 
@@ -646,7 +634,7 @@ namespace WpfApp.ViewModels
             {
                 Logger.Error("启动按键映射失败", ex);
                 StopKeyMapping();
-                _mainViewModel.UpdateStatusMessage("启动失败", true);
+                ShowMessage("启动失败", true);
             }
         }
 
@@ -668,22 +656,69 @@ namespace WpfApp.ViewModels
 
         #region 窗口管理
 
-        public void UpdateSelectedWindow(IntPtr handle, string title, string className, string processName)
+        private void AddWindow()
         {
-            _windowService.UpdateSelectedWindow(handle, title, className, processName);
-            OnPropertyChanged(nameof(SelectedWindowTitle));
-            OnPropertyChanged(nameof(SelectedWindowHandle));
-            OnPropertyChanged(nameof(SelectedWindowClassName));
-            OnPropertyChanged(nameof(SelectedWindowProcessName));
-            SaveConfig();
+            var dialog = new Views.WindowHandleDialog
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                _windowService.AddWindow(
+                    dialog.SelectedProcessName,
+                    dialog.SelectedTitle,
+                    dialog.SelectedClassName
+                );
+
+                var windowItem = new WindowItemViewModel(
+                    dialog.SelectedProcessName,
+                    dialog.SelectedTitle,
+                    dialog.SelectedClassName,
+                    Guid.NewGuid()
+                );
+
+                SelectedWindows.Add(windowItem);
+                SaveKeyConfig();
+            }
         }
 
-        public void ClearSelectedWindow()
+        private void RemoveWindow(Guid windowId)
         {
-            _windowService.ClearSelectedWindow();
-            OnPropertyChanged(nameof(SelectedWindowTitle));
-            OnPropertyChanged(nameof(SelectedWindowHandle));
-            SaveConfig();
+            var window = SelectedWindows.FirstOrDefault(w => w.Id == windowId);
+            if (window != null)
+            {
+                _windowService.RemoveWindow(windowId);
+                SelectedWindows.Remove(window);
+                SaveKeyConfig();
+            }
+        }
+
+        private void ClearAllWindows()
+        {
+            _windowService.ClearAllWindows();
+            SelectedWindows.Clear();
+            SaveKeyConfig();
+        }
+
+        private void LoadWindowsToUI()
+        {
+            SelectedWindows.Clear();
+            foreach (var window in _windowService.SelectedWindows)
+            {
+                var windowItem = new WindowItemViewModel(
+                    window.ProcessName,
+                    window.Title,
+                    window.ClassName,
+                    window.Id
+                );
+                SelectedWindows.Add(windowItem);
+            }
+        }
+
+        private void OnWindowListChanged()
+        {
+            // 窗口列表变化时无需额外处理
         }
 
         #endregion
@@ -721,6 +756,8 @@ namespace WpfApp.ViewModels
 
         public void SaveConfig()
         {
+            if (_isLoadingConfig) return;
+
             try
             {
                 SaveKeyConfig();
@@ -733,7 +770,7 @@ namespace WpfApp.ViewModels
             }
         }
 
-        private void SaveKeyConfig()
+        public void SaveKeyConfig()
         {
             ConfigManager.UpdateKeyConfig(config =>
             {
@@ -751,23 +788,15 @@ namespace WpfApp.ViewModels
                 config.interval = KeyInterval;
                 config.KeyPressInterval = KeyPressInterval;
 
-                if (!string.IsNullOrEmpty(SelectedWindowClassName))
-                {
-                    config.TargetWindowClassName = SelectedWindowClassName;
-                    config.TargetWindowProcessName = SelectedWindowProcessName;
-                    config.TargetWindowTitle = SelectedWindowTitle;
-                }
-                else
-                {
-                    config.TargetWindowClassName = null;
-                    config.TargetWindowProcessName = null;
-                    config.TargetWindowTitle = null;
-                }
+                // 保存多窗口配置
+                config.TargetWindows = _windowService.SelectedWindows.ToList();
             });
         }
 
         private void SaveGlobalConfig()
         {
+            if (_isLoadingConfig) return;
+
             ConfigManager.UpdateGlobalConfig(config =>
             {
                 config.soundEnabled = IsSoundEnabled;
@@ -784,6 +813,14 @@ namespace WpfApp.ViewModels
         #endregion
 
         #region 辅助方法
+
+        /// <summary>
+        /// 统一的消息显示接口
+        /// </summary>
+        public void ShowMessage(string message, bool isError = false)
+        {
+            _mainViewModel.UpdateStatusMessage(message, isError);
+        }
 
         public HotkeyService GetHotkeyService() => _hotkeyService;
 

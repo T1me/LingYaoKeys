@@ -151,13 +151,13 @@ public partial class KeyMappingView : Page
         var keyCode = _inputCaptureService.CaptureKeyboardInput(e);
         if (!keyCode.HasValue)
         {
-            ShowError(KEY_ERROR);
+            ShowMessage(KEY_ERROR, true);
             return;
         }
 
         if (ViewModel.IsHotkeyConflict(keyCode.Value))
         {
-            ShowError(HOTKEY_CONFLICT);
+            ShowMessage(HOTKEY_CONFLICT, true);
             return;
         }
 
@@ -183,7 +183,7 @@ public partial class KeyMappingView : Page
             e.Handled = true;
             if (ViewModel.IsHotkeyConflict(keyCode.Value))
             {
-                ShowError(HOTKEY_CONFLICT);
+                ShowMessage(HOTKEY_CONFLICT, true);
                 return;
             }
             ViewModel?.SetCurrentKey(keyCode.Value);
@@ -201,7 +201,7 @@ public partial class KeyMappingView : Page
         var keyCode = _inputCaptureService.CaptureKeyboardInput(e);
         if (!keyCode.HasValue)
         {
-            ShowError(KEY_ERROR);
+            ShowMessage(KEY_ERROR, true);
             return;
         }
 
@@ -209,7 +209,7 @@ public partial class KeyMappingView : Page
 
         if (ViewModel?.IsHotkeyConflict(keyCode.Value) == true)
         {
-            ShowError("热键与按键序列冲突，请选择其他键");
+            ShowMessage("热键与按键序列冲突，请选择其他键", true);
             return;
         }
 
@@ -272,11 +272,22 @@ public partial class KeyMappingView : Page
 
     private void ToggleEditMode()
     {
+        if (!_isEditMode)
+        {
+            // 进入编辑模式前检查是否有坐标
+            if (!ViewModel.KeyList.Any(k => k.Type == KeyItemType.Coordinates))
+            {
+                ShowMessage("按键列表中没有坐标，无法进入编辑模式，请先拖动箭头添加坐标位置", isError: true);
+                return;
+            }
+        }
+
         _isEditMode = !_isEditMode;
         if (_isEditMode)
         {
             ChangeMouseIconToExit();
             _coordinateService.ShowAll(ViewModel.KeyList);
+            ViewModel.IsCoordinateEditMode = true;
             ShowMessage("已进入坐标编辑模式");
         }
         else
@@ -285,8 +296,9 @@ public partial class KeyMappingView : Page
             if (!_isCoordinateMarkersVisible)
                 _coordinateService.HideAll();
 
+            ViewModel.IsCoordinateEditMode = false;
             // 退出编辑模式时保存坐标配置
-            ViewModel?.SaveConfig();
+            ViewModel?.SaveKeyConfig();
             ShowMessage("已退出坐标编辑模式并保存坐标");
         }
     }
@@ -313,13 +325,10 @@ public partial class KeyMappingView : Page
         }
     }
 
-    // 辅助方法
-    private void ShowError(string message) => ShowMessage(message, true);
-
+    // 辅助方法：统一消息显示接口
     private void ShowMessage(string message, bool isError = false)
     {
-        if (Application.Current.MainWindow?.DataContext is MainViewModel mainVm)
-            mainVm.UpdateStatusMessage(message, isError);
+        ViewModel?.ShowMessage(message, isError);
     }
 
     private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
@@ -328,28 +337,6 @@ public partial class KeyMappingView : Page
         e.Handled = true;
     }
 
-    private void GetWindowHandle_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var dialog = new WindowHandleDialog
-            {
-                Owner = Window.GetWindow(this),
-                WindowStartupLocation = WindowStartupLocation.CenterOwner
-            };
-
-            if (dialog.ShowDialog() == true)
-            {
-                ViewModel.UpdateSelectedWindow(dialog.SelectedHandle, dialog.SelectedTitle,
-                    dialog.SelectedClassName, dialog.SelectedProcessName);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("获取窗口句柄时发生异常", ex);
-            ShowError("获取窗口句柄失败，请查看日志");
-        }
-    }
 
     // ListBox 选择管理
     private void KeysList_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -479,10 +466,6 @@ public partial class KeyMappingView : Page
         // 由 DeleteConfirmationBehavior 处理
     }
 
-    private void ClearWindowHandle_Click(object sender, RoutedEventArgs e)
-    {
-        ViewModel?.ClearSelectedWindow();
-    }
 
     private void StartHotkeyInput_KeyDown(object sender, KeyEventArgs e)
     {

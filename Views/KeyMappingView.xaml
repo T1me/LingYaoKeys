@@ -844,63 +844,73 @@
                             Padding="10"
                             Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Text="窗口句柄"
+                            <TextBlock Text="目标窗口"
                                        FontSize="12"
                                        FontWeight="SemiBold"
                                        Foreground="#505050"
                                        Margin="0,0,0,8" />
 
-                            <!-- 按钮区域 - 水平排列获取和清除按钮 -->
-                            <DockPanel Margin="0,0,0,8">
-                                <!-- 获取窗口句柄按钮 -->
-                                <Button Style="{StaticResource RoundedShadowButtonSmall}"
-                                        Name="btnGetWindowHandle"
-                                        IsEnabled="{Binding IsNotExecuting}"
-                                        Height="32"
-                                        MinWidth="160"
-                                        Margin="0,0,5,0"
-                                        Click="GetWindowHandle_Click"
-                                        DockPanel.Dock="Left">
-                                    <DockPanel>
-                                        <Path
-                                            Data="M13,9V3.5L18.5,9M6,2C4.89,2 4,2.89 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2H6Z"
-                                            Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                            Width="16" Height="16"
-                                            Stretch="Uniform"
-                                            Margin="0,0,10,0" />
-                                        <TextBlock Text="获取窗口句柄"
-                                                   VerticalAlignment="Center" />
-                                    </DockPanel>
-                                </Button>
-                                
-                                <!-- 清除窗口句柄按钮 -->
-                                <Button Style="{StaticResource CircleButtonStyle}"
-                                        Width="32" Height="32"
-                                        DockPanel.Dock="Left"
-                                        ToolTip="清除窗口句柄">
-                                    <b:Interaction.Behaviors>
-                                        <behaviors:DeleteConfirmationBehavior
-                                            ConfirmedCommand="{Binding ClearWindowHandleCommand}" />
-                                    </b:Interaction.Behaviors>
-                                    <Path
-                                        Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
-                                        Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                        Width="14" Height="14"
-                                        Stretch="Uniform" />
-                                </Button>
-                            </DockPanel>
+                            <!-- 窗口列表 -->
+                            <ListBox ItemsSource="{Binding SelectedWindows}"
+                                     Height="120"
+                                     SelectionMode="Single"
+                                     Margin="0,0,0,8">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
 
-                            <!-- 窗口句柄显示 -->
-                            <TextBox x:Name="txtWindowHandle"
-                                     Style="{StaticResource ModernTextBox}"
-                                     Focusable="False"
-                                     IsReadOnly="True"
-                                     Text="{Binding SelectedWindowTitle, Mode=OneWay}"
-                                     Tag="{x:Static viewModels:KeyMappingViewModel.EMPTY_WINDOW_PLACEHOLDER}"
-                                     ToolTip="{Binding SelectedWindowClassName}"
-                                     behaviors:AutoScrollBehavior.IsEnabled="True"
-                                     behaviors:AutoScrollBehavior.ScrollDelay="1000"
-                                     behaviors:AutoScrollBehavior.ScrollSpeed="100" />
+                                            <!-- 删除按钮 -->
+                                            <Button Grid.Column="0"
+                                                    Style="{StaticResource CircleButtonStyle}"
+                                                    Width="24" Height="24"
+                                                    Margin="0,0,8,0">
+                                                <b:Interaction.Behaviors>
+                                                    <behaviors:DeleteConfirmationBehavior>
+                                                        <behaviors:DeleteConfirmationBehavior.ConfirmedCommand>
+                                                            <Binding Path="DataContext.RemoveWindowCommand" RelativeSource="{RelativeSource AncestorType=ListBox}"/>
+                                                        </behaviors:DeleteConfirmationBehavior.ConfirmedCommand>
+                                                        <behaviors:DeleteConfirmationBehavior.CommandParameter>
+                                                            <Binding Path="Id"/>
+                                                        </behaviors:DeleteConfirmationBehavior.CommandParameter>
+                                                    </behaviors:DeleteConfirmationBehavior>
+                                                </b:Interaction.Behaviors>
+                                                <Path Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
+                                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      Width="12" Height="12"
+                                                      Stretch="Uniform" />
+                                            </Button>
+
+                                            <!-- 窗口信息 -->
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding DisplayName}"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <!-- 操作按钮 -->
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="添加窗口"
+                                        Command="{Binding AddWindowCommand}"
+                                        Width="100"
+                                        Margin="0,0,8,0"/>
+                                <Button Content="清除全部"
+                                        Command="{Binding ClearAllWindowsCommand}"
+                                        Width="100"/>
+                            </StackPanel>
+
+                            <!-- 提示信息 -->
+                            <TextBlock Text="提示: 热键将在任意一个目标窗口激活时触发"
+                                       Foreground="Gray"
+                                       FontSize="10"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
 

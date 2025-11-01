@@ -309,6 +309,7 @@ public class MainViewModel : ViewModelBase
 
     public void Cleanup()
     {
+        // 清理时保存所有配置
         _keyMappingViewModel.SaveConfig();
         _hotkeyService?.Dispose();
         _statusMessageTimer.Stop();

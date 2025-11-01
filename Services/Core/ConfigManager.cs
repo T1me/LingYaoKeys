@@ -224,11 +224,10 @@ namespace WpfApp.Services.Core
                         {
                             loadedConfig = JsonConvert.DeserializeObject<KeyConfigData>(json) ?? CreateDefaultKeyConfig();
 
-                            if (loadedConfig.keys == null || loadedConfig.keys.Count == 0)
+                            // 确保 keys 列表不为 null（但允许为空）
+                            if (loadedConfig.keys == null)
                             {
-                                var defaultConfig = CreateDefaultKeyConfig();
-                                loadedConfig.keys = defaultConfig.keys;
-                                needsSave = true;
+                                loadedConfig.keys = new List<KeyConfig>();
                             }
 
                             _logger.Debug($"已加载按键配置，按键数量: {loadedConfig.keys.Count}");
@@ -396,9 +395,7 @@ namespace WpfApp.Services.Core
                 keyMode = 0,
                 interval = 10,
                 KeyPressInterval = 5,
-                TargetWindowClassName = null,
-                TargetWindowProcessName = null,
-                TargetWindowTitle = null
+                TargetWindows = new List<TargetWindow>()
             };
         }
         

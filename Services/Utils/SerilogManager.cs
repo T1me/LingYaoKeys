@@ -113,7 +113,7 @@ public class SerilogManager : ILogger, IDisposable
         boundProperties = Array.Empty<LogEventProperty>();
         return false;
     }
-
+    
     public bool BindProperty(string? propertyName, object? value, bool destructureObjects,
         out LogEventProperty? property)
     {

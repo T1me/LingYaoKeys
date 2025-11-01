@@ -14,9 +14,6 @@ namespace WpfApp.Services.Core
     {
         private FloatingStatusWindow? _floatingWindow;
         private FloatingStatusViewModel? _floatingViewModel;
-        private readonly object _updateLock = new();
-        private DateTime _lastUpdateTime = DateTime.MinValue;
-        private const int UPDATE_THROTTLE_MS = 200;
 
         // 状态属性
         private bool _isEnabled;
@@ -161,21 +158,10 @@ namespace WpfApp.Services.Core
         }
 
         /// <summary>
-        /// 更新浮窗状态(带节流控制)
+        /// 更新浮窗状态
         /// </summary>
-        public void UpdateStatus(bool forceUpdate = false)
+        public void UpdateStatus()
         {
-            lock (_updateLock)
-            {
-                var now = DateTime.Now;
-                if (!forceUpdate && (now - _lastUpdateTime).TotalMilliseconds < UPDATE_THROTTLE_MS)
-                {
-                    SerilogManager.Instance.Debug("浮窗状态更新被节流控制跳过");
-                    return;
-                }
-                _lastUpdateTime = now;
-            }
-
             Application.Current?.Dispatcher.Invoke(() =>
             {
                 try
@@ -184,7 +170,6 @@ namespace WpfApp.Services.Core
                     {
                         _floatingViewModel.IsHotkeyControlEnabled = _isHotkeyControlEnabled;
                         _floatingViewModel.IsExecuting = _isExecuting;
-                        SerilogManager.Instance.Debug($"浮窗状态已更新: IsExecuting={_isExecuting}, IsHotkeyControlEnabled={_isHotkeyControlEnabled}");
                     }
                 }
                 catch (Exception ex)

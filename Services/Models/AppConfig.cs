@@ -140,6 +140,17 @@ public class GlobalConfig
 }
 
 /// <summary>
+/// 目标窗口信息类
+/// </summary>
+public class TargetWindow
+{
+    public string ProcessName { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string ClassName { get; set; } = string.Empty;
+    public Guid Id { get; set; } = Guid.NewGuid();
+}
+
+/// <summary>
 /// 按键配置类，包含按键相关的所有配置
 /// </summary>
 public class KeyConfigData
@@ -153,12 +164,10 @@ public class KeyConfigData
     public int keyMode { get; set; }
     public int interval { get; set; } = 10;
     public int? KeyPressInterval { get; set; }
-    
-    // 窗口句柄相关信息
-    public string? TargetWindowClassName { get; set; }
-    public string? TargetWindowProcessName { get; set; }
-    public string? TargetWindowTitle { get; set; }
-    
+
+    // 多窗口支持
+    public List<TargetWindow> TargetWindows { get; set; } = new();
+
     public KeyConfigData()
     {
         keys = new List<KeyConfig>();

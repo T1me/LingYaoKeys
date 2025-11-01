@@ -319,9 +319,7 @@ public class SettingsViewModel : ViewModelBase
                             kc.keyMode = config.KeyConfig.keyMode;
                             kc.interval = config.KeyConfig.interval;
                             kc.KeyPressInterval = config.KeyConfig.KeyPressInterval;
-                            kc.TargetWindowTitle = config.KeyConfig.TargetWindowTitle;
-                            kc.TargetWindowClassName = config.KeyConfig.TargetWindowClassName;
-                            kc.TargetWindowProcessName = config.KeyConfig.TargetWindowProcessName;
+                            kc.TargetWindows = config.KeyConfig.TargetWindows;
                         });
                     }
 
