@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using WpfApp.Services.Core;
 using WpfApp.Services.Models;
+using WpfApp.Services.Utils;
 using MessageBox = System.Windows.MessageBox;
 using Application = System.Windows.Application;
 
@@ -16,7 +17,10 @@ public class SettingsViewModel : ViewModelBase
     private bool _isCheckingUpdate;
     private string _updateStatus = "检查更新";
     private string _debugModeStatus = "调试模式关闭";
+    private System.Windows.Media.Brush _debugModeStatusColor = System.Windows.Media.Brushes.Gray;
     private string _selectedDriver = "AHK";
+    private string _driverStatus = "🟢 已加载";
+    private System.Windows.Media.Brush _driverStatusColor = System.Windows.Media.Brushes.Green;
 
     public string UpdateStatus
     {
@@ -30,6 +34,24 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _debugModeStatus, value);
     }
 
+    public System.Windows.Media.Brush DebugModeStatusColor
+    {
+        get => _debugModeStatusColor;
+        set => SetProperty(ref _debugModeStatusColor, value);
+    }
+
+    public string DriverStatus
+    {
+        get => _driverStatus;
+        set => SetProperty(ref _driverStatus, value);
+    }
+
+    public System.Windows.Media.Brush DriverStatusColor
+    {
+        get => _driverStatusColor;
+        set => SetProperty(ref _driverStatusColor, value);
+    }
+
     public string SelectedDriver
     {
         get => _selectedDriver;
@@ -38,8 +60,44 @@ public class SettingsViewModel : ViewModelBase
             if (SetProperty(ref _selectedDriver, value))
             {
                 ConfigManager.UpdateGlobalConfig(config => config.SelectedDriver = value);
+                ReloadDriver(value);
             }
         }
+    }
+
+    private void ReloadDriver(string driverType)
+    {
+        try
+        {
+            SetDriverStatus("🟠 加载中...", System.Windows.Media.Brushes.Orange);
+            App.LyKeysDriver?.Dispose();
+
+            var pathService = Services.Utils.PathService.Instance;
+            var driverFile = DriverFactory.PrepareDriverFiles(driverType, pathService, App.ExtractEmbeddedResource);
+            var driver = DriverFactory.CreateDriver(driverType, driverFile);
+            App.LyKeysDriver = new LyKeysService(driver);
+
+            if (!App.LyKeysDriver.Initialize(driverFile))
+            {
+                SetDriverStatus("🔴 加载失败", System.Windows.Media.Brushes.Red);
+                MessageBox.Show($"驱动加载失败({driverType})", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            else
+            {
+                SetDriverStatus("🟢 已加载", System.Windows.Media.Brushes.Green);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetDriverStatus("🔴 加载失败", System.Windows.Media.Brushes.Red);
+            MessageBox.Show($"切换驱动失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void SetDriverStatus(string status, System.Windows.Media.Brush color)
+    {
+        DriverStatus = status;
+        DriverStatusColor = color;
     }
 
     public ICommand CheckUpdateCommand { get; }
@@ -64,13 +122,39 @@ public class SettingsViewModel : ViewModelBase
     private void UpdateDebugModeStatus()
     {
         var globalConfig = ConfigManager.GlobalConfig;
-        _debugModeStatus = globalConfig.Debug.IsDebugMode ? "🟢 调试模式：已开启" : "⭕ 调试模式：已关闭";
+        if (globalConfig.Debug.IsDebugMode)
+        {
+            DebugModeStatus = "🟢 调试模式：已开启";
+            DebugModeStatusColor = System.Windows.Media.Brushes.Green;
+        }
+        else
+        {
+            DebugModeStatus = "⭕ 调试模式：已关闭";
+            DebugModeStatusColor = System.Windows.Media.Brushes.Gray;
+        }
     }
 
     private void UpdateDriverStatus()
     {
         var globalConfig = ConfigManager.GlobalConfig;
         _selectedDriver = globalConfig.SelectedDriver ?? "AHK";
+        OnPropertyChanged(nameof(SelectedDriver));
+
+        try
+        {
+            if (App.LyKeysDriver != null && App.LyKeysDriver.IsInitialized)
+            {
+                SetDriverStatus("🟢 已加载", System.Windows.Media.Brushes.Green);
+            }
+            else
+            {
+                SetDriverStatus("⭕ 未加载", System.Windows.Media.Brushes.Gray);
+            }
+        }
+        catch
+        {
+            SetDriverStatus("🔴 加载失败", System.Windows.Media.Brushes.Red);
+        }
     }
 
     private async void ToggleDebugMode()
@@ -86,14 +170,7 @@ public class SettingsViewModel : ViewModelBase
                 });
 
                 UpdateDebugModeStatus();
-
-                var result = MessageBox.Show(
-                    "调试模式设置已更改，需要重启程序才能生效。是否立即重启？",
-                    "重启提示",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes) RestartApplication();
+                SerilogManager.Instance.Initialize(ConfigManager.GlobalConfig.Debug);
             },
             "切换调试模式");
     }

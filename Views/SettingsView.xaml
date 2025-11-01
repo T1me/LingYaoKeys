@@ -9,18 +9,6 @@
       Title="设置">
 
     <Page.Resources>
-        <!-- 调试模式状态颜色转换器 -->
-        <Style x:Key="DebugModeTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#666666" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding ElementName=DebugStatusText, Path=Text}" Value="🟢 调试模式：已开启">
-                    <Setter Property="Foreground" Value="#2ECC71" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding ElementName=DebugStatusText, Path=Text}" Value="⭕ 调试模式：已关闭">
-                    <Setter Property="Foreground" Value="#666666" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
     </Page.Resources>
 
     <Grid Margin="20">
@@ -35,9 +23,6 @@
         <!-- 配置文件管理 -->
         <GroupBox Header="配置文件管理" Margin="0,0,0,20">
             <StackPanel Margin="10">
-                <TextBlock Text="导入/导出配置文件"
-                           Margin="0,0,0,10"
-                           FontSize="14" />
                 <StackPanel Orientation="Horizontal"
                             Margin="0,10,0,0">
                     <Button Style="{StaticResource RoundedShadowButton}"
@@ -76,9 +61,6 @@
         <!-- 更新管理 -->
         <GroupBox Grid.Row="1" Header="更新管理" Margin="0,0,0,20">
             <StackPanel Margin="10">
-                <TextBlock Text="检查软件更新"
-                           Margin="0,0,0,10"
-                           FontSize="14" />
                 <StackPanel Orientation="Horizontal"
                             Margin="0,10,0,0">
                     <Button Style="{StaticResource RoundedShadowButton}"
@@ -102,28 +84,29 @@
         <!-- 驱动选择 -->
         <GroupBox Grid.Row="2" Header="驱动选择" Margin="0,0,0,20">
             <StackPanel Margin="10">
-                <TextBlock Text="选择键盘模拟驱动"
-                           Margin="0,0,0,10"
-                           FontSize="14" />
-                <ComboBox Style="{StaticResource ModernComboBox}"
-                          ItemContainerStyle="{StaticResource ModernComboBoxItem}"
-                          SelectedValuePath="Tag"
-                          SelectedValue="{Binding SelectedDriver}"
-                          Width="200"
-                          HorizontalAlignment="Left"
-                          Margin="0,10,0,0">
-                    <ComboBoxItem Content="AHK" Tag="AHK" />
-                    <ComboBoxItem Content="lykeys" Tag="lykeys" />
-                </ComboBox>
+                <StackPanel Orientation="Horizontal">
+                    <ComboBox Style="{StaticResource ModernComboBox}"
+                              ItemContainerStyle="{StaticResource ModernComboBoxItem}"
+                              SelectedValuePath="Tag"
+                              SelectedValue="{Binding SelectedDriver}"
+                              Width="120"
+                              Margin="0,10,0,0">
+                        <ComboBoxItem Content="AHK" Tag="AHK" />
+                        <ComboBoxItem Content="LyKeys" Tag="LyKeys" />
+                    </ComboBox>
+                    <TextBlock Text="{Binding DriverStatus}"
+                               Foreground="{Binding DriverStatusColor}"
+                               FontFamily="{StaticResource EmojiFont}"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               Margin="10,10,0,0" />
+                </StackPanel>
             </StackPanel>
         </GroupBox>
 
         <!-- 调试模式 -->
         <GroupBox Grid.Row="3" Header="调试模式" Margin="0,0,0,20">
             <StackPanel Margin="10">
-                <TextBlock Text="启用调试模式将显示更多调试信息，重启后生效"
-                           Margin="0,0,0,10"
-                           FontSize="14" />
                 <StackPanel Orientation="Horizontal"
                             Margin="0,10,0,0">
                     <Button Style="{StaticResource RoundedShadowButton}"
@@ -131,15 +114,10 @@
                             Height="35"
                             Command="{Binding ToggleDebugModeCommand}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE783;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="16"
-                                       Margin="0,0,8,0"
-                                       VerticalAlignment="Center" />
-                            <TextBlock x:Name="DebugStatusText"
-                                       Text="{Binding DebugModeStatus}"
+
+                            <TextBlock Text="{Binding DebugModeStatus}"
+                                       Foreground="{Binding DebugModeStatusColor}"
                                        FontFamily="{StaticResource EmojiFont}"
-                                       Style="{StaticResource DebugModeTextStyle}"
                                        FontWeight="Bold"
                                        VerticalAlignment="Center" />
                         </StackPanel>

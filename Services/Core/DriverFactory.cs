@@ -23,7 +23,7 @@ public static class DriverFactory
         return driverType?.ToUpperInvariant() switch
         {
             "LYKEYS" => new LyKeys(driverPath),
-            "AHK" => throw new NotImplementedException("AHK 驱动尚未实现"),
+            "AHK" => new AhkDriver(),
             _ => throw new ArgumentException($"不支持的驱动类型: {driverType}")
         };
     }
@@ -45,7 +45,7 @@ public static class DriverFactory
                 return PrepareLyKeysDriver(pathService, extractResource);
 
             case "AHK":
-                throw new NotImplementedException("AHK 驱动文件准备尚未实现");
+                return string.Empty;
 
             default:
                 throw new ArgumentException($"不支持的驱动类型: {driverType}");
