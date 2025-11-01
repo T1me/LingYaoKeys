@@ -27,7 +27,7 @@ public partial class App : Application
     private readonly SerilogManager _logger = SerilogManager.Instance;
     private readonly PathService _pathService = PathService.Instance;
 
-    public static LyKeysService LyKeysDriver { get; private set; }
+    public static LyKeysService LyKeysDriver { get; set; }
     public static ConfigManager ConfigService { get; private set; }
     public static AudioService AudioService { get; private set; }
     
@@ -413,11 +413,11 @@ public partial class App : Application
     /// </summary>
     /// <param name="resourceName">资源名称</param>
     /// <param name="outputPath">输出路径</param>
-    private void ExtractEmbeddedResource(string resourceName, string outputPath)
+    public static void ExtractEmbeddedResource(string resourceName, string outputPath)
     {
         try
         {
-            using (var stream = GetType().Assembly.GetManifestResourceStream(resourceName))
+            using (var stream = typeof(App).Assembly.GetManifestResourceStream(resourceName))
             {
                 if (stream == null) throw new FileNotFoundException($"找不到嵌入式资源: {resourceName}");
 

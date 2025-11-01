@@ -7,12 +7,14 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="Styles/TrayContextMenuStyle.xaml" />
-                <ResourceDictionary Source="Styles/NavigationStyles.xaml" />
-                <ResourceDictionary Source="Styles/ButtonStyles.xaml" />
-                <ResourceDictionary Source="Styles/ControlStyles.xaml" />
-                <ResourceDictionary Source="Styles/SwitchStyles.xaml" />
-                <ResourceDictionary Source="Styles/AnimationStyles.xaml" />
+                <ResourceDictionary Source="Styles/TrayContextMenuStyle.xaml" />    <!-- 任务栏图标右键菜单样式 -->
+                <ResourceDictionary Source="Styles/NavigationStyles.xaml" />    <!-- 导航栏样式 -->
+                <ResourceDictionary Source="Styles/ButtonStyles.xaml" />      <!-- 按钮样式 -->
+                <ResourceDictionary Source="Styles/ControlStyles.xaml" />        <!-- 通用控件样式 -->
+                <ResourceDictionary Source="Styles/SwitchStyles.xaml" />    <!-- 开关控件样式 -->
+                <ResourceDictionary Source="Styles/AnimationStyles.xaml" />     <!-- 页面切换动画资源 -->
+                <!-- <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/SkinDefault.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/Theme.xaml"/> -->
             </ResourceDictionary.MergedDictionaries>
 
             <!-- 转换器 -->

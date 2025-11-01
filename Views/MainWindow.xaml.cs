@@ -110,7 +110,6 @@ public partial class MainWindow : Window
             InitializeComponent();
             _configManager = App.ConfigService ?? ConfigManager.Instance;
             _viewModel = new MainViewModel(App.LyKeysDriver, this);
-            _viewModel.IsNavExpanded = false;
 
             try
             {
@@ -784,89 +783,4 @@ public partial class MainWindow : Window
         }
     }
 
-    private void NavToggleButton_Click(object sender, RoutedEventArgs e)
-    {
-        // 获取ViewModel
-        if (DataContext is MainViewModel viewModel)
-        {
-            // 切换导航栏状态
-            viewModel.IsNavExpanded = !viewModel.IsNavExpanded;
-
-            // 创建列宽动画
-            var animation = new GridLengthAnimation
-            {
-                Duration = TimeSpan.FromMilliseconds(300),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-                To = viewModel.NavColumnWidth
-            };
-
-            // 获取Grid并应用动画
-            if (MainBorder.Parent is Grid mainGrid && mainGrid.ColumnDefinitions.Count > 0)
-                mainGrid.ColumnDefinitions[0].BeginAnimation(ColumnDefinition.WidthProperty, animation);
-        }
-    }
-
-    /// <summary>
-    /// GridLength 动画类
-    /// </summary>
-    public class GridLengthAnimation : AnimationTimeline
-    {
-        public override Type TargetPropertyType => typeof(GridLength);
-
-        protected override Freezable CreateInstanceCore()
-        {
-            return new GridLengthAnimation();
-        }
-
-        public GridLength? From
-        {
-            get => (GridLength?)GetValue(FromProperty);
-            set => SetValue(FromProperty, value);
-        }
-
-        public GridLength? To
-        {
-            get => (GridLength?)GetValue(ToProperty);
-            set => SetValue(ToProperty, value);
-        }
-
-        public IEasingFunction EasingFunction
-        {
-            get => (IEasingFunction)GetValue(EasingFunctionProperty);
-            set => SetValue(EasingFunctionProperty, value);
-        }
-
-        public static readonly DependencyProperty FromProperty =
-            DependencyProperty.Register("From", typeof(GridLength?), typeof(GridLengthAnimation));
-
-        public static readonly DependencyProperty ToProperty =
-            DependencyProperty.Register("To", typeof(GridLength?), typeof(GridLengthAnimation));
-
-        public static readonly DependencyProperty EasingFunctionProperty =
-            DependencyProperty.Register("EasingFunction", typeof(IEasingFunction), typeof(GridLengthAnimation));
-
-        public override object GetCurrentValue(object defaultOriginValue,
-            object defaultDestinationValue,
-            AnimationClock animationClock)
-        {
-            var from = From ?? (GridLength)defaultOriginValue;
-            var to = To ?? (GridLength)defaultDestinationValue;
-
-            if (animationClock.CurrentProgress == null)
-                return from;
-
-            var progress = animationClock.CurrentProgress.Value;
-            if (EasingFunction != null)
-                progress = EasingFunction.Ease(progress);
-
-            return new GridLength((1 - progress) * from.Value + progress * to.Value,
-                to.IsStar ? GridUnitType.Star : GridUnitType.Pixel);
-        }
-    }
-
-    private void NavButton_Click(object sender, RoutedEventArgs e)
-    {
-        // 如果导航栏是展开状态，点击后自动收起
-        if (_viewModel.IsNavExpanded) NavToggleButton_Click(FindName("NavToggleButton"), e);
-    }
 }

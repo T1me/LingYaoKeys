@@ -34,7 +34,6 @@ public class MainViewModel : ViewModelBase
     private readonly Storyboard? _fadeInStoryboard;
     private readonly Storyboard? _fadeOutStoryboard;
     private bool _isInitializing = true;
-    private bool _isNavExpanded = true;
 
     // 状态消息颜色
     private static readonly System.Windows.Media.Brush STATUS_COLOR_NORMAL = System.Windows.Media.Brushes.Black;
@@ -63,22 +62,6 @@ public class MainViewModel : ViewModelBase
     {
         UpdateStatusMessage(message, STATUS_COLOR_INFO);
     }
-
-    // 导航栏状态相关属性
-    public bool IsNavExpanded
-    {
-        get => _isNavExpanded;
-        set => SetProperty(ref _isNavExpanded, value);
-    }
-
-    // 导航栏列宽度
-    public GridLength NavColumnWidth => IsNavExpanded ? new GridLength(160) : new GridLength(60);
-
-    // 导航文本可见性
-    public Visibility NavTextVisibility => IsNavExpanded ? Visibility.Visible : Visibility.Collapsed;
-
-    // 导航切换按钮图标
-    public string NavToggleIcon => IsNavExpanded ? "\uE700" : "\uE701";
 
     public GlobalConfig GlobalConfig
     {

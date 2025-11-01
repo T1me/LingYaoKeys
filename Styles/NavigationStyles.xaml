@@ -3,7 +3,7 @@
 
     <!-- 导航按钮基础样式 - 现代WPF UI Large风格 -->
     <Style x:Key="NavButtonStyle" TargetType="RadioButton">
-        <Setter Property="Height" Value="50" />
+        <Setter Property="Height" Value="36" />
         <Setter Property="Foreground" Value="#666666" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Margin" Value="0,2,0,2" />
@@ -11,25 +11,15 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Grid>
-                        <!-- 选中指示器 -->
-                        <Border x:Name="SelectionIndicator"
-                                Width="3"
-                                HorizontalAlignment="Left"
-                                Background="#1976D2"
-                                Opacity="0" />
-
-                        <!-- 主背景 -->
-                        <Border x:Name="border"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="4"
-                                Margin="4,0,4,0"
-                                BorderThickness="0">
-                            <ContentPresenter HorizontalAlignment="Left"
-                                              VerticalAlignment="Center"
-                                              Margin="12,0,0,0" />
-                        </Border>
-                    </Grid>
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            Margin="0,0,4,0"
+                            BorderThickness="0">
+                        <ContentPresenter HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          Margin="5,0,10,0" />
+                    </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="border" Property="Background" Value="#F5F5F5" />
@@ -38,7 +28,6 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="border" Property="Background" Value="#E3F2FD" />
                             <Setter Property="Foreground" Value="#1976D2" />
-                            <Setter TargetName="SelectionIndicator" Property="Opacity" Value="1" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
