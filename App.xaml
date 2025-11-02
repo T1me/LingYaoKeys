@@ -13,8 +13,8 @@
                 <ResourceDictionary Source="Styles/ControlStyles.xaml" />        <!-- 通用控件样式 -->
                 <ResourceDictionary Source="Styles/SwitchStyles.xaml" />    <!-- 开关控件样式 -->
                 <ResourceDictionary Source="Styles/AnimationStyles.xaml" />     <!-- 页面切换动画资源 -->
-                <!-- <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/SkinDefault.xaml"/>
-                <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/Theme.xaml"/> -->
+                <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/SkinDefault.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/HandyControl;component/Themes/Theme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!-- 转换器 -->

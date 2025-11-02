@@ -7,6 +7,7 @@
       xmlns:behaviors="clr-namespace:WpfApp.Behaviors"
       xmlns:viewModels="clr-namespace:WpfApp.ViewModels"
       xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
+      xmlns:hc="https://handyorg.github.io/handycontrol"
       mc:Ignorable="d"
       Title="按键映射"
       behaviors:FocusManagerBehavior.ClearFocusOnClickOutside="True"
@@ -1007,19 +1008,17 @@
                                     </Border>
                                 </Popup>
 
-                                <ComboBox x:Name="cboKeyMode"
-                                          Style="{StaticResource ModernComboBox}"
-                                          ItemContainerStyle="{StaticResource ModernComboBoxItem}"
-                                          Width="120"
-                                          ItemsSource="{Binding KeyModes}"
-                                          SelectedIndex="{Binding SelectedKeyMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                                    <ComboBox.ItemTemplate>
+                                <hc:ComboBox x:Name="cboKeyMode"
+                                             Width="120"
+                                             ItemsSource="{Binding KeyModes}"
+                                             SelectedIndex="{Binding SelectedKeyMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                    <hc:ComboBox.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding}"
                                                        HorizontalAlignment="Center" />
                                         </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
+                                    </hc:ComboBox.ItemTemplate>
+                                </hc:ComboBox>
                             </DockPanel>
                         </StackPanel>
                     </Border>

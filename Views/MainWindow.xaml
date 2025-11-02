@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:behaviors="clr-namespace:WpfApp.Behaviors"
         xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
+        xmlns:hc="https://handyorg.github.io/handycontrol"
         mc:Ignorable="d"
         behaviors:FocusManagerBehavior.ClearFocusOnClickOutside="True"
         Title="{Binding WindowTitle}"
