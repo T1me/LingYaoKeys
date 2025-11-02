@@ -338,18 +338,18 @@ public partial class KeyMappingView : Page
     }
 
 
-    // ListBox 选择管理
+    // ListView 选择管理
     private void KeysList_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is ListBox listBox)
+        if (sender is System.Windows.Controls.ListView listView)
         {
             var scrollBar = FindParent<ScrollBar>(e.OriginalSource as DependencyObject);
             if (scrollBar != null) return;
 
-            var hitTest = VisualTreeHelper.HitTest(listBox, e.GetPosition(listBox));
-            if (hitTest == null || FindParent<ListBoxItem>(hitTest.VisualHit as DependencyObject) == null)
+            var hitTest = VisualTreeHelper.HitTest(listView, e.GetPosition(listView));
+            if (hitTest == null || FindParent<System.Windows.Controls.ListViewItem>(hitTest.VisualHit as DependencyObject) == null)
             {
-                listBox.SelectedItem = null;
+                listView.SelectedItem = null;
                 e.Handled = true;
             }
         }
@@ -486,5 +486,15 @@ public partial class KeyMappingView : Page
     {
         if (_hotkeyService != null)
             _hotkeyService.IsInputFocused = true;
+    }
+
+    private void KeysList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+
+    }
+
+    private void KeysList_SelectionChanged_1(object sender, SelectionChangedEventArgs e)
+    {
+
     }
 }

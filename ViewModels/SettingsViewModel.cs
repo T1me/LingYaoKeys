@@ -78,7 +78,7 @@ public class SettingsViewModel : ViewModelBase
             if (!App.LyKeysDriver.ReloadDriver(driver, driverFile))
             {
                 SetDriverStatus("🔴 加载失败", System.Windows.Media.Brushes.Red);
-                MessageBox.Show($"驱动加载失败({driverType})", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                HandyControl.Controls.MessageBox.Error($"驱动加载失败({driverType})", "错误");
             }
             else
             {
@@ -88,7 +88,7 @@ public class SettingsViewModel : ViewModelBase
         catch (Exception ex)
         {
             SetDriverStatus("🔴 加载失败", System.Windows.Media.Brushes.Red);
-            MessageBox.Show($"切换驱动失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            HandyControl.Controls.MessageBox.Error($"切换驱动失败: {ex.Message}", "错误");
         }
     }
 
@@ -205,11 +205,9 @@ public class SettingsViewModel : ViewModelBase
                 var updateInfo = _updateService.CheckForUpdate();
                 if (updateInfo != null)
                 {
-                    var result = MessageBox.Show(
+                    var result = HandyControl.Controls.MessageBox.Ask(
                         $"发现新版本：{updateInfo.LatestVersion}\n当前版本：{updateInfo.CurrentVersion}\n是否前往下载页面？",
-                        "发现新版本",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Information);
+                        "发现新版本");
 
                     if (result == MessageBoxResult.Yes)
                     {
@@ -220,11 +218,7 @@ public class SettingsViewModel : ViewModelBase
                 }
                 else
                 {
-                    MessageBox.Show(
-                        "当前已是最新版本",
-                        "检查更新",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                    HandyControl.Controls.MessageBox.Info("当前已是最新版本", "检查更新");
                     UpdateStatus = "已是最新";
                 }
             },
@@ -268,7 +262,7 @@ public class SettingsViewModel : ViewModelBase
                     var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
                     System.IO.File.WriteAllText(dialog.FileName, json);
 
-                    MessageBox.Show("配置导出成功！", "导出配置", MessageBoxButton.OK, MessageBoxImage.Information);
+                    HandyControl.Controls.MessageBox.Success("配置导出成功！", "导出配置");
                 }
             },
             "导出配置");
@@ -323,7 +317,7 @@ public class SettingsViewModel : ViewModelBase
                         });
                     }
 
-                    MessageBox.Show("配置导入成功！部分设置可能需要重启应用生效。", "导入配置", MessageBoxButton.OK, MessageBoxImage.Information);
+                    HandyControl.Controls.MessageBox.Success("配置导入成功！部分设置可能需要重启应用生效。", "导入配置");
 
                     UpdateDebugModeStatus();
                     UpdateDriverStatus();

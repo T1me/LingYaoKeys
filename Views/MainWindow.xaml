@@ -147,7 +147,7 @@
                             <Border Grid.Row="1"
                                     x:Name="NavPanel"
                                     Background="White"
-                                    BorderThickness="0,0,0,1"
+                                    BorderThickness="0"
                                     BorderBrush="#EEEEEE">
                                 <StackPanel Orientation="Horizontal" Margin="10,0">
                                     <RadioButton Style="{StaticResource NavButtonStyle}"
@@ -235,7 +235,9 @@
                                    Content="{Binding CurrentPage}" />
 
                             <!-- 状态栏 -->
-                            <StatusBar Grid.Row="3" Background="Transparent">
+                            <StatusBar Grid.Row="3"
+                                       Background="Transparent"
+                                       BorderThickness="0">
                                 <StatusBar.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <Grid>

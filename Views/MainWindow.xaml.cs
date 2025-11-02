@@ -130,7 +130,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _logger.Error("窗口初始化失败", ex);
-            System.Windows.MessageBox.Show($"窗口初始化失败: {ex.Message}\n\n{ex.StackTrace}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            HandyControl.Controls.MessageBox.Error($"窗口初始化失败: {ex.Message}\n\n{ex.StackTrace}", "错误");
             throw;
         }
     }

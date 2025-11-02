@@ -204,11 +204,7 @@ namespace WpfApp.Services.Utils
         {
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
-                System.Windows.MessageBox.Show(
-                    message,
-                    title,
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Error);
+                HandyControl.Controls.MessageBox.Error(message, title);
             });
         }
     }

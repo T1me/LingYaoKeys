@@ -8,6 +8,7 @@
       xmlns:viewModels="clr-namespace:WpfApp.ViewModels"
       xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
       xmlns:hc="https://handyorg.github.io/handycontrol"
+      xmlns:dd="urn:gong-wpf-dragdrop"
       mc:Ignorable="d"
       Title="按键映射"
       behaviors:FocusManagerBehavior.ClearFocusOnClickOutside="True"
@@ -20,31 +21,27 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- 功能开关组 - 现在作为顶部横向布局 -->
+            <!-- 功能开关组 - 可展开收缩 -->
             <Border Grid.Row="0"
                     Background="#FFFFFF"
                     BorderBrush="#E0E0E0"
                     BorderThickness="1"
                     CornerRadius="4"
-                    Padding="15"
                     Margin="0,0,0,10">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <!-- 区域标题 -->
-                    <TextBlock Grid.Row="0"
-                               Text="功能开关"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               Foreground="#333333"
-                               Margin="0,0,0,10" />
+                <Expander IsExpanded="True"
+                          BorderThickness="0"
+                          Background="Transparent">
+                    <Expander.Header>
+                        <TextBlock Text="功能开关"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="#333333"
+                                   Margin="5,5,0,5" />
+                    </Expander.Header>
 
                     <!-- 功能开关区域 - 横向布局 -->
-                    <WrapPanel Grid.Row="1"
-                               Orientation="Horizontal">
+                    <WrapPanel Orientation="Horizontal"
+                               Margin="15,5,0,0">
                         <!-- 总开关 -->
                         <DockPanel Margin="0,0,20,10">
                             <TextBlock Text="总开关"
@@ -304,7 +301,7 @@
                                       ToolTip="启用后，程序将使用硬件加速优化渲染性能，重启应用后生效" />
                         </DockPanel>
                     </WrapPanel>
-                </Grid>
+                </Expander>
             </Border>
 
             <!-- 主要内容区域 -->
@@ -589,236 +586,91 @@
                         </Grid>
                     </Grid>
 
-                    <ListBox x:Name="KeysList"
-                             IsEnabled="{Binding IsNotExecuting}"
-                             BorderThickness="1"
-                             ItemsSource="{Binding KeyList}"
-                             Background="White"
-                             BorderBrush="#BDBDBD"
-                             PreviewMouseDown="KeysList_PreviewMouseDown"
-                             ScrollViewer.CanContentScroll="True"
-                             VirtualizingStackPanel.IsVirtualizing="True"
-                             VirtualizingStackPanel.VirtualizationMode="Recycling"
-                             Margin="0,0,0,0">
-                        <b:Interaction.Behaviors>
-                            <behaviors:ListBoxDragDropBehavior />
-                        </b:Interaction.Behaviors>
-                        <ListBox.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Columns="1"
-                                             HorizontalAlignment="Stretch"
-                                             VerticalAlignment="Top" />
-                            </ItemsPanelTemplate>
-                        </ListBox.ItemsPanel>
-                        <ListBox.Template>
-                            <ControlTemplate TargetType="ListBox">
-                                <Border Background="{TemplateBinding Background}"
-                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                        BorderThickness="{TemplateBinding BorderThickness}"
-                                        CornerRadius="4">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" /> <!-- 表头行 -->
-                                            <RowDefinition Height="*" /> <!-- 内容行 -->
-                                        </Grid.RowDefinitions>
-                                        
-                                        <!-- 表头部分 - 固定在顶部 -->
-                                        <Grid Grid.Row="0" Margin="4,2,4,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="32" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="70" />
-                                                <ColumnDefinition Width="60" />
-                                            </Grid.ColumnDefinitions>
-
-                                            <!-- 删除列表头 -->
-                                            <TextBlock Grid.Column="0"
-                                                       Width="24"
-                                                       TextAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       FontSize="12"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="#505050"
-                                                       Text="" />
-
-                                            <!-- 按键名称/坐标列表头 -->
-                                            <TextBlock Grid.Column="1"
-                                                       Margin="4,0,0,0"
-                                                       VerticalAlignment="Center"
-                                                       FontSize="12"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="#505050"
-                                                       Text="按键名称/坐标" />
-
-                                            <!-- 间隔列表头 -->
-                                            <TextBlock Grid.Column="2"
-                                                       TextAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       FontSize="12"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="#505050"
-                                                       Margin="0,0,4,0"
-                                                       Text="间隔(ms)" />
-
-                                            <!-- 状态列表头 -->
-                                            <TextBlock Grid.Column="3"
-                                                       TextAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       FontSize="12"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="#505050"
-                                                       Text="状态" />
-                                        </Grid>
-
-                                        <!-- 分隔线 -->
-                                        <Border Grid.Row="0" Height="1"
-                                                Margin="4,26,4,0"
-                                                Background="#BDBDBD" />
-
-                                        <!-- 内容部分 - 可滚动 -->
-                                        <ScrollViewer Grid.Row="1"
-                                                      x:Name="ScrollViewer"
-                                                      Padding="4"
-                                                      Margin="0,6,0,0"
-                                                      Focusable="False"
-                                                      VerticalScrollBarVisibility="Auto"
-                                                      HorizontalScrollBarVisibility="Disabled"
-                                                      Template="{DynamicResource ScrollViewerControlTemplate}">
-                                            <ItemsPresenter />
-                                        </ScrollViewer>
-                                    </Grid>
-                                </Border>
-                            </ControlTemplate>
-                        </ListBox.Template>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border x:Name="itemBorder"
-                                        Background="Transparent"
-                                        CornerRadius="4"
-                                        Padding="4">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="32" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="80" />
-                                            <ColumnDefinition Width="50" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <!-- 删除按钮 -->
-                                        <Button Grid.Column="0"
-                                                Width="24"
-                                                Height="24"
-                                                VerticalAlignment="Center"
-                                                Style="{StaticResource CircleButtonStyle}">
-                                            <b:Interaction.Behaviors>
-                                                <behaviors:DeleteConfirmationBehavior CommandParameter="{Binding}" />
-                                            </b:Interaction.Behaviors>
-                                            <Path
-                                                Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
-                                                Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                Width="12" Height="12"
-                                                Stretch="Uniform" />
-                                            <Button.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock Text="删除此按键" />
-                                                </ToolTip>
-                                            </Button.ToolTip>
-                                        </Button>
-
-                                        <!-- 按键名称 -->
-                                        <TextBlock Grid.Column="1"
-                                                   Text="{Binding DisplayName}"
-                                                   VerticalAlignment="Center"
-                                                   FontWeight="Medium"
-                                                   Margin="4,0,0,0" />
-
-                                        <!-- 按键间隔输入框 -->
-                                        <StackPanel Grid.Column="2"
-                                                    Orientation="Horizontal"
+                    <ListView x:Name="KeysList"
+                              IsEnabled="{Binding IsNotExecuting}"
+                              ItemsSource="{Binding KeyList}"
+                              SelectionMode="Single"
+                              PreviewMouseDown="KeysList_PreviewMouseDown"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
+                              dd:DragDrop.IsDragSource="True"
+                              dd:DragDrop.IsDropTarget="True"
+                              dd:DragDrop.UseDefaultDragAdorner="True"
+                              dd:DragDrop.DefaultDragAdornerOpacity="0.5"
+                              Margin="0,0,0,0" SelectionChanged="KeysList_SelectionChanged_1">
+                        <ListView.View>
+                            <GridView>
+                                <!-- 删除按钮列 -->
+                                <GridViewColumn Width="50">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Width="24"
+                                                    Height="24"
                                                     VerticalAlignment="Center"
-                                                    HorizontalAlignment="Center">
-                                            <TextBox Style="{StaticResource ModernTextBox}"
+                                                    HorizontalAlignment="Center"
+                                                    Style="{StaticResource CircleButtonStyle}">
+                                                <b:Interaction.Behaviors>
+                                                    <behaviors:DeleteConfirmationBehavior CommandParameter="{Binding}" />
+                                                </b:Interaction.Behaviors>
+                                                <Path Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
+                                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      Width="12"
+                                                      Height="12"
+                                                      Stretch="Uniform" />
+                                                <Button.ToolTip>
+                                                    <ToolTip>
+                                                        <TextBlock Text="删除此按键" />
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <!-- 按键名称/坐标列 -->
+                                <GridViewColumn Header="按键名称/坐标" Width="200">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       VerticalAlignment="Center"
+                                                       FontWeight="Medium"
+                                                       Margin="8,0,0,0" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <!-- 间隔列 -->
+                                <GridViewColumn Header="间隔(ms)" Width="100">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Style="{StaticResource TextBoxExtend}"
                                                      Height="28"
-                                                     Width="70"
+                                                     Width="60"
                                                      VerticalContentAlignment="Center"
                                                      TextAlignment="Center"
                                                      FontSize="12"
-                                                     Padding="2,4,2,4"
                                                      ToolTip="按键间隔(ms)"
                                                      PreviewTextInput="NumberValidationTextBox"
                                                      GotFocus="NumberInput_GotFocus"
                                                      LostFocus="NumberInput_LostFocus"
                                                      Text="{Binding KeyInterval, Converter={StaticResource IntToStringConverter}, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
-                                            <TextBlock Margin="0,0,0,0"
-                                                       VerticalAlignment="Center"
-                                                       FontSize="12"
-                                                       Foreground="#707070" />
-                                        </StackPanel>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
 
-                                        <!-- ModernSwitch 开关 -->
-                                        <CheckBox Grid.Column="3"
-                                                  Height="32"
-                                                  Width="50"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"
-                                                  VerticalContentAlignment="Center">
-                                            <CheckBox.Style>
-                                                <Style TargetType="CheckBox" BasedOn="{StaticResource ModernSwitch}">
-                                                    <Setter Property="IsChecked" Value="{Binding IsSelected}" />
-                                                </Style>
-                                            </CheckBox.Style>
-                                        </CheckBox>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Height" Value="42" />
-                                <Setter Property="Margin" Value="4,1" />
-                                <Setter Property="Padding" Value="0" />
-                                <Setter Property="Background" Value="Transparent" />
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                <Setter Property="VerticalContentAlignment" Value="Center" />
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="Bd"
-                                                    Background="{TemplateBinding Background}"
-                                                    BorderThickness="0"
-                                                    CornerRadius="4"
-                                                    Padding="{TemplateBinding Padding}"
-                                                    SnapsToDevicePixels="true">
-                                                <ContentPresenter
-                                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="true">
-                                                    <Setter Property="Background" Value="#F5F9FF" />
-                                                </Trigger>
-                                                <Trigger Property="IsSelected" Value="true">
-                                                    <Setter Property="Background" Value="#E3F2FD" />
-                                                </Trigger>
-                                                <Trigger Property="behaviors:DragDropProperties.IsDragTarget"
-                                                         Value="true">
-                                                    <Setter Property="Background" Value="#E3F2FD" />
-                                                </Trigger>
-                                                <MultiTrigger>
-                                                    <MultiTrigger.Conditions>
-                                                        <Condition Property="IsSelected" Value="true" />
-                                                        <Condition Property="Selector.IsSelectionActive" Value="false" />
-                                                    </MultiTrigger.Conditions>
-                                                    <Setter Property="Background" Value="#E3F2FD" />
-                                                </MultiTrigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                    </ListBox>
+                                <!-- 状态开关列 -->
+                                <GridViewColumn Header="状态" Width="80">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ToggleButton Style="{StaticResource ToggleButtonSwitch}"
+                                                          HorizontalAlignment="Center"
+                                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
                 </DockPanel>
 
                 <!-- 右侧设置区域 -->

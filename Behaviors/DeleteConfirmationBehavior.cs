@@ -61,9 +61,17 @@ public class DeleteConfirmationBehavior : Behavior<Button>
         {
             AssociatedObject.Loaded += (s, e) =>
             {
+                // 支持 ListBox 和 DataGrid
                 var listBox = FindParent<System.Windows.Controls.ListBox>(AssociatedObject);
                 if (listBox != null)
+                {
                     AssociatedObject.Tag = listBox.DataContext;
+                    return;
+                }
+
+                var dataGrid = FindParent<System.Windows.Controls.DataGrid>(AssociatedObject);
+                if (dataGrid != null)
+                    AssociatedObject.Tag = dataGrid.DataContext;
             };
         }
     }
@@ -180,7 +188,7 @@ public class DeleteConfirmationBehavior : Behavior<Button>
         }
     }
 
-    private static void ClearAllConfirmStates()
+    private void ClearAllConfirmStates()
     {
         var buttonsToReset = new List<Button>(PendingButtons.Keys);
         foreach (var button in buttonsToReset)
@@ -191,6 +199,9 @@ public class DeleteConfirmationBehavior : Behavior<Button>
                 PendingButtons.Remove(button);
             }
             button.SetValue(ConfirmStateProperty, false);
+
+            // 重置按钮的视觉状态
+            ResetButton(button);
         }
     }
 }

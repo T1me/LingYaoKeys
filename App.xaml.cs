@@ -358,7 +358,7 @@ public partial class App : Application
             if (!LyKeysDriver.Initialize(driverFile))
             {
                 _logger.Error("驱动加载失败");
-                MessageBox.Show($"驱动加载失败({selectedDriver})，请检查是否以管理员身份运行", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                HandyControl.Controls.MessageBox.Error($"驱动加载失败({selectedDriver})，请检查是否以管理员身份运行", "错误");
                 Current.Shutdown();
                 return;
             }
@@ -380,7 +380,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             _logger.Error("应用程序启动失败", ex);
-            MessageBox.Show($"程序启动异常：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            HandyControl.Controls.MessageBox.Error($"程序启动异常：{ex.Message}", "错误");
             Current.Shutdown();
         }
     }

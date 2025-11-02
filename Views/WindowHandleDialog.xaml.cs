@@ -153,7 +153,7 @@ public partial class WindowHandleDialog : Window
         }
         else
         {
-            System.Windows.MessageBox.Show("请选择一个窗口", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            HandyControl.Controls.MessageBox.Info("请选择一个窗口", "提示");
         }
     }
 

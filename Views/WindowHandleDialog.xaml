@@ -4,8 +4,10 @@
         Title="选择窗口句柄"
         Height="500"
         Width="650"
-        WindowStyle="ToolWindow"
-        ResizeMode="NoResize">
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        MinHeight="400"
+        MinWidth="500">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
