@@ -133,13 +133,6 @@
 如果你遇到按键速度不理想的情况，可以尝试关闭"降低卡位"功能。但请注意，这可能在某些游戏中导致卡位移现象。根据你的实际使用场景选择合适的模式。
 </details>
 
-## 🍒 关于与建议
-
-- 该项目是本人利用工作之余首次尝试使用`C#`和`WPF`以及`Cursor AI`技术栈进行开发的实践项目
-- 目前项目处于开发初期，新功能正在持续添加中
-- 如果你对软件有任何功能与建议，欢迎在 [Issues](https://github.com/ZyphrZero/LingYaoKeys/issues) 中提出
-- 如果对项目感兴趣，欢迎参与讨论或提交 [Pull Request](https://github.com/ZyphrZero/LingYaoKeys/pulls)
-
 ## ⚙️ 开发相关
 
 ### 环境准备
@@ -147,10 +140,17 @@
 - 安装 [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - 推荐使用 [Visual Studio 2022](https://visualstudio.microsoft.com/) 或更高版本
 
-### 运行项目
+### 项目命令
 
+- 构建&运行
 ```bash
+dotnet build
 dotnet run
+```
+
+- 停止驱动
+```shell
+@echo off && sc query lykeys > nul 2>&1 && (echo Service exists, stopping... && sc stop lykeys > nul 2>&1 && timeout /t 2 /nobreak > nul && sc delete lykeys > nul 2>&1 && echo Service deleted successfully && exit) || (echo Service does not exist && exit)
 ```
 
 ## 🔧 驱动使用说明
