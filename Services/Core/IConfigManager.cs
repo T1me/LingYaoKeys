@@ -4,56 +4,6 @@ using WpfApp.Services.Models;
 namespace WpfApp.Services.Core
 {
     /// <summary>
-    /// 配置变更事件参数
-    /// </summary>
-    public class ConfigEventArgs : EventArgs
-    {
-        /// <summary>
-        /// 变更的配置类型
-        /// </summary>
-        public ConfigChangeType ChangeType { get; }
-
-        /// <summary>
-        /// 全局配置（当ChangeType为Global或All时有效）
-        /// </summary>
-        public GlobalConfig? GlobalConfigData { get; }
-
-        /// <summary>
-        /// 按键配置（当ChangeType为Key或All时有效）
-        /// </summary>
-        public KeyConfigData? KeyConfigData { get; }
-
-        public ConfigEventArgs(ConfigChangeType changeType, GlobalConfig? globalConfig = null,
-            KeyConfigData? keyConfig = null)
-        {
-            ChangeType = changeType;
-            GlobalConfigData = globalConfig;
-            KeyConfigData = keyConfig;
-        }
-    }
-
-    /// <summary>
-    /// 配置变更类型
-    /// </summary>
-    public enum ConfigChangeType
-    {
-        /// <summary>
-        /// 全局配置变更
-        /// </summary>
-        Global,
-
-        /// <summary>
-        /// 按键配置变更
-        /// </summary>
-        Key,
-
-        /// <summary>
-        /// 所有配置变更
-        /// </summary>
-        All
-    }
-    
-    /// <summary>
     /// 统一配置管理接口
     /// </summary>
     public interface IConfigManager
