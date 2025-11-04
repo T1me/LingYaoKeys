@@ -17,13 +17,36 @@ public class RelayCommand<T> : ICommand
     // 命令是否可用
     public bool CanExecute(object? parameter)
     {
-        return _canExecute?.Invoke((T)parameter!) ?? true;
+        if (_canExecute == null)
+            return true;
+
+        // 安全地转换参数
+        if (parameter == null && default(T) == null)
+            return _canExecute((T)(object?)null!);
+
+        if (parameter is T typedParameter)
+            return _canExecute(typedParameter);
+
+        return false;
     }
 
     // 执行命令
     public void Execute(object? parameter)
     {
-        _execute((T)parameter!);
+        // 安全地转换参数
+        if (parameter == null && default(T) == null)
+        {
+            _execute((T)(object?)null!);
+            return;
+        }
+
+        if (parameter is T typedParameter)
+        {
+            _execute(typedParameter);
+            return;
+        }
+
+        throw new ArgumentException($"Parameter must be of type {typeof(T).Name}", nameof(parameter));
     }
 
     public event EventHandler? CanExecuteChanged

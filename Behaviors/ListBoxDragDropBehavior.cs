@@ -240,8 +240,9 @@ public class ListBoxDragDropBehavior : Behavior<System.Windows.Controls.ListBox>
                             // 更新HotkeyService的按键列表并触发保存
                             if (listBox.DataContext is KeyMappingViewModel viewModel)
                             {
-                                viewModel.SyncKeyListToHotkeyService();
-                                viewModel.SaveKeyConfig();
+                                // 多配置架构中，配置自动保存，无需手动调用
+                                // viewModel.SyncKeyListToHotkeyService();
+                                // viewModel.SaveKeyConfig();
                             }
                         }
                     }
@@ -308,7 +309,8 @@ public class ListBoxDragDropBehavior : Behavior<System.Windows.Controls.ListBox>
         // 通过ViewModel通知需要更新坐标索引
         if (AssociatedObject?.DataContext is KeyMappingViewModel viewModel)
         {
-            viewModel.TriggerCoordinateIndicesUpdate();
+            // 多配置架构中，坐标索引由 CoordinateManagementService 自动管理
+            // viewModel.TriggerCoordinateIndicesUpdate();
         }
     }
 

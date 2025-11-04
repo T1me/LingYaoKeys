@@ -5,7 +5,6 @@
 
     <!-- 通用输入框样式 -->
     <Style x:Key="ModernTextBox" TargetType="TextBox">
-        <Setter Property="behaviors:FocusManagerBehavior.ClearFocusOnClickOutside" Value="True" />
         <Setter Property="Height" Value="32" />
         <Setter Property="Padding" Value="8,4" />
         <Setter Property="Background" Value="White" />
@@ -15,6 +14,7 @@
         <Setter Property="BorderBrush" Value="#BDBDBD" />
         <Setter Property="Focusable" Value="True" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -22,27 +22,42 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="4">
+                            CornerRadius="4"
+                            SnapsToDevicePixels="True">
                         <Grid>
+                            <!-- 占位符文本 -->
                             <TextBlock x:Name="placeholder"
                                        Text="{TemplateBinding Tag}"
                                        Foreground="#999999"
                                        Margin="{TemplateBinding Padding}"
                                        VerticalAlignment="Center"
-                                       HorizontalAlignment="Center"
-                                       Visibility="Collapsed" />
+                                       HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                       Visibility="Collapsed"
+                                       IsHitTestVisible="False" />
+                            <!-- 内容区域 -->
                             <ScrollViewer x:Name="PART_ContentHost"
                                           Margin="2"
-                                          VerticalAlignment="Center" />
+                                          VerticalAlignment="Center"
+                                          Focusable="False" />
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <!-- 鼠标悬停效果 -->
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="BorderBrush" Value="#90CAF9" />
+                            <Setter TargetName="border" Property="BorderBrush" Value="#90CAF9" />
                         </Trigger>
+                        <!-- 聚焦效果 -->
                         <Trigger Property="IsFocused" Value="True">
-                            <Setter Property="BorderBrush" Value="#FF0000" />
+                            <Setter TargetName="border" Property="BorderBrush" Value="#2196F3" />
+                            <Setter TargetName="border" Property="BorderThickness" Value="2" />
                         </Trigger>
+                        <!-- 禁用效果 -->
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Background" Value="#F5F5F5" />
+                            <Setter TargetName="border" Property="BorderBrush" Value="#E0E0E0" />
+                            <Setter Property="Foreground" Value="#BDBDBD" />
+                        </Trigger>
+                        <!-- 显示占位符：文本为空且未聚焦 -->
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="Text" Value="" />
