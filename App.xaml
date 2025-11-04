@@ -25,6 +25,7 @@
             <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
             <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
             <converters:RatioConverter x:Key="RatioConverter" />
+            <converters:IndexConverter x:Key="IndexConverter" />
 
             <!-- 颜色资源 -->
             <SolidColorBrush x:Key="PrimaryBrush" Color="#2196F3" />

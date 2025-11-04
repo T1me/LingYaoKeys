@@ -229,10 +229,11 @@
                             </Border>
 
                             <!-- 主内容区域 -->
-                            <Frame Grid.Row="2"
-                                   x:Name="MainFrame"
-                                   NavigationUIVisibility="Hidden"
-                                   Content="{Binding CurrentPage}" />
+                            <hc:DialogContainer Grid.Row="2">
+                                <Frame x:Name="MainFrame"
+                                       NavigationUIVisibility="Hidden"
+                                       Content="{Binding CurrentPage}" />
+                            </hc:DialogContainer>
 
                             <!-- 状态栏 -->
                             <StatusBar Grid.Row="3"

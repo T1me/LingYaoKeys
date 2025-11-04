@@ -13,18 +13,18 @@ namespace WpfApp.Services.Core
     public class KeyListManagementService
     {
         private readonly LyKeysService _lyKeysService;
-        private readonly HotkeyService _hotkeyService;
+        private readonly HotkeyService? _hotkeyService;
         private readonly CoordinateManagementService _coordinateService;
 
         public event EventHandler? KeyListChanged;
 
         public KeyListManagementService(
             LyKeysService lyKeysService,
-            HotkeyService hotkeyService,
+            HotkeyService? hotkeyService,
             CoordinateManagementService coordinateService)
         {
             _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
-            _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
+            _hotkeyService = hotkeyService; // 可选参数，允许为 null
             _coordinateService = coordinateService ?? throw new ArgumentNullException(nameof(coordinateService));
         }
 
@@ -123,6 +123,13 @@ namespace WpfApp.Services.Core
         {
             try
             {
+                // 如果没有热键服务（例如在配置对话框中），跳过同步
+                if (_hotkeyService == null)
+                {
+                    SerilogManager.Instance.Debug("热键服务未初始化，跳过同步");
+                    return;
+                }
+
                 var selectedItems = keyList.Where(k => k.IsSelected).ToList();
 
                 if (!selectedItems.Any())

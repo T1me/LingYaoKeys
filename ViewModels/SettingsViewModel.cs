@@ -294,10 +294,8 @@ public class SettingsViewModel : ViewModelBase
                         {
                             gc.UI = config.GlobalConfig.UI;
                             gc.Debug = config.GlobalConfig.Debug;
-                            gc.soundEnabled = config.GlobalConfig.soundEnabled;
-                            gc.SoundVolume = config.GlobalConfig.SoundVolume;
-                            gc.AutoSwitchToEnglishIME = config.GlobalConfig.AutoSwitchToEnglishIME;
                             gc.SelectedDriver = config.GlobalConfig.SelectedDriver;
+                            // 注意：soundEnabled, SoundVolume, AutoSwitchToEnglishIME 已移至 KeyConfiguration
                         });
                     }
 
