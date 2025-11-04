@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using WpfApp.Services.Models;
 using WpfApp.Services.Utils;
@@ -9,62 +10,72 @@ namespace WpfApp.Services.Core
 {
     /// <summary>
     /// 统一配置管理服务
-    /// 负责管理全局配置、按键配置和配置文件的加载、保存、切换等操作
+    /// 负责管理全局配置、多按键配置和配置文件的加载、保存等操作
     /// 采用实时保存策略，所有配置更改立即持久化到磁盘
     /// </summary>
-
     public class ConfigManager : IConfigManager
     {
         #region 私有字段
-        
+
         private static ConfigManager _instance;
         private static readonly object _instanceLock = new object();
-        
+
         /// <summary>
         /// 配置锁：保护共享状态的访问，确保线程安全
         /// 注意：I/O 操作应在锁外执行，避免长时间持有锁
         /// </summary>
         private readonly object _configLock = new object();
-        
+
         private readonly SerilogManager _logger = SerilogManager.Instance;
         private readonly PathService _pathService = PathService.Instance;
 
         private string _configDir;
         private string _globalConfigPath;
-        private string _keyConfigPath;
+        private string _multiKeyConfigPath;
 
         /// <summary>全局配置实例</summary>
         private GlobalConfig _globalConfig;
 
-        /// <summary>当前按键配置实例</summary>
-        private KeyConfigData _currentKeyConfig;
-        
+        /// <summary>多配置数据实例</summary>
+        private MultiKeyConfigData _multiKeyConfigData;
+
         #endregion
-        
+
         #region 公共属性和事件
-        
+
         /// <summary>
         /// 配置变更事件
         /// 当配置发生变更时触发，订阅者可根据 ConfigChangeType 执行相应操作
         /// </summary>
         public event EventHandler<ConfigEventArgs> ConfigChanged;
-        
+
         /// <summary>
         /// 获取全局配置
-        /// 包含 UI 设置、调试设置、音频设置等应用级配置
+        /// 包含 UI 设置、调试设置等应用级配置
         /// </summary>
         public GlobalConfig GlobalConfig => _globalConfig;
 
         /// <summary>
-        /// 获取当前按键配置
-        /// 包含热键、按键序列、目标窗口等按键相关配置
+        /// 获取多配置数据
+        /// 包含所有按键配置方案
         /// </summary>
-        public KeyConfigData CurrentKeyConfig => _currentKeyConfig;
-        
+        public MultiKeyConfigData MultiKeyConfigData => _multiKeyConfigData;
+
+        /// <summary>
+        /// 获取当前激活的配置
+        /// </summary>
+        public KeyConfiguration ActiveConfiguration => _multiKeyConfigData?.GetActiveConfiguration();
+
+        /// <summary>
+        /// 获取当前按键配置（兼容性属性，已废弃）
+        /// </summary>
+        [Obsolete("请使用 ActiveConfiguration 或 MultiKeyConfigData")]
+        public KeyConfigData CurrentKeyConfig => null;
+
         #endregion
-        
+
         #region 单例模式
-        
+
         /// <summary>
         /// 获取 ConfigManager 的单例实例
         /// 使用双重检查锁定模式确保线程安全
@@ -83,7 +94,7 @@ namespace WpfApp.Services.Core
                 return _instance;
             }
         }
-        
+
         /// <summary>
         /// 私有构造函数，确保单例模式
         /// 初始化配置路径信息
@@ -92,13 +103,13 @@ namespace WpfApp.Services.Core
         {
             _configDir = _pathService.ConfigPath;
             _globalConfigPath = _pathService.GetGlobalConfigPath();
-            _keyConfigPath = _pathService.GetKeyConfigPath();
+            _multiKeyConfigPath = Path.Combine(_configDir, "multi_key_config.json");
         }
-        
+
         #endregion
-        
+
         #region 初始化方法
-        
+
         /// <summary>
         /// 初始化配置管理器
         /// </summary>
@@ -118,8 +129,8 @@ namespace WpfApp.Services.Core
                 // 加载全局配置
                 LoadGlobalConfig();
 
-                // 加载当前按键配置
-                LoadCurrentKeyConfig();
+                // 加载多配置数据
+                LoadMultiKeyConfig();
 
                 _logger.Debug("配置管理器初始化完成");
             }
@@ -139,11 +150,11 @@ namespace WpfApp.Services.Core
 
                     // 创建默认配置
                     _globalConfig = CreateDefaultGlobalConfig();
-                    _currentKeyConfig = CreateDefaultKeyConfig();
+                    _multiKeyConfigData = CreateDefaultMultiKeyConfig();
 
                     // 保存默认配置
                     SaveGlobalConfig();
-                    SaveCurrentKeyConfig();
+                    SaveMultiKeyConfig();
 
                     _logger.Warning("已使用默认配置初始化配置管理器");
                 }
@@ -154,17 +165,17 @@ namespace WpfApp.Services.Core
                 }
             }
         }
-        
+
         #endregion
-        
+
         #region 配置保存和加载方法
-        
+
         private void LoadGlobalConfig()
         {
             try
             {
                 GlobalConfig loadedConfig;
-                
+
                 if (File.Exists(_globalConfigPath))
                 {
                     var json = File.ReadAllText(_globalConfigPath);
@@ -176,12 +187,12 @@ namespace WpfApp.Services.Core
                     loadedConfig = CreateDefaultGlobalConfig();
                     _logger.Debug("全局配置不存在，已创建默认配置");
                 }
-                
+
                 lock (_configLock)
                 {
                     _globalConfig = loadedConfig;
                 }
-                
+
                 if (!File.Exists(_globalConfigPath))
                 {
                     SaveGlobalConfig();
@@ -191,126 +202,134 @@ namespace WpfApp.Services.Core
             {
                 _logger.Error($"加载全局配置失败: {ex.Message}", ex);
                 _logger.Warning("将使用默认全局配置");
-                
+
                 lock (_configLock)
                 {
                     _globalConfig = CreateDefaultGlobalConfig();
                 }
-                
+
                 SaveGlobalConfig();
             }
         }
-        
-        private void LoadCurrentKeyConfig()
+
+        private void LoadMultiKeyConfig()
         {
             try
             {
-                KeyConfigData loadedConfig;
+                MultiKeyConfigData loadedConfig;
                 bool needsSave = false;
 
-                if (File.Exists(_keyConfigPath))
+                if (File.Exists(_multiKeyConfigPath))
                 {
                     try
                     {
-                        var json = File.ReadAllText(_keyConfigPath);
+                        var json = File.ReadAllText(_multiKeyConfigPath);
 
                         if (string.IsNullOrWhiteSpace(json))
                         {
-                            _logger.Warning($"配置文件为空: {_keyConfigPath}");
-                            loadedConfig = CreateDefaultKeyConfig();
+                            _logger.Warning($"多配置文件为空: {_multiKeyConfigPath}");
+                            loadedConfig = CreateDefaultMultiKeyConfig();
                             needsSave = true;
                         }
                         else
                         {
-                            loadedConfig = JsonConvert.DeserializeObject<KeyConfigData>(json) ?? CreateDefaultKeyConfig();
+                            loadedConfig = JsonConvert.DeserializeObject<MultiKeyConfigData>(json) ?? CreateDefaultMultiKeyConfig();
 
-                            // 确保 keys 列表不为 null（但允许为空）
-                            if (loadedConfig.keys == null)
+                            // 确保配置列表不为 null
+                            if (loadedConfig.Configurations == null)
                             {
-                                loadedConfig.keys = new List<KeyConfig>();
+                                loadedConfig.Configurations = new List<KeyConfiguration>();
                             }
 
-                            _logger.Debug($"已加载按键配置，按键数量: {loadedConfig.keys.Count}");
+                            // 如果没有配置，创建默认配置
+                            if (loadedConfig.Configurations.Count == 0)
+                            {
+                                var defaultConfig = CreateDefaultKeyConfiguration();
+                                loadedConfig.AddConfiguration(defaultConfig);
+                                needsSave = true;
+                            }
+
+                            _logger.Debug($"已加载多配置数据，配置数量: {loadedConfig.Configurations.Count}");
                         }
                     }
                     catch (JsonException jsonEx)
                     {
-                        _logger.Error($"配置文件格式错误: {_keyConfigPath}", jsonEx);
-                        loadedConfig = CreateDefaultKeyConfig();
+                        _logger.Error($"多配置文件格式错误: {_multiKeyConfigPath}", jsonEx);
+                        loadedConfig = CreateDefaultMultiKeyConfig();
                         needsSave = true;
                     }
                 }
                 else
                 {
-                    _logger.Warning($"配置文件不存在: {_keyConfigPath}，创建默认配置");
-                    loadedConfig = CreateDefaultKeyConfig();
+                    _logger.Warning($"多配置文件不存在: {_multiKeyConfigPath}，创建默认配置");
+                    loadedConfig = CreateDefaultMultiKeyConfig();
                     needsSave = true;
                 }
 
                 lock (_configLock)
                 {
-                    _currentKeyConfig = loadedConfig;
+                    _multiKeyConfigData = loadedConfig;
                 }
 
                 if (needsSave)
                 {
-                    SaveCurrentKeyConfig();
+                    SaveMultiKeyConfig();
                 }
             }
             catch (Exception ex)
             {
-                _logger.Error($"加载按键配置失败: {ex.Message}", ex);
-                _logger.Warning("将使用默认按键配置");
+                _logger.Error($"加载多配置数据失败: {ex.Message}", ex);
+                _logger.Warning("将使用默认多配置数据");
 
                 lock (_configLock)
                 {
-                    _currentKeyConfig = CreateDefaultKeyConfig();
+                    _multiKeyConfigData = CreateDefaultMultiKeyConfig();
                 }
 
                 try
                 {
-                    SaveCurrentKeyConfig();
+                    SaveMultiKeyConfig();
                 }
                 catch (Exception saveEx)
                 {
-                    _logger.Error($"保存默认配置失败: {saveEx.Message}", saveEx);
+                    _logger.Error($"保存默认多配置失败: {saveEx.Message}", saveEx);
                 }
             }
         }
-        
+
         private void SaveGlobalConfig()
         {
             GlobalConfig configSnapshot;
-            
+
             lock (_configLock)
             {
                 configSnapshot = _globalConfig;
             }
-            
+
             var json = JsonConvert.SerializeObject(configSnapshot, Formatting.Indented);
             File.WriteAllText(_globalConfigPath, json);
             _logger.Debug("全局配置已保存");
         }
-        
-        private void SaveCurrentKeyConfig()
+
+        private void SaveMultiKeyConfig()
         {
-            KeyConfigData configSnapshot;
+            MultiKeyConfigData configSnapshot;
 
             lock (_configLock)
             {
-                if (_currentKeyConfig == null)
+                if (_multiKeyConfigData == null)
                 {
-                    _logger.Warning("按键配置数据为空，无法保存");
+                    _logger.Warning("多配置数据为空，无法保存");
                     return;
                 }
 
-                configSnapshot = _currentKeyConfig;
+                configSnapshot = _multiKeyConfigData;
             }
 
             try
             {
                 // 确保目录存在
-                var directory = Path.GetDirectoryName(_keyConfigPath);
+                var directory = Path.GetDirectoryName(_multiKeyConfigPath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
                     Directory.CreateDirectory(directory);
@@ -318,22 +337,21 @@ namespace WpfApp.Services.Core
                 }
 
                 var json = JsonConvert.SerializeObject(configSnapshot, Formatting.Indented);
-                File.WriteAllText(_keyConfigPath, json);
+                File.WriteAllText(_multiKeyConfigPath, json);
 
-                _logger.Debug("按键配置已保存");
+                _logger.Debug($"多配置数据已保存，配置数量: {configSnapshot.Configurations.Count}");
             }
             catch (Exception ex)
             {
-                _logger.Error($"保存按键配置失败: {_keyConfigPath}", ex);
+                _logger.Error($"保存多配置数据失败: {_multiKeyConfigPath}", ex);
                 throw;
             }
         }
-        
+
         /// <summary>
         /// 创建默认全局配置
         /// 返回包含默认值的全局配置对象
         /// </summary>
-        /// <returns>默认全局配置实例</returns>
         private GlobalConfig CreateDefaultGlobalConfig()
         {
             return new GlobalConfig
@@ -349,7 +367,8 @@ namespace WpfApp.Services.Core
                     {
                         Left = 0,
                         Top = 0,
-                        IsEnabled = true
+                        IsEnabled = true,
+                        Opacity = 0.8
                     }
                 },
                 Debug = new DebugConfig
@@ -364,63 +383,65 @@ namespace WpfApp.Services.Core
                         RetainDays = 7
                     }
                 },
-                soundEnabled = false,
-                IsReduceKeyStuck = true,
-                SoundVolume = 0.8,
-                AutoSwitchToEnglishIME = true,
-                isHotkeyControlEnabled = true
+                isHotkeyControlEnabled = true,
+                EnableHardwareAcceleration = true,
+                SelectedDriver = "AHK"
             };
         }
-        
+
+        /// <summary>
+        /// 创建默认多配置数据
+        /// </summary>
+        private MultiKeyConfigData CreateDefaultMultiKeyConfig()
+        {
+            var multiConfig = new MultiKeyConfigData();
+            var defaultConfig = CreateDefaultKeyConfiguration();
+            multiConfig.AddConfiguration(defaultConfig);
+            return multiConfig;
+        }
+
         /// <summary>
         /// 创建默认按键配置
-        /// 返回包含默认热键和按键序列的配置对象
         /// </summary>
-        /// <returns>默认按键配置实例</returns>
-        private KeyConfigData CreateDefaultKeyConfig()
+        private KeyConfiguration CreateDefaultKeyConfiguration()
         {
-            return new KeyConfigData
+            return new KeyConfiguration("默认配置")
             {
-                startKey = VirtualKeyCode.VK_F9,
-                startMods = 0,
-                stopKey = VirtualKeyCode.VK_F9,
-                stopMods = 0,
-                keys = new List<KeyConfig>
+                StartKey = VirtualKeyCode.VK_F9,
+                StartMods = 0,
+                StopKey = VirtualKeyCode.VK_F9,
+                StopMods = 0,
+                ExecutionMode = KeyExecutionMode.Sequence,
+                Interval = 10,
+                KeyPressInterval = 5,
+                IsReduceKeyStuck = true,
+                SoundEnabled = false,
+                SoundVolume = 0.8,
+                AutoSwitchToEnglishIME = true,
+                Keys = new List<KeyConfig>
                 {
                     new KeyConfig(VirtualKeyCode.VK_F, true, 10),
                     new KeyConfig(VirtualKeyCode.VK_1, true, 10),
                     new KeyConfig(VirtualKeyCode.VK_2, true, 10),
                     new KeyConfig(VirtualKeyCode.VK_3, true, 10)
                 },
-                keyMode = 0,
-                interval = 10,
-                KeyPressInterval = 5,
                 TargetWindows = new List<TargetWindow>()
             };
         }
-        
+
         #endregion
-        
+
         #region 事件触发方法
-        
+
         /// <summary>
         /// 触发配置变更事件
-        /// 通知所有订阅者配置已发生变更
         /// </summary>
-        /// <param name="changeType">变更类型</param>
-        /// <param name="globalConfig">全局配置（仅在 Global 类型时传递）</param>
-        /// <param name="keyConfig">按键配置（仅在 Key 类型时传递）</param>
-        /// <remarks>
-        /// 事件触发规则：
-        /// - Global: 仅传递 globalConfig，用于通知全局设置变更
-        /// - Key: 传递 keyConfig，用于通知按键配置变更
-        /// </remarks>
         private void RaiseConfigChanged(ConfigChangeType changeType, GlobalConfig globalConfig = null,
-            KeyConfigData keyConfig = null)
+            MultiKeyConfigData multiKeyConfig = null)
         {
             try
             {
-                var args = new ConfigEventArgs(changeType, globalConfig, keyConfig);
+                var args = new ConfigEventArgs(changeType, globalConfig, null);
                 ConfigChanged?.Invoke(this, args);
                 _logger.Debug($"触发配置变更事件: {changeType}");
             }
@@ -429,11 +450,11 @@ namespace WpfApp.Services.Core
                 _logger.Error($"触发配置变更事件失败: {changeType}", ex);
             }
         }
-        
+
         #endregion
-        
+
         #region 配置更新方法
-        
+
         /// <summary>
         /// 更新全局配置
         /// 执行更新操作后立即保存到磁盘，并触发 ConfigChanged 事件
@@ -442,9 +463,9 @@ namespace WpfApp.Services.Core
         {
             if (updateAction == null)
                 throw new ArgumentNullException(nameof(updateAction));
-            
+
             GlobalConfig configSnapshot;
-            
+
             lock (_configLock)
             {
                 if (_globalConfig == null)
@@ -455,55 +476,52 @@ namespace WpfApp.Services.Core
                 updateAction(_globalConfig);
                 configSnapshot = _globalConfig;
             }
-            
+
             SaveGlobalConfig();
             RaiseConfigChanged(ConfigChangeType.Global, configSnapshot, null);
             _logger.Debug("Global配置已更新并保存");
         }
-        
+
         /// <summary>
-        /// 更新当前按键配置
+        /// 更新多配置数据
         /// 执行更新操作后立即保存到磁盘，并触发 ConfigChanged 事件
         /// </summary>
-        public void UpdateKeyConfig(Action<KeyConfigData> updateAction)
+        public void UpdateMultiKeyConfig(Action<MultiKeyConfigData> updateAction)
         {
             if (updateAction == null)
                 throw new ArgumentNullException(nameof(updateAction));
 
-            KeyConfigData configSnapshot;
+            MultiKeyConfigData configSnapshot;
 
             lock (_configLock)
             {
-                if (_currentKeyConfig == null)
+                if (_multiKeyConfigData == null)
                 {
-                    _logger.Warning("Key配置为空，无法更新");
+                    _logger.Warning("多配置数据为空，无法更新");
                     return;
                 }
-                updateAction(_currentKeyConfig);
-                configSnapshot = _currentKeyConfig;
+                updateAction(_multiKeyConfigData);
+                configSnapshot = _multiKeyConfigData;
             }
 
-            SaveCurrentKeyConfig();
-            RaiseConfigChanged(ConfigChangeType.Key, null, configSnapshot);
-            _logger.Debug("Key配置已更新并保存");
+            SaveMultiKeyConfig();
+            RaiseConfigChanged(ConfigChangeType.MultiKey, null, configSnapshot);
+            _logger.Debug("多配置数据已更新并保存");
         }
-        
+
+        /// <summary>
+        /// 更新当前按键配置（已废弃，保留用于兼容性）
+        /// </summary>
+        [Obsolete("请使用 UpdateMultiKeyConfig")]
+        public void UpdateKeyConfig(Action<KeyConfigData> updateAction)
+        {
+            _logger.Warning("UpdateKeyConfig 已废弃，请使用 UpdateMultiKeyConfig");
+        }
+
         #endregion
-        
-        #region 配置切换方法
-        
-        #endregion
-        
-        #region 配置文件操作方法
-        
-        #endregion
-        
-        #region 配置导入导出方法
-        
-        #endregion
-        
+
         #region 资源清理和辅助方法
-        
+
         /// <summary>
         /// 清理配置管理器资源
         /// 取消所有事件订阅，释放资源
@@ -517,7 +535,7 @@ namespace WpfApp.Services.Core
                 {
                     // 清理事件订阅
                     ConfigChanged = null;
-                    
+
                     _logger.Debug("配置管理器资源已清理");
                 }
             }
@@ -526,7 +544,47 @@ namespace WpfApp.Services.Core
                 _logger.Error("清理配置管理器资源失败", ex);
             }
         }
-        
+
         #endregion
     }
-} 
+
+    /// <summary>
+    /// 配置变更类型枚举
+    /// </summary>
+    public enum ConfigChangeType
+    {
+        /// <summary>全局配置变更</summary>
+        Global,
+
+        /// <summary>按键配置变更（已废弃）</summary>
+        [Obsolete]
+        Key,
+
+        /// <summary>多配置数据变更</summary>
+        MultiKey,
+
+        /// <summary>所有配置变更</summary>
+        All
+    }
+
+    /// <summary>
+    /// 配置变更事件参数
+    /// </summary>
+    public class ConfigEventArgs : EventArgs
+    {
+        public ConfigChangeType ChangeType { get; }
+        public GlobalConfig GlobalConfigData { get; }
+
+        [Obsolete]
+        public KeyConfigData KeyConfigData { get; }
+
+        public MultiKeyConfigData MultiKeyConfigData { get; }
+
+        public ConfigEventArgs(ConfigChangeType changeType, GlobalConfig globalConfig, KeyConfigData keyConfig)
+        {
+            ChangeType = changeType;
+            GlobalConfigData = globalConfig;
+            KeyConfigData = keyConfig;
+        }
+    }
+}

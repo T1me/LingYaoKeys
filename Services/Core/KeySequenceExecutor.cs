@@ -18,6 +18,7 @@ public class KeySequenceExecutor
     private bool _isRunning;
     private Action? _onCompleted;
     private bool _isHoldMode;
+    private KeyConfiguration? _currentConfig;
 
     public KeySequenceExecutor(
         LyKeysService driverService,
@@ -35,23 +36,28 @@ public class KeySequenceExecutor
     /// <summary>
     /// 启动按键序列执行
     /// </summary>
-    public void Start(List<KeyItemSettings> operations, bool isHoldMode, Action? onCompleted = null)
+    /// <param name="operations">按键操作列表</param>
+    /// <param name="isHoldMode">是否为按压模式</param>
+    /// <param name="config">配置信息（包含音效、输入法等设置）</param>
+    /// <param name="onCompleted">完成回调</param>
+    public void Start(List<KeyItemSettings> operations, bool isHoldMode, KeyConfiguration config, Action? onCompleted = null)
     {
         if (_isRunning || operations == null || operations.Count == 0) return;
 
         _isRunning = true;
         _isHoldMode = isHoldMode;
         _onCompleted = onCompleted;
+        _currentConfig = config;
 
         // 副作用：输入法切换
-        if (_configManager.GlobalConfig.AutoSwitchToEnglishIME == true)
+        if (config.AutoSwitchToEnglishIME)
         {
             _inputMethodService.StoreCurrentLayout();
             _inputMethodService.SwitchToEnglish();
         }
 
         // 副作用：播放启动音效
-        if (_configManager.GlobalConfig.soundEnabled == true)
+        if (config.SoundEnabled)
         {
             _audioService.PlayStartSound();
         }
@@ -90,22 +96,25 @@ public class KeySequenceExecutor
     /// </summary>
     private void OnExecutionCompleted()
     {
-        if (!_isRunning) return;
+        if (!_isRunning || _currentConfig == null) return;
 
         _isRunning = false;
         _currentMode = null;
 
         // 副作用：恢复输入法
-        if (_configManager.GlobalConfig.AutoSwitchToEnglishIME == true)
+        if (_currentConfig.AutoSwitchToEnglishIME)
         {
             _inputMethodService.RestorePreviousLayout();
         }
 
         // 副作用：播放停止音效
-        if (_configManager.GlobalConfig.soundEnabled == true)
+        if (_currentConfig.SoundEnabled)
         {
             _audioService.PlayStopSound();
         }
+
+        // 清理配置引用
+        _currentConfig = null;
 
         // 回调通知
         _onCompleted?.Invoke();

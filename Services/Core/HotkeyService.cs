@@ -125,41 +125,16 @@ public class HotkeyService
     // 加载初始状态
     private void LoadInitialState()
     {
-        var keyConfig = _configManager.CurrentKeyConfig;
-
-        // 加载按键列表
-        if (keyConfig.keys?.Count > 0)
+        try
         {
-            // 获取所有选中的按键和坐标
-            var selectedItems = keyConfig.keys.Where(k => k.IsSelected).ToList();
-
-            if (selectedItems.Count > 0)
-            {
-                // 创建统一操作列表
-                var operations = new List<KeyItemSettings>();
-                
-                foreach (var item in selectedItems)
-                {
-                    if (item.Type == KeyItemType.Keyboard && item.Code.HasValue)
-                    {
-                        // 添加键盘操作
-                        operations.Add(KeyItemSettings.CreateKeyboard(item.Code.Value, item.KeyInterval));
-                    }
-                    else if (item.Type == KeyItemType.Coordinates)
-                    {
-                        // 添加坐标操作
-                        operations.Add(KeyItemSettings.CreateCoordinates(item.X, item.Y, item.KeyInterval));
-                    }
-                }
-                
-                // 设置统一操作列表
-                SetKeySequence(operations);
-                
-            }
+            // 在多配置架构中，初始状态由 KeyConfigurationService 管理
+            // HotkeyService 不再直接加载配置，而是等待 KeyConfigurationService 注册热键
+            _logger.Debug("HotkeyService 初始化完成，等待配置加载");
         }
-
-        // 直接设置模式，不触发事件
-        _lyKeysService.IsHoldMode = keyConfig.keyMode != 0;
+        catch (Exception ex)
+        {
+            _logger.Error("加载初始状态失败", ex);
+        }
     }
 
     /// <summary>
@@ -256,6 +231,27 @@ public class HotkeyService
         }
     }
 
+    // 注销热键
+    public void UnregisterHotkey(VirtualKeyCode keyCode, ModifierKeys modifiers)
+    {
+        try
+        {
+            // 由于使用全局钩子而不是 RegisterHotKey API，
+            // 这里只需要清空当前热键状态即可
+            if (_pendingHotkey == keyCode)
+            {
+                _pendingHotkey = null;
+                _hotkeyVirtualKey = 0;
+                _logger.Info($"已注销热键: {keyCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"注销热键失败: KeyCode={keyCode}, Modifiers={modifiers}", ex);
+            throw;
+        }
+    }
+
     // 保存热键配置
     private void SaveHotkeyConfig(VirtualKeyCode keyCode, ModifierKeys modifiers)
     {
@@ -304,7 +300,16 @@ public class HotkeyService
 
             SequenceModeStarted?.Invoke();
 
-            _executor.Start(_keySettings, _lyKeysService.IsHoldMode, () =>
+            // TODO: 从 KeyConfigurationService 获取当前激活的配置
+            // 临时使用默认配置
+            var tempConfig = new KeyConfiguration("临时配置")
+            {
+                SoundEnabled = true,
+                AutoSwitchToEnglishIME = true,
+                IsReduceKeyStuck = true
+            };
+
+            _executor.Start(_keySettings, _lyKeysService.IsHoldMode, tempConfig, () =>
             {
                 SequenceModeStopped?.Invoke();
             });

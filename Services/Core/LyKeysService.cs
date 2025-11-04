@@ -134,19 +134,9 @@ namespace WpfApp.Services.Core
             _virtualKeyMap = InitializeVirtualKeyMap();
             _inputMethodService = new InputMethodService();
 
-            // 读取降低卡位配置
-            try
-            {
-                var globalConfig = _configManager.GlobalConfig;
-                _isReduceKeyStuck = globalConfig.IsReduceKeyStuck ?? false;
-                _keyPressInterval = _isReduceKeyStuck ? DEFAULT_KEY_PRESS_INTERVAL : 0;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("读取配置失败", ex);
-                _isReduceKeyStuck = false;
-                _keyPressInterval = 0;
-            }
+            // 初始化降低卡位配置（默认关闭，由配置动态设置）
+            _isReduceKeyStuck = false;
+            _keyPressInterval = 0;
 
         }
         #endregion

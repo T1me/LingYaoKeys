@@ -120,12 +120,8 @@ public class GlobalConfig
     [JsonIgnore] public AppInfo AppInfo { get; set; } = new();
     public UIConfig UI { get; set; } = new();
     public DebugConfig Debug { get; set; } = new();
-    
-    // 通用配置
-    public bool? soundEnabled { get; set; }
-    public bool? IsReduceKeyStuck { get; set; }
-    public double? SoundVolume { get; set; } = 0.8;
-    public bool? AutoSwitchToEnglishIME { get; set; } = true;
+
+    // 全局配置（所有配置共享）
     public bool? isHotkeyControlEnabled { get; set; } = true;
     public bool? EnableHardwareAcceleration { get; set; } = true;
     public string? SelectedDriver { get; set; } = "AHK";
@@ -152,6 +148,7 @@ public class TargetWindow
 
 /// <summary>
 /// 按键配置类，包含按键相关的所有配置
+/// 注意：此类保留用于向后兼容，新功能请使用 KeyConfiguration
 /// </summary>
 public class KeyConfigData
 {
@@ -171,6 +168,119 @@ public class KeyConfigData
     public KeyConfigData()
     {
         keys = new List<KeyConfig>();
+    }
+
+    /// <summary>
+    /// 转换为新的 KeyConfiguration 格式
+    /// </summary>
+    public KeyConfiguration ToKeyConfiguration(string name = "默认配置", GlobalConfig? globalConfig = null)
+    {
+        return new KeyConfiguration(name)
+        {
+            StartKey = startKey,
+            StartMods = startMods,
+            StopKey = stopKey,
+            StopMods = stopMods,
+            Keys = new List<KeyConfig>(keys),
+            ExecutionMode = keyMode == 0 ? KeyExecutionMode.Sequence : KeyExecutionMode.Hold,
+            Interval = interval,
+            KeyPressInterval = KeyPressInterval ?? 5,
+            TargetWindows = new List<TargetWindow>(TargetWindows),
+        };
+    }
+}
+
+/// <summary>
+/// 多配置数据类 - 支持多个按键配置方案
+/// </summary>
+public class MultiKeyConfigData
+{
+    /// <summary>
+    /// 所有配置列表
+    /// </summary>
+    public List<KeyConfiguration> Configurations { get; set; } = new();
+
+    /// <summary>
+    /// 当前激活的配置ID
+    /// </summary>
+    public Guid? ActiveConfigurationId { get; set; }
+
+    /// <summary>
+    /// 配置文件版本
+    /// </summary>
+    public int Version { get; set; } = 2;
+
+    public MultiKeyConfigData()
+    {
+        Configurations = new List<KeyConfiguration>();
+    }
+
+    /// <summary>
+    /// 获取当前激活的配置
+    /// </summary>
+    public KeyConfiguration? GetActiveConfiguration()
+    {
+        if (!ActiveConfigurationId.HasValue)
+            return Configurations.FirstOrDefault();
+
+        return Configurations.FirstOrDefault(c => c.Id == ActiveConfigurationId.Value);
+    }
+
+    /// <summary>
+    /// 设置激活的配置
+    /// </summary>
+    public void SetActiveConfiguration(Guid configId)
+    {
+        if (Configurations.Any(c => c.Id == configId))
+        {
+            ActiveConfigurationId = configId;
+        }
+    }
+
+    /// <summary>
+    /// 添加配置
+    /// </summary>
+    public void AddConfiguration(KeyConfiguration config)
+    {
+        if (config == null) return;
+
+        Configurations.Add(config);
+
+        // 如果是第一个配置，自动设为激活
+        if (Configurations.Count == 1)
+        {
+            ActiveConfigurationId = config.Id;
+        }
+    }
+
+    /// <summary>
+    /// 删除配置
+    /// </summary>
+    public bool RemoveConfiguration(Guid configId)
+    {
+        var config = Configurations.FirstOrDefault(c => c.Id == configId);
+        if (config == null) return false;
+
+        Configurations.Remove(config);
+
+        // 如果删除的是激活配置，切换到第一个
+        if (ActiveConfigurationId == configId)
+        {
+            ActiveConfigurationId = Configurations.FirstOrDefault()?.Id;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 从旧版本配置迁移
+    /// </summary>
+    public static MultiKeyConfigData FromLegacyConfig(KeyConfigData legacyConfig, GlobalConfig? globalConfig = null)
+    {
+        var multiConfig = new MultiKeyConfigData();
+        var config = legacyConfig.ToKeyConfiguration("默认配置", globalConfig);
+        multiConfig.AddConfiguration(config);
+        return multiConfig;
     }
 }
 
