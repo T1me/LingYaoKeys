@@ -12,7 +12,7 @@ namespace WpfApp.Services.Core
     /// <summary>
     /// LyKeys服务类 - 提供键盘模拟和按键序列管理功能
     /// </summary>
-    public class LyKeysService : IDisposable
+    public class LyKeysService : ILyKeysService, IDisposable
     {
         #region 私有字段
         private IDriver _driver;

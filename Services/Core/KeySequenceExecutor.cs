@@ -6,7 +6,7 @@ namespace WpfApp.Services.Core;
 /// <summary>
 /// 按键序列执行器 - 统一管理按键执行的状态和副作用
 /// </summary>
-public class KeySequenceExecutor
+public class KeySequenceExecutor : IKeySequenceExecutor
 {
     private readonly LyKeysService _driverService;
     private readonly InputMethodService _inputMethodService;

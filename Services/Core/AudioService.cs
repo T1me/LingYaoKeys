@@ -5,7 +5,7 @@ using WpfApp.Services.Utils;
 
 namespace WpfApp.Services.Core;
 
-public class AudioService
+public class AudioService : IAudioService, IDisposable
 {
     private readonly SerilogManager _logger = SerilogManager.Instance;
     private readonly PathService _pathService = PathService.Instance;

@@ -4,7 +4,7 @@ using WpfApp.Services.Utils;
 // 输入法服务
 namespace WpfApp.Services.Core;
 
-public class InputMethodService
+public class InputMethodService : IInputMethodService
 {
     private const int WM_INPUTLANGCHANGEREQUEST = 0x0050;
     private const int INPUTLANGCHANGE_FORWARD = 0x0002;

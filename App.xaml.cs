@@ -12,6 +12,8 @@ using System.Windows.Media;
 using System.Windows.Interop;
 using System.Threading;
 using System.Windows.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 // 避免命名空间冲突
 using Application = System.Windows.Application;
@@ -24,13 +26,14 @@ namespace WpfApp;
 /// </summary>
 public partial class App : Application
 {
+    private IHost? _host;
     private readonly SerilogManager _logger = SerilogManager.Instance;
     private readonly PathService _pathService = PathService.Instance;
 
     public static LyKeysService LyKeysDriver { get; set; }
     public static ConfigManager ConfigService { get; private set; }
     public static AudioService AudioService { get; private set; }
-    
+
     private bool _isShuttingDown;
 
     [DllImport("Kernel32")]
@@ -66,6 +69,41 @@ public partial class App : Application
 
         // 注册应用程序退出事件（只注册一次）
         Exit += OnApplicationExit;
+
+        // 配置 DI 容器
+        ConfigureServices();
+    }
+
+    private void ConfigureServices()
+    {
+        var builder = Host.CreateDefaultBuilder();
+
+        builder.ConfigureServices((context, services) =>
+        {
+            // 注册工具服务（Singleton）
+            services.AddSingleton<IPathService>(PathService.Instance);
+            services.AddSingleton<ISerilogManager>(SerilogManager.Instance);
+
+            // 注册核心服务（Singleton）
+            services.AddSingleton<IConfigManager>(ConfigManager.Instance);
+            services.AddSingleton<ILyKeysService>(sp => LyKeysDriver);
+            services.AddSingleton<IAudioService>(sp => AudioService);
+            services.AddSingleton<IInputMethodService, InputMethodService>();
+
+            // 注册 ViewModels
+            services.AddSingleton<MainViewModel>();
+            services.AddTransient<KeyMappingViewModel>();
+            services.AddTransient<SettingsViewModel>();
+            services.AddTransient<AboutViewModel>();
+
+            // 注册 Views
+            services.AddSingleton<MainWindow>();
+            services.AddTransient<KeyMappingView>();
+            services.AddTransient<SettingsView>();
+            services.AddTransient<AboutView>();
+        });
+
+        _host = builder.Build();
     }
 
     private bool Handler(CtrlType sig)
@@ -315,12 +353,14 @@ public partial class App : Application
         }
     }
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
         try
         {
+            // 启动 Host
+            await _host.StartAsync();
 
             Directory.CreateDirectory(_pathService.AppDataPath);
             ConfigManager.Instance.Initialize();
@@ -365,7 +405,8 @@ public partial class App : Application
 
             AudioService = new AudioService();
 
-            var mainWindow = new Views.MainWindow();
+            // 从 DI 容器获取 MainWindow
+            var mainWindow = _host.Services.GetRequiredService<MainWindow>();
             Current.MainWindow = mainWindow;
 
             if (mainWindow.DataContext is MainViewModel mainViewModel)
@@ -439,9 +480,15 @@ public partial class App : Application
         }
     }
 
-    private void OnApplicationExit(object sender, ExitEventArgs e)
+    private async void OnApplicationExit(object sender, ExitEventArgs e)
     {
         Cleanup(CleanupLevel.Normal);
+
+        if (_host != null)
+        {
+            await _host.StopAsync();
+            _host.Dispose();
+        }
     }
 
     /// <summary>

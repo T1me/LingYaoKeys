@@ -11,7 +11,7 @@ using WpfApp.Services.Models;
 // 提供快捷键服务
 namespace WpfApp.Services.Core;
 
-public class HotkeyService
+public class HotkeyService : IHotkeyService, IDisposable
 {
     // Win32 API 函数
     // 统一的钩子回调委托

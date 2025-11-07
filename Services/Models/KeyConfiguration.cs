@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using CommunityToolkit.Mvvm.ComponentModel;
 using WpfApp.Services.Core;
 
 namespace WpfApp.Services.Models;
@@ -9,134 +10,81 @@ namespace WpfApp.Services.Models;
 /// 按键配置类 - 代表一个完整的按键配置方案
 /// 每个配置包含独立的热键、按键列表和执行设置
 /// </summary>
-public class KeyConfiguration : INotifyPropertyChanged
+public partial class KeyConfiguration : ObservableObject
 {
-    private Guid _id;
-    private string _name = "新配置";
-    private bool _isEnabled = true;
-    private VirtualKeyCode? _startKey;
-    private ModifierKeys _startMods = ModifierKeys.None;
-    private VirtualKeyCode? _stopKey;
-    private ModifierKeys _stopMods = ModifierKeys.None;
-    private KeyExecutionMode _executionMode = KeyExecutionMode.Sequence;
-    private int _interval = 10;
-    private int _keyPressInterval = 5;
-    private bool _isReduceKeyStuck = true;
-    private bool _soundEnabled = true;
-    private double _soundVolume = 0.8;
-    private bool _autoSwitchToEnglishIME = true;
-    private List<KeyConfig> _keys = new();
-    private List<TargetWindow> _targetWindows = new();
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     /// <summary>
     /// 配置唯一标识符
     /// </summary>
-    public Guid Id
-    {
-        get => _id;
-        set => SetProperty(ref _id, value);
-    }
+    [ObservableProperty]
+    private Guid _id;
 
     /// <summary>
     /// 配置名称
     /// </summary>
-    public string Name
-    {
-        get => _name;
-        set => SetProperty(ref _name, value);
-    }
+    [ObservableProperty]
+    private string _name = "新配置";
 
     /// <summary>
     /// 是否启用此配置
     /// </summary>
-    public bool IsEnabled
-    {
-        get => _isEnabled;
-        set => SetProperty(ref _isEnabled, value);
-    }
+    [ObservableProperty]
+    private bool _isEnabled = true;
 
     /// <summary>
     /// 启动热键
     /// </summary>
-    public VirtualKeyCode? StartKey
-    {
-        get => _startKey;
-        set => SetProperty(ref _startKey, value);
-    }
+    [ObservableProperty]
+    private VirtualKeyCode? _startKey;
 
     /// <summary>
     /// 启动热键修饰键
     /// </summary>
-    public ModifierKeys StartMods
-    {
-        get => _startMods;
-        set => SetProperty(ref _startMods, value);
-    }
+    [ObservableProperty]
+    private ModifierKeys _startMods = ModifierKeys.None;
 
     /// <summary>
     /// 停止热键
     /// </summary>
-    public VirtualKeyCode? StopKey
-    {
-        get => _stopKey;
-        set => SetProperty(ref _stopKey, value);
-    }
+    [ObservableProperty]
+    private VirtualKeyCode? _stopKey;
 
     /// <summary>
     /// 停止热键修饰键
     /// </summary>
-    public ModifierKeys StopMods
-    {
-        get => _stopMods;
-        set => SetProperty(ref _stopMods, value);
-    }
+    [ObservableProperty]
+    private ModifierKeys _stopMods = ModifierKeys.None;
 
     /// <summary>
     /// 按键执行模式
     /// </summary>
-    public KeyExecutionMode ExecutionMode
-    {
-        get => _executionMode;
-        set => SetProperty(ref _executionMode, value);
-    }
+    [ObservableProperty]
+    private KeyExecutionMode _executionMode = KeyExecutionMode.Sequence;
 
     /// <summary>
     /// 循环间隔（毫秒）
     /// </summary>
-    public int Interval
-    {
-        get => _interval;
-        set => SetProperty(ref _interval, value);
-    }
+    [ObservableProperty]
+    private int _interval = 10;
 
     /// <summary>
     /// 按键按下时长（毫秒）
     /// </summary>
-    public int KeyPressInterval
-    {
-        get => _keyPressInterval;
-        set => SetProperty(ref _keyPressInterval, value);
-    }
+    [ObservableProperty]
+    private int _keyPressInterval = 5;
 
     /// <summary>
     /// 是否降低按键卡位
     /// </summary>
-    public bool IsReduceKeyStuck
-    {
-        get => _isReduceKeyStuck;
-        set => SetProperty(ref _isReduceKeyStuck, value);
-    }
+    [ObservableProperty]
+    private bool _isReduceKeyStuck = true;
 
     /// <summary>
     /// 是否启用声音提示
     /// </summary>
-    public bool SoundEnabled
-    {
-        get => _soundEnabled;
-        set => SetProperty(ref _soundEnabled, value);
-    }
+    [ObservableProperty]
+    private bool _soundEnabled = true;
+
+    private double _soundVolume = 0.8;
 
     /// <summary>
     /// 声音音量 (0.0 - 1.0)
@@ -150,29 +98,20 @@ public class KeyConfiguration : INotifyPropertyChanged
     /// <summary>
     /// 是否自动切换到英文输入法
     /// </summary>
-    public bool AutoSwitchToEnglishIME
-    {
-        get => _autoSwitchToEnglishIME;
-        set => SetProperty(ref _autoSwitchToEnglishIME, value);
-    }
+    [ObservableProperty]
+    private bool _autoSwitchToEnglishIME = true;
 
     /// <summary>
     /// 按键列表
     /// </summary>
-    public List<KeyConfig> Keys
-    {
-        get => _keys;
-        set => SetProperty(ref _keys, value);
-    }
+    [ObservableProperty]
+    private List<KeyConfig> _keys = new();
 
     /// <summary>
     /// 目标窗口列表
     /// </summary>
-    public List<TargetWindow> TargetWindows
-    {
-        get => _targetWindows;
-        set => SetProperty(ref _targetWindows, value);
-    }
+    [ObservableProperty]
+    private List<TargetWindow> _targetWindows = new();
 
     /// <summary>
     /// 构造函数
@@ -293,20 +232,6 @@ public class KeyConfiguration : INotifyPropertyChanged
         };
     }
 
-    protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-            return false;
-
-        field = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
-
-    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
 }
 
 /// <summary>

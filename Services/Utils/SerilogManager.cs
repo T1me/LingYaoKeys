@@ -7,7 +7,7 @@ using WpfApp.Services.Models;
 
 namespace WpfApp.Services.Utils;
 
-public class SerilogManager : ILogger, IDisposable
+public class SerilogManager : ISerilogManager, ILogger, IDisposable
 {
     private static readonly Lazy<SerilogManager> _instance = new(() => new SerilogManager());
     private ILogger? _logger;

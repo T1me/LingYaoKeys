@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using CommunityToolkit.Mvvm.ComponentModel;
 using WpfApp.Services.Core;
 
 namespace WpfApp.Services.Models;
@@ -13,27 +14,44 @@ public enum KeyItemType
     /// 键盘按键
     /// </summary>
     Keyboard,
-    
+
     /// <summary>
     /// 鼠标坐标点击
     /// </summary>
     Coordinates
 }
 
-public class KeyItem : INotifyPropertyChanged
+public partial class KeyItem : ObservableObject
 {
     private readonly LyKeysService _lyKeysService;
-    private bool _isSelected = true;
-    private VirtualKeyCode _keyCode;
-    private int _keyInterval;
-    private int? _x;
-    private int? _y;
-    private KeyItemType _type = KeyItemType.Keyboard;
-    private int _coordinateIndex = 0;
 
-    public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<bool>? SelectionChanged;
     public event EventHandler<int>? KeyIntervalChanged;
+
+    [ObservableProperty]
+    private bool _isSelected = true;
+
+    [ObservableProperty]
+    private VirtualKeyCode _keyCode;
+
+    [ObservableProperty]
+    private int _keyInterval;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    private int? _x;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    private int? _y;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    private KeyItemType _type = KeyItemType.Keyboard;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    private int _coordinateIndex = 0;
 
     /// <summary>
     /// 创建键盘按键类型的项目
@@ -59,118 +77,15 @@ public class KeyItem : INotifyPropertyChanged
         _keyCode = default;
     }
 
-    /// <summary>
-    /// 按键项目类型
-    /// </summary>
-    public KeyItemType Type
+    // 属性变更通知 - 触发自定义事件
+    partial void OnIsSelectedChanged(bool value)
     {
-        get => _type;
-        set
-        {
-            if (_type != value)
-            {
-                _type = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(DisplayName));
-            }
-        }
+        SelectionChanged?.Invoke(this, value);
     }
 
-    /// <summary>
-    /// 键盘按键码（仅当Type为Keyboard时有效）
-    /// </summary>
-    public VirtualKeyCode KeyCode
+    partial void OnKeyIntervalChanged(int value)
     {
-        get => _keyCode;
-        set
-        {
-            if (_keyCode != value)
-            {
-                _keyCode = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(DisplayName));
-            }
-        }
-    }
-
-    /// <summary>
-    /// X坐标（仅当Type为Coordinates时有效）
-    /// </summary>
-    public int? X
-    {
-        get => _x;
-        set
-        {
-            if (_x != value)
-            {
-                _x = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(DisplayName));
-            }
-        }
-    }
-
-    /// <summary>
-    /// Y坐标（仅当Type为Coordinates时有效）
-    /// </summary>
-    public int? Y
-    {
-        get => _y;
-        set
-        {
-            if (_y != value)
-            {
-                _y = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(DisplayName));
-            }
-        }
-    }
-
-    /// <summary>
-    /// 坐标索引（仅当Type为Coordinates时有效）
-    /// 用于在UI中显示坐标的序号
-    /// </summary>
-    public int CoordinateIndex
-    {
-        get => _coordinateIndex;
-        set
-        {
-            if (_coordinateIndex != value)
-            {
-                _coordinateIndex = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(DisplayName));
-            }
-        }
-    }
-
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set
-        {
-            if (_isSelected != value)
-            {
-                _isSelected = value;
-                OnPropertyChanged();
-                SelectionChanged?.Invoke(this, value);
-            }
-        }
-    }
-
-    public int KeyInterval
-    {
-        get => _keyInterval;
-        set
-        {
-            if (_keyInterval != value)
-            {
-                _keyInterval = value;
-                OnPropertyChanged();
-                KeyIntervalChanged?.Invoke(this, value);
-            }
-        }
+        KeyIntervalChanged?.Invoke(this, value);
     }
 
     /// <summary>
@@ -189,8 +104,4 @@ public class KeyItem : INotifyPropertyChanged
         }
     }
 
-    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
 }

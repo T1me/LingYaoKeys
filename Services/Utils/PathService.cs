@@ -7,7 +7,7 @@ namespace WpfApp.Services.Utils;
 /// <summary>
 /// 路径服务类，负责管理应用程序所有路径相关的操作
 /// </summary>
-public class PathService
+public class PathService : IPathService
 {
     private static readonly Lazy<PathService> _instance = new(() => new PathService());
     private readonly SerilogManager _logger = SerilogManager.Instance;
