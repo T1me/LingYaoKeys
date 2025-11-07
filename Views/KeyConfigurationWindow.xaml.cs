@@ -1,6 +1,9 @@
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using WpfApp.Services.Core;
 using WpfApp.Services.Models;
 using WpfApp.Services.UI;
@@ -16,15 +19,21 @@ public partial class KeyConfigurationWindow : Window
 {
     private readonly InputCaptureService _inputCaptureService;
     private readonly CoordinateDragService _dragService;
+    private readonly CoordinateVisualizationService _coordinateService;
+    private bool _isEditMode = false;
 
     public KeyConfigurationWindow()
     {
         InitializeComponent();
         _inputCaptureService = new InputCaptureService();
         _dragService = new CoordinateDragService();
+        _coordinateService = new CoordinateVisualizationService();
 
         // 订阅坐标捕获事件
         _dragService.CoordinateCaptured += OnCoordinateCaptured;
+
+        // 订阅坐标更新事件
+        _coordinateService.CoordinateUpdated += OnCoordinateUpdated;
 
         // 附加拖拽行为到鼠标图标按钮
         Loaded += (s, e) =>
@@ -32,7 +41,7 @@ public partial class KeyConfigurationWindow : Window
             if (btnMouseIcon != null)
             {
                 _dragService.AttachToElement(btnMouseIcon);
-                // 添加 PreviewMouseUp 事件处理点击捕获
+                // 添加 PreviewMouseUp 事件处理点击进入编辑模式
                 btnMouseIcon.PreviewMouseUp += MouseIcon_PreviewMouseUp;
             }
 
@@ -50,7 +59,17 @@ public partial class KeyConfigurationWindow : Window
             {
                 btnMouseIcon.PreviewMouseUp -= MouseIcon_PreviewMouseUp;
             }
+
+            // 退出编辑模式（如果处于编辑模式）
+            if (_isEditMode)
+            {
+                _isEditMode = false;
+                _coordinateService?.HideAll();
+            }
+
+            // 清理资源
             _dragService?.Dispose();
+            _coordinateService?.Dispose();
 
             // 取消订阅 ViewModel 事件
             if (ViewModel != null)
@@ -64,20 +83,86 @@ public partial class KeyConfigurationWindow : Window
     private KeyConfigurationDialogViewModel ViewModel => DataContext as KeyConfigurationDialogViewModel;
 
     /// <summary>
-    /// 鼠标抬起事件 - 处理点击捕获坐标
+    /// 鼠标抬起事件 - 处理点击进入/退出坐标编辑模式
     /// </summary>
     private void MouseIcon_PreviewMouseUp(object sender, MouseButtonEventArgs e)
     {
-        // 只有在点击（未拖拽）时才捕获当前鼠标位置
+        // 只有在点击（未拖拽）时才切换编辑模式
         if (e.LeftButton == MouseButtonState.Released && !_dragService.IsDragStarted)
         {
-            // 捕获当前鼠标位置
-            var cursorPos = System.Windows.Forms.Cursor.Position;
-            OnCoordinateCaptured(this, new CoordinateCapturedEventArgs(cursorPos.X, cursorPos.Y));
+            ToggleEditMode();
             e.Handled = true;
-
-            HandyControl.Controls.Growl.Success($"已捕获坐标: ({cursorPos.X}, {cursorPos.Y})");
         }
+    }
+
+    /// <summary>
+    /// 切换坐标编辑模式
+    /// </summary>
+    private void ToggleEditMode()
+    {
+        if (!_isEditMode)
+        {
+            // 进入编辑模式前检查是否有坐标
+            if (ViewModel?.KeyItems == null || !ViewModel.KeyItems.Any(k => k.Type == KeyItemType.Coordinates))
+            {
+                HandyControl.Controls.MessageBox.Warning("按键列表中没有坐标，无法进入编辑模式\n请先添加坐标位置", "提示");
+                return;
+            }
+        }
+
+        _isEditMode = !_isEditMode;
+        if (_isEditMode)
+        {
+            ChangeMouseIconToExit();
+            _coordinateService.ShowAll(ViewModel.KeyItems);
+            HandyControl.Controls.Growl.Success("已进入坐标编辑模式\n可拖动红点调整坐标位置");
+        }
+        else
+        {
+            RestoreOriginalMouseIcon();
+            _coordinateService.HideAll();
+            HandyControl.Controls.Growl.Info("已退出坐标编辑模式");
+        }
+    }
+
+    /// <summary>
+    /// 更改鼠标图标为退出标志
+    /// </summary>
+    private void ChangeMouseIconToExit()
+    {
+        if (btnMouseIcon.Content is Path path)
+        {
+            // 保存原始图标数据
+            path.Tag = path.Data;
+
+            // 更改为退出图标（X 符号）
+            path.Data = Geometry.Parse("M512 456.310154L325.15799 269.469166c-16.662774-16.662774-43.677083-16.662774-60.339857 0s-16.662774 43.677083 0 60.339857L451.656143 516.650011 264.818154 703.490999c-16.662774 16.662774-16.662774 43.677083 0 60.339857s43.677083 16.662774 60.339857 0l186.840988-186.840988 186.840988 186.840988c16.662774 16.662774 43.677083 16.662774 60.339857 0s16.662774-43.677083 0-60.339857L572.340834 516.650011l186.840988-186.840988c16.662774-16.662774 16.662774-43.677083 0-60.339857s-43.677083-16.662774-60.339857 0L512 456.310154z");
+            path.Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(232, 75, 108));
+            btnMouseIcon.ToolTip = "退出编辑模式";
+        }
+    }
+
+    /// <summary>
+    /// 恢复原始鼠标图标
+    /// </summary>
+    private void RestoreOriginalMouseIcon()
+    {
+        if (btnMouseIcon.Content is Path path && path.Tag is Geometry originalData)
+        {
+            path.Data = originalData;
+            path.Tag = null;
+            path.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#707070"));
+            btnMouseIcon.ToolTip = "点击进入坐标编辑模式，或拖拽到目标位置捕获坐标";
+        }
+    }
+
+    /// <summary>
+    /// 坐标更新事件处理（拖动标记时触发）
+    /// </summary>
+    private void OnCoordinateUpdated(object sender, CoordinateUpdatedEventArgs e)
+    {
+        // 坐标已通过拖拽更新，无需额外操作
+        // KeyItem 已自动更新，退出编辑模式时会保存
     }
 
     /// <summary>
@@ -317,15 +402,6 @@ public partial class KeyConfigurationWindow : Window
     /// 关闭请求事件处理
     /// </summary>
     private void ViewModel_CloseRequested(object? sender, EventArgs e)
-    {
-        DialogResult = false;
-        Close();
-    }
-
-    /// <summary>
-    /// 关闭按钮点击事件
-    /// </summary>
-    private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         DialogResult = false;
         Close();
