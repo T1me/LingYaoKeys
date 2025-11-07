@@ -22,7 +22,7 @@ public partial class MainWindow : Window
 {
     private readonly SerilogManager _logger = SerilogManager.Instance;
     private readonly IConfigManager _configManager;
-    private readonly MainViewModel _viewModel;
+    private MainViewModel _viewModel;
     private bool _isClosing;
     private bool _hasShownMinimizeNotification;
     private NotifyIcon _trayIcon;
@@ -102,13 +102,15 @@ public partial class MainWindow : Window
         public int Y;
     }
 
+    /// <summary>
+    /// 无参构造函数（用于 DI 容器工厂方法）
+    /// </summary>
     public MainWindow()
     {
         try
         {
             InitializeComponent();
             _configManager = App.ConfigService ?? ConfigManager.Instance;
-            _viewModel = new MainViewModel(App.LyKeysDriver, this);
 
             try
             {
@@ -121,17 +123,25 @@ public partial class MainWindow : Window
 
             UpdateMaximizeButtonState();
             StateChanged += MainWindow_StateChanged;
-
-            if (_viewModel.KeyMappingViewModel != null)
-            {
-                _viewModel.KeyMappingViewModel.SetMainWindow(this);
-            }
         }
         catch (Exception ex)
         {
             _logger.Error("窗口初始化失败", ex);
             HandyControl.Controls.MessageBox.Error($"窗口初始化失败: {ex.Message}\n\n{ex.StackTrace}", "错误");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 设置 ViewModel（在 DI 容器创建后调用）
+    /// </summary>
+    internal void SetViewModel(MainViewModel viewModel)
+    {
+        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+
+        if (_viewModel.KeyMappingViewModel != null)
+        {
+            _viewModel.KeyMappingViewModel.SetMainWindow(this);
         }
     }
 

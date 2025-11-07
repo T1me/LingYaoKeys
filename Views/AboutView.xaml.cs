@@ -1,7 +1,5 @@
-using System.Windows;
 using System.Windows.Controls;
-using System.Diagnostics;
-using WpfApp.Services.Utils;
+using WpfApp.ViewModels;
 
 namespace WpfApp.Views;
 
@@ -10,14 +8,9 @@ namespace WpfApp.Views;
 /// </summary>
 public partial class AboutView : Page
 {
-    private readonly ViewModels.AboutViewModel _viewModel;
-    private readonly SerilogManager _logger = SerilogManager.Instance;
-
-    public AboutView()
+    public AboutView(AboutViewModel viewModel)
     {
         InitializeComponent();
-        _viewModel = new ViewModels.AboutViewModel();
-        DataContext = _viewModel;
-        _logger.Debug("AboutView页面已初始化");
+        DataContext = viewModel;
     }
 }

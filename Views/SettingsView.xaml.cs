@@ -3,11 +3,14 @@ using WpfApp.ViewModels;
 
 namespace WpfApp.Views;
 
+/// <summary>
+/// SettingsView.xaml 的交互逻辑
+/// </summary>
 public partial class SettingsView : Page
 {
-    public SettingsView()
+    public SettingsView(SettingsViewModel viewModel)
     {
         InitializeComponent();
-        DataContext = new SettingsViewModel();
+        DataContext = viewModel;
     }
 }

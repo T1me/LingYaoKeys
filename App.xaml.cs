@@ -91,13 +91,28 @@ public partial class App : Application
             services.AddSingleton<IInputMethodService, InputMethodService>();
 
             // 注册 ViewModels
-            services.AddSingleton<MainViewModel>();
-            services.AddTransient<KeyMappingViewModel>();
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<AboutViewModel>();
 
-            // 注册 Views
-            services.AddSingleton<MainWindow>();
+            // 注册 Views（MainWindow 需要特殊处理，因为 MainViewModel 需要 Window 参数）
+            services.AddSingleton<MainWindow>(sp =>
+            {
+                // 先创建 MainWindow 实例
+                var mainWindow = new MainWindow();
+
+                // 然后创建 MainViewModel，传入 MainWindow
+                var configManager = sp.GetRequiredService<IConfigManager>();
+                var logger = sp.GetRequiredService<ISerilogManager>();
+                var lyKeysService = sp.GetRequiredService<ILyKeysService>();
+
+                var mainViewModel = new MainViewModel(configManager, logger, lyKeysService, mainWindow);
+
+                // 设置 ViewModel 和 DataContext
+                mainWindow.SetViewModel(mainViewModel);
+                mainWindow.DataContext = mainViewModel;
+
+                return mainWindow;
+            });
             services.AddTransient<KeyMappingView>();
             services.AddTransient<SettingsView>();
             services.AddTransient<AboutView>();

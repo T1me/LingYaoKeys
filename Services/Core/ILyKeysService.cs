@@ -82,4 +82,9 @@ public interface ILyKeysService : IDisposable
     /// 状态消息变更事件
     /// </summary>
     event EventHandler<StatusMessageEventArgs>? StatusMessageChanged;
+
+    /// <summary>
+    /// 输入法服务
+    /// </summary>
+    InputMethodService InputMethodService { get; }
 }

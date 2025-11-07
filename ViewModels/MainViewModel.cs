@@ -1,137 +1,82 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using WpfApp.Views;
 using System.Windows.Threading;
 using System.Windows.Media.Animation;
+using WpfApp.Views;
 using WpfApp.Services.Core;
 using WpfApp.Services.Utils;
 using WpfApp.Services.Events;
 using WpfApp.Services.Models;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Brush = System.Windows.Media.Brush;
+using Brushes = System.Windows.Media.Brushes;
+using Application = System.Windows.Application;
 
 namespace WpfApp.ViewModels;
 
-public class MainViewModel : ViewModelBase
+/// <summary>
+/// 主视图模型，负责页面导航、状态栏消息管理和页面缓存
+/// </summary>
+public partial class MainViewModel : ObservableObject
 {
-    private GlobalConfig? _globalConfig;
-    private KeyConfigData? _keyConfig;
-    private Page? _currentPage;
-    private readonly LyKeysService _lyKeysService;
-    private readonly Window _mainWindow;
     private readonly IConfigManager _configManager;
+    private readonly ISerilogManager _logger;
+    private readonly ILyKeysService _lyKeysService;
+    private readonly Window _mainWindow;
     private readonly KeyMappingViewModel _keyMappingViewModel;
     private readonly HotkeyService _hotkeyService;
-    private string _statusMessage = "就绪";
-    private System.Windows.Media.Brush _statusMessageColor = System.Windows.Media.Brushes.Black;
-    private readonly DispatcherTimer _statusMessageTimer;
-    private const int STATUS_MESSAGE_TIMEOUT = 3000;  // 状态栏消息显示时间（毫秒）
     private readonly AboutViewModel _aboutViewModel;
+    private readonly DispatcherTimer _statusMessageTimer;
     private readonly Dictionary<string, Page> _pageCache = new();
     private readonly Dictionary<string, Storyboard> _fadeInCache = new();
     private readonly Dictionary<string, Storyboard> _fadeOutCache = new();
     private readonly Storyboard? _fadeInStoryboard;
     private readonly Storyboard? _fadeOutStoryboard;
+    private readonly Dictionary<string, PageConfig> _pageConfigs;
+    private GlobalConfig? _globalConfig;
+    private KeyConfigData? _keyConfig;
     private bool _isInitializing = true;
 
-    // 状态消息颜色
-    private static readonly System.Windows.Media.Brush STATUS_COLOR_NORMAL = System.Windows.Media.Brushes.Black;
-    private static readonly System.Windows.Media.Brush STATUS_COLOR_SUCCESS = System.Windows.Media.Brushes.Green;
-    private static readonly System.Windows.Media.Brush STATUS_COLOR_WARNING = System.Windows.Media.Brushes.Orange;
-    private static readonly System.Windows.Media.Brush STATUS_COLOR_ERROR = System.Windows.Media.Brushes.Red;
-    private static readonly System.Windows.Media.Brush STATUS_COLOR_INFO = System.Windows.Media.Brushes.Blue;
+    private const int STATUS_MESSAGE_TIMEOUT = 3000;  // 状态栏消息显示时间（毫秒）
 
-    // 状态栏快捷方法
-    public void ShowSuccessMessage(string message)
-    {
-        UpdateStatusMessage(message, STATUS_COLOR_SUCCESS);
-    }
+    // 状态消息颜色常量
+    private static readonly Brush STATUS_COLOR_NORMAL = Brushes.Black;
+    private static readonly Brush STATUS_COLOR_SUCCESS = Brushes.Green;
+    private static readonly Brush STATUS_COLOR_WARNING = Brushes.Orange;
+    private static readonly Brush STATUS_COLOR_ERROR = Brushes.Red;
+    private static readonly Brush STATUS_COLOR_INFO = Brushes.Blue;
 
-    public void ShowWarningMessage(string message)
-    {
-        UpdateStatusMessage(message, STATUS_COLOR_WARNING);
-    }
+    /// <summary>
+    /// 当前显示的页面
+    /// </summary>
+    [ObservableProperty]
+    private Page? _currentPage;
 
-    public void ShowErrorMessage(string message)
-    {
-        UpdateStatusMessage(message, STATUS_COLOR_ERROR);
-    }
+    /// <summary>
+    /// 状态栏消息文本
+    /// </summary>
+    [ObservableProperty]
+    private string _statusMessage = "就绪";
 
-    public void ShowInfoMessage(string message)
-    {
-        UpdateStatusMessage(message, STATUS_COLOR_INFO);
-    }
+    /// <summary>
+    /// 状态栏消息颜色
+    /// </summary>
+    [ObservableProperty]
+    private Brush _statusMessageColor = Brushes.Black;
 
-    public GlobalConfig GlobalConfig
-    {
-        get
-        {
-            if (_globalConfig == null)
-            {
-                _globalConfig = _configManager.GlobalConfig;
-                OnPropertyChanged();
-            }
-            return _globalConfig;
-        }
-    }
-
-    public KeyConfigData KeyConfig
-    {
-        get
-        {
-            if (_keyConfig == null) _keyConfig = _configManager.CurrentKeyConfig;
-            return _keyConfig;
-        }
-    }
-
-    public string WindowTitle => GlobalConfig.AppInfo.Title;
-    public string VersionInfo => $"v{GlobalConfig.AppInfo.Version}";
-    public string AuthorInfo => $"By: {GlobalConfig.Author} | {VersionInfo}";
-
-    public Page? CurrentPage
-    {
-        get => _currentPage;
-        set
-        {
-            if (_currentPage != value)
-            {
-                _currentPage = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    public object? CurrentViewModel => CurrentPage?.DataContext;
-
-    public string StatusMessage
-    {
-        get => _statusMessage;
-        set => SetProperty(ref _statusMessage, value);
-    }
-
-    public System.Windows.Media.Brush StatusMessageColor
-    {
-        get => _statusMessageColor;
-        set => SetProperty(ref _statusMessageColor, value);
-    }
-
-    public ICommand NavigateCommand { get; }
-
-    // 添加KeyMappingViewModel的公共属性
-    public KeyMappingViewModel KeyMappingViewModel => _keyMappingViewModel;
-
-    private class PageConfig
-    {
-        public bool UseCaching { get; set; } = true;
-        public bool IsFrequentlyAccessed { get; set; } = false;
-        public Func<Page> CreatePageFunc { get; set; }
-    }
-
-    // 页面配置字典，用于存储不同页面的配置
-    private readonly Dictionary<string, PageConfig> _pageConfigs;
-
-    public MainViewModel(LyKeysService lyKeysService, Window mainWindow)
+    /// <summary>
+    /// 构造函数，初始化主视图模型
+    /// </summary>
+    public MainViewModel(
+        IConfigManager configManager,
+        ISerilogManager logger,
+        ILyKeysService lyKeysService,
+        Window mainWindow)
     {
         _isInitializing = true;
+        _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
 
@@ -145,27 +90,25 @@ public class MainViewModel : ViewModelBase
         {
             _statusMessageTimer.Stop();
             StatusMessage = "就绪";
-            StatusMessageColor = System.Windows.Media.Brushes.Black;
+            StatusMessageColor = Brushes.Black;
         };
 
         // 初始化配置
-        _configManager = App.ConfigService ?? WpfApp.Services.Core.ConfigManager.Instance
-            ?? throw new InvalidOperationException("ConfigManager未初始化");
         _globalConfig = _configManager.GlobalConfig;
 
         mainWindow.DataContext = this;
 
-        // 创建服务
-        var executor = new KeySequenceExecutor(lyKeysService, lyKeysService._inputMethodService, App.AudioService, _configManager);
-        _hotkeyService = new HotkeyService(mainWindow, executor, lyKeysService, _configManager);
+        // 创建服务（临时转换为具体类型，待后续重构）
+        var lyKeysServiceConcrete = (LyKeysService)lyKeysService;
+        var executor = new KeySequenceExecutor(lyKeysServiceConcrete, lyKeysService.InputMethodService, App.AudioService, _configManager);
+        _hotkeyService = new HotkeyService(mainWindow, executor, lyKeysServiceConcrete, _configManager);
 
         _isInitializing = false;
 
         // 初始化 ViewModels
-        _keyMappingViewModel = new KeyMappingViewModel(_lyKeysService, _hotkeyService, this, App.AudioService);
-        _aboutViewModel = new AboutViewModel();
+        _keyMappingViewModel = new KeyMappingViewModel(lyKeysServiceConcrete, _hotkeyService, this, App.AudioService);
+        _aboutViewModel = new AboutViewModel(_configManager, SerilogManager.Instance);
 
-        NavigateCommand = new RelayCommand<string>(Navigate);
         _lyKeysService.StatusMessageChanged += OnDriverStatusMessageChanged;
 
         // 页面配置
@@ -180,12 +123,12 @@ public class MainViewModel : ViewModelBase
             ["About"] = new PageConfig
             {
                 UseCaching = true,
-                CreatePageFunc = () => new AboutView { DataContext = _aboutViewModel }
+                CreatePageFunc = () => new AboutView(_aboutViewModel)
             },
             ["Settings"] = new PageConfig
             {
                 UseCaching = true,
-                CreatePageFunc = () => new SettingsView { DataContext = new SettingsViewModel() }
+                CreatePageFunc = () => new SettingsView(new SettingsViewModel(_configManager, SerilogManager.Instance))
             }
         };
 
@@ -193,10 +136,67 @@ public class MainViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// 全局配置
+    /// </summary>
+    public GlobalConfig GlobalConfig
+    {
+        get
+        {
+            if (_globalConfig == null)
+            {
+                _globalConfig = _configManager.GlobalConfig;
+                OnPropertyChanged();
+            }
+            return _globalConfig;
+        }
+    }
+
+    /// <summary>
+    /// 按键配置数据
+    /// </summary>
+    public KeyConfigData KeyConfig
+    {
+        get
+        {
+            if (_keyConfig == null) _keyConfig = _configManager.CurrentKeyConfig;
+            return _keyConfig;
+        }
+    }
+
+    /// <summary>
+    /// 窗口标题
+    /// </summary>
+    public string WindowTitle => GlobalConfig.AppInfo.Title;
+
+    /// <summary>
+    /// 版本信息
+    /// </summary>
+    public string VersionInfo => $"v{GlobalConfig.AppInfo.Version}";
+
+    /// <summary>
+    /// 作者信息
+    /// </summary>
+    public string AuthorInfo => $"By: {GlobalConfig.Author} | {VersionInfo}";
+
+    /// <summary>
+    /// 当前页面的 ViewModel
+    /// </summary>
+    public object? CurrentViewModel => CurrentPage?.DataContext;
+
+    /// <summary>
+    /// 按键映射 ViewModel
+    /// </summary>
+    public KeyMappingViewModel KeyMappingViewModel => _keyMappingViewModel;
+
+    /// <summary>
     /// 获取当前是否处于初始化状态
     /// </summary>
     public bool IsInitializing => _isInitializing;
 
+    /// <summary>
+    /// 页面导航命令
+    /// </summary>
+    [RelayCommand]
     private void Navigate(string? parameter)
     {
         if (string.IsNullOrEmpty(parameter)) return;
@@ -233,17 +233,20 @@ public class MainViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Logger.Error($"页面导航失败: {parameter} ，直接切换页面", ex);
+            _logger.Error($"页面导航失败: {parameter} ，直接切换页面", ex);
             // 降级处理：直接切换页面
             try { CurrentPage = GetOrCreatePage(parameter); } catch { }
         }
     }
 
+    /// <summary>
+    /// 获取或创建页面
+    /// </summary>
     private Page? GetOrCreatePage(string parameter)
     {
         if (!_pageConfigs.TryGetValue(parameter, out var pageConfig))
         {
-            Logger.Error($"未知页面: {parameter}");
+            _logger.Error($"未知页面: {parameter}");
             return null;
         }
 
@@ -265,7 +268,10 @@ public class MainViewModel : ViewModelBase
         _pageCache[parameter] = newPage;
         return newPage;
     }
-    
+
+    /// <summary>
+    /// 预加载常用页面
+    /// </summary>
     public void PreloadCommonPages()
     {
         Task.Run(() =>
@@ -278,17 +284,20 @@ public class MainViewModel : ViewModelBase
             {
                 try
                 {
-                    System.Windows.Application.Current.Dispatcher.Invoke(() => GetOrCreatePage(pageName),
-                        System.Windows.Threading.DispatcherPriority.Background);
+                    Application.Current.Dispatcher.Invoke(() => GetOrCreatePage(pageName),
+                        DispatcherPriority.Background);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"预加载失败: {pageName}", ex);
+                    _logger.Error($"预加载失败: {pageName}", ex);
                 }
             }
         });
     }
 
+    /// <summary>
+    /// 获取或创建淡入动画
+    /// </summary>
     private Storyboard GetOrCreateFadeInAnimation(string parameter)
     {
         if (_fadeInCache.TryGetValue(parameter, out var fadeIn)) return fadeIn;
@@ -298,6 +307,9 @@ public class MainViewModel : ViewModelBase
         return newFadeIn;
     }
 
+    /// <summary>
+    /// 获取或创建淡出动画
+    /// </summary>
     private Storyboard GetOrCreateFadeOutAnimation(string parameter)
     {
         if (_fadeOutCache.TryGetValue(parameter, out var fadeOut)) return fadeOut;
@@ -307,6 +319,9 @@ public class MainViewModel : ViewModelBase
         return newFadeOut;
     }
 
+    /// <summary>
+    /// 清理资源
+    /// </summary>
     public void Cleanup()
     {
         // 清理时保存所有配置
@@ -318,33 +333,84 @@ public class MainViewModel : ViewModelBase
         _pageCache.Clear();
     }
 
+    /// <summary>
+    /// 驱动状态消息变更事件处理
+    /// </summary>
     private void OnDriverStatusMessageChanged(object? sender, StatusMessageEventArgs e)
     {
-        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        Application.Current.Dispatcher.Invoke(() =>
         {
             _statusMessageTimer.Stop();
             StatusMessage = e.Message;
-            StatusMessageColor = e.IsError ? System.Windows.Media.Brushes.Red : System.Windows.Media.Brushes.Black;
+            StatusMessageColor = e.IsError ? Brushes.Red : Brushes.Black;
             _statusMessageTimer.Start();
 
             if (e.IsError)
-                Logger.Error($"驱动错误: {e.Message}");
+                _logger.Error($"驱动错误: {e.Message}");
         });
     }
 
+    /// <summary>
+    /// 显示成功消息
+    /// </summary>
+    public void ShowSuccessMessage(string message)
+    {
+        UpdateStatusMessage(message, STATUS_COLOR_SUCCESS);
+    }
+
+    /// <summary>
+    /// 显示警告消息
+    /// </summary>
+    public void ShowWarningMessage(string message)
+    {
+        UpdateStatusMessage(message, STATUS_COLOR_WARNING);
+    }
+
+    /// <summary>
+    /// 显示错误消息
+    /// </summary>
+    public void ShowErrorMessage(string message)
+    {
+        UpdateStatusMessage(message, STATUS_COLOR_ERROR);
+    }
+
+    /// <summary>
+    /// 显示信息消息
+    /// </summary>
+    public void ShowInfoMessage(string message)
+    {
+        UpdateStatusMessage(message, STATUS_COLOR_INFO);
+    }
+
+    /// <summary>
+    /// 更新状态消息
+    /// </summary>
     public void UpdateStatusMessage(string message, bool isError = false)
     {
         UpdateStatusMessage(message, isError ? STATUS_COLOR_ERROR : STATUS_COLOR_NORMAL);
     }
 
-    public void UpdateStatusMessage(string message, System.Windows.Media.Brush color)
+    /// <summary>
+    /// 更新状态消息（带颜色）
+    /// </summary>
+    public void UpdateStatusMessage(string message, Brush color)
     {
-        System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+        Application.Current?.Dispatcher?.Invoke(() =>
         {
             _statusMessageTimer?.Stop();
             StatusMessage = message;
             StatusMessageColor = color;
             _statusMessageTimer?.Start();
         });
+    }
+
+    /// <summary>
+    /// 页面配置类
+    /// </summary>
+    private class PageConfig
+    {
+        public bool UseCaching { get; set; } = true;
+        public bool IsFrequentlyAccessed { get; set; } = false;
+        public Func<Page> CreatePageFunc { get; set; }
     }
 }

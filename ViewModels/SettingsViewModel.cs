@@ -1,205 +1,185 @@
 using System;
-using System.Windows.Input;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using WpfApp.Services.Core;
 using WpfApp.Services.Models;
 using WpfApp.Services.Utils;
 using MessageBox = System.Windows.MessageBox;
 using Application = System.Windows.Application;
+using Brush = System.Windows.Media.Brush;
+using Brushes = System.Windows.Media.Brushes;
 
 namespace WpfApp.ViewModels;
 
-public class SettingsViewModel : ViewModelBase
+/// <summary>
+/// 设置页面视图模型
+/// </summary>
+public partial class SettingsViewModel : ObservableObject
 {
+    private readonly IConfigManager _configManager;
+    private readonly ISerilogManager _logger;
     private readonly UpdateService _updateService;
-    private bool _isCheckingUpdate;
+    private readonly ExceptionHandler _exceptionHandler;
+
+    [ObservableProperty]
     private string _updateStatus = "检查更新";
+
+    [ObservableProperty]
     private string _debugModeStatus = "调试模式关闭";
-    private System.Windows.Media.Brush _debugModeStatusColor = System.Windows.Media.Brushes.Gray;
-    private string _selectedDriver = "AHK";
+
+    [ObservableProperty]
+    private Brush _debugModeStatusColor = Brushes.Gray;
+
+    [ObservableProperty]
     private string _driverStatus = "🟢 已加载";
-    private System.Windows.Media.Brush _driverStatusColor = System.Windows.Media.Brushes.Green;
 
-    public string UpdateStatus
+    [ObservableProperty]
+    private Brush _driverStatusColor = Brushes.Green;
+
+    [ObservableProperty]
+    private string _selectedDriver = "AHK";
+
+    private bool _isCheckingUpdate;
+
+    public SettingsViewModel(
+        IConfigManager configManager,
+        ISerilogManager logger)
     {
-        get => _updateStatus;
-        set => SetProperty(ref _updateStatus, value);
-    }
-
-    public string DebugModeStatus
-    {
-        get => _debugModeStatus;
-        set => SetProperty(ref _debugModeStatus, value);
-    }
-
-    public System.Windows.Media.Brush DebugModeStatusColor
-    {
-        get => _debugModeStatusColor;
-        set => SetProperty(ref _debugModeStatusColor, value);
-    }
-
-    public string DriverStatus
-    {
-        get => _driverStatus;
-        set => SetProperty(ref _driverStatus, value);
-    }
-
-    public System.Windows.Media.Brush DriverStatusColor
-    {
-        get => _driverStatusColor;
-        set => SetProperty(ref _driverStatusColor, value);
-    }
-
-    public string SelectedDriver
-    {
-        get => _selectedDriver;
-        set
-        {
-            if (SetProperty(ref _selectedDriver, value))
-            {
-                ConfigManager.UpdateGlobalConfig(config => config.SelectedDriver = value);
-                ReloadDriver(value);
-            }
-        }
-    }
-
-    private void ReloadDriver(string driverType)
-    {
-        try
-        {
-            SetDriverStatus("🟠 加载中...", System.Windows.Media.Brushes.Orange);
-
-            var pathService = Services.Utils.PathService.Instance;
-            var driverFile = DriverFactory.PrepareDriverFiles(driverType, pathService, App.ExtractEmbeddedResource);
-            var driver = DriverFactory.CreateDriver(driverType, driverFile);
-
-            if (!App.LyKeysDriver.ReloadDriver(driver, driverFile))
-            {
-                SetDriverStatus("🔴 加载失败", System.Windows.Media.Brushes.Red);
-                HandyControl.Controls.MessageBox.Error($"驱动加载失败({driverType})", "错误");
-            }
-            else
-            {
-                SetDriverStatus("🟢 已加载", System.Windows.Media.Brushes.Green);
-            }
-        }
-        catch (Exception ex)
-        {
-            SetDriverStatus("🔴 加载失败", System.Windows.Media.Brushes.Red);
-            HandyControl.Controls.MessageBox.Error($"切换驱动失败: {ex.Message}", "错误");
-        }
-    }
-
-    private void SetDriverStatus(string status, System.Windows.Media.Brush color)
-    {
-        DriverStatus = status;
-        DriverStatusColor = color;
-    }
-
-    public ICommand CheckUpdateCommand { get; }
-    public ICommand ToggleDebugModeCommand { get; }
-    public ICommand ExportConfigCommand { get; }
-    public ICommand ImportConfigCommand { get; }
-
-    public SettingsViewModel()
-    {
+        _configManager = configManager;
+        _logger = logger;
         _updateService = new UpdateService();
-
-        // 使用统一的命令初始化模式
-        CheckUpdateCommand = CreateCommand(CheckForUpdate, () => !_isCheckingUpdate);
-        ToggleDebugModeCommand = CreateCommand(ToggleDebugMode);
-        ExportConfigCommand = CreateCommand(ExportConfig);
-        ImportConfigCommand = CreateCommand(ImportConfig);
+        _exceptionHandler = new ExceptionHandler();
 
         UpdateDebugModeStatus();
         UpdateDriverStatus();
     }
 
+    /// <summary>
+    /// 当选中的驱动改变时
+    /// </summary>
+    partial void OnSelectedDriverChanged(string value)
+    {
+        _configManager.UpdateGlobalConfig(config => config.SelectedDriver = value);
+        ReloadDriver(value);
+    }
+
+    /// <summary>
+    /// 重新加载驱动
+    /// </summary>
+    private void ReloadDriver(string driverType)
+    {
+        try
+        {
+            SetDriverStatus("🟠 加载中...", Brushes.Orange);
+
+            var pathService = PathService.Instance;
+            var driverFile = DriverFactory.PrepareDriverFiles(driverType, pathService, App.ExtractEmbeddedResource);
+            var driver = DriverFactory.CreateDriver(driverType, driverFile);
+
+            if (!App.LyKeysDriver.ReloadDriver(driver, driverFile))
+            {
+                SetDriverStatus("🔴 加载失败", Brushes.Red);
+                HandyControl.Controls.MessageBox.Error($"驱动加载失败({driverType})", "错误");
+            }
+            else
+            {
+                SetDriverStatus("🟢 已加载", Brushes.Green);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetDriverStatus("🔴 加载失败", Brushes.Red);
+            HandyControl.Controls.MessageBox.Error($"切换驱动失败: {ex.Message}", "错误");
+        }
+    }
+
+    /// <summary>
+    /// 设置驱动状态
+    /// </summary>
+    private void SetDriverStatus(string status, Brush color)
+    {
+        DriverStatus = status;
+        DriverStatusColor = color;
+    }
+
+    /// <summary>
+    /// 更新调试模式状态
+    /// </summary>
     private void UpdateDebugModeStatus()
     {
-        var globalConfig = ConfigManager.GlobalConfig;
+        var globalConfig = _configManager.GlobalConfig;
         if (globalConfig.Debug.IsDebugMode)
         {
             DebugModeStatus = "🟢 调试模式：已开启";
-            DebugModeStatusColor = System.Windows.Media.Brushes.Green;
+            DebugModeStatusColor = Brushes.Green;
         }
         else
         {
             DebugModeStatus = "⭕ 调试模式：已关闭";
-            DebugModeStatusColor = System.Windows.Media.Brushes.Gray;
+            DebugModeStatusColor = Brushes.Gray;
         }
     }
 
+    /// <summary>
+    /// 更新驱动状态
+    /// </summary>
     private void UpdateDriverStatus()
     {
-        var globalConfig = ConfigManager.GlobalConfig;
-        _selectedDriver = globalConfig.SelectedDriver ?? "AHK";
-        OnPropertyChanged(nameof(SelectedDriver));
+        var globalConfig = _configManager.GlobalConfig;
+        SelectedDriver = globalConfig.SelectedDriver ?? "AHK";
 
         try
         {
             if (App.LyKeysDriver != null && App.LyKeysDriver.IsInitialized)
             {
-                SetDriverStatus("🟢 已加载", System.Windows.Media.Brushes.Green);
+                SetDriverStatus("🟢 已加载", Brushes.Green);
             }
             else
             {
-                SetDriverStatus("⭕ 未加载", System.Windows.Media.Brushes.Gray);
+                SetDriverStatus("⭕ 未加载", Brushes.Gray);
             }
         }
         catch
         {
-            SetDriverStatus("🔴 加载失败", System.Windows.Media.Brushes.Red);
+            SetDriverStatus("🔴 加载失败", Brushes.Red);
         }
     }
 
+    /// <summary>
+    /// 切换调试模式
+    /// </summary>
+    [RelayCommand]
     private void ToggleDebugMode()
     {
-        ExceptionHandler.Execute(
+        _exceptionHandler.Execute(
             () =>
             {
-                var currentDebugMode = ConfigManager.GlobalConfig.Debug.IsDebugMode;
+                var currentDebugMode = _configManager.GlobalConfig.Debug.IsDebugMode;
 
-                ConfigManager.UpdateGlobalConfig(config =>
+                _configManager.UpdateGlobalConfig(config =>
                 {
                     config.Debug.IsDebugMode = !currentDebugMode;
                 });
 
                 UpdateDebugModeStatus();
-                SerilogManager.Instance.Initialize(ConfigManager.GlobalConfig.Debug);
+                SerilogManager.Instance.Initialize(_configManager.GlobalConfig.Debug);
             },
             "切换调试模式");
     }
 
-    private void RestartApplication()
+    /// <summary>
+    /// 检查更新
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanCheckUpdate))]
+    private void CheckUpdate()
     {
-        ExceptionHandler.Execute(
-            () =>
-            {
-                var appPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
-                              ?? throw new InvalidOperationException("无法获取应用程序路径");
-
-                var startInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = appPath,
-                    UseShellExecute = true,
-                    Verb = "runas"
-                };
-
-                System.Diagnostics.Process.Start(startInfo);
-                Application.Current.Shutdown();
-            },
-            "重启应用程序");
-    }
-
-    private void CheckForUpdate()
-    {
-        ExceptionHandler.Execute(
+        _exceptionHandler.Execute(
             () =>
             {
                 _isCheckingUpdate = true;
+                CheckUpdateCommand.NotifyCanExecuteChanged();
                 UpdateStatus = "正在检查...";
 
                 var updateInfo = _updateService.CheckForUpdate();
@@ -234,14 +214,22 @@ public class SettingsViewModel : ViewModelBase
                     _ => "检查失败"
                 };
                 _isCheckingUpdate = false;
+                CheckUpdateCommand.NotifyCanExecuteChanged();
             });
 
         _isCheckingUpdate = false;
+        CheckUpdateCommand.NotifyCanExecuteChanged();
     }
 
+    private bool CanCheckUpdate() => !_isCheckingUpdate;
+
+    /// <summary>
+    /// 导出配置
+    /// </summary>
+    [RelayCommand]
     private void ExportConfig()
     {
-        ExceptionHandler.Execute(
+        _exceptionHandler.Execute(
             () =>
             {
                 var dialog = new Microsoft.Win32.SaveFileDialog
@@ -255,8 +243,8 @@ public class SettingsViewModel : ViewModelBase
                 {
                     var config = new
                     {
-                        GlobalConfig = ConfigManager.GlobalConfig,
-                        KeyConfig = ConfigManager.CurrentKeyConfig
+                        GlobalConfig = _configManager.GlobalConfig,
+                        KeyConfig = _configManager.CurrentKeyConfig
                     };
 
                     var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
@@ -268,9 +256,13 @@ public class SettingsViewModel : ViewModelBase
             "导出配置");
     }
 
+    /// <summary>
+    /// 导入配置
+    /// </summary>
+    [RelayCommand]
     private void ImportConfig()
     {
-        ExceptionHandler.Execute(
+        _exceptionHandler.Execute(
             () =>
             {
                 var dialog = new Microsoft.Win32.OpenFileDialog
@@ -290,18 +282,17 @@ public class SettingsViewModel : ViewModelBase
 
                     if (config?.GlobalConfig != null)
                     {
-                        ConfigManager.UpdateGlobalConfig(gc =>
+                        _configManager.UpdateGlobalConfig(gc =>
                         {
                             gc.UI = config.GlobalConfig.UI;
                             gc.Debug = config.GlobalConfig.Debug;
                             gc.SelectedDriver = config.GlobalConfig.SelectedDriver;
-                            // 注意：soundEnabled, SoundVolume, AutoSwitchToEnglishIME 已移至 KeyConfiguration
                         });
                     }
 
                     if (config?.KeyConfig != null)
                     {
-                        ConfigManager.UpdateKeyConfig(kc =>
+                        _configManager.UpdateKeyConfig(kc =>
                         {
                             kc.startKey = config.KeyConfig.startKey;
                             kc.startMods = config.KeyConfig.startMods;
@@ -323,5 +314,4 @@ public class SettingsViewModel : ViewModelBase
             },
             "导入配置");
     }
-
 }

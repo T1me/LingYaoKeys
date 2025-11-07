@@ -60,6 +60,10 @@ namespace WpfApp.Services.Core
         /// </summary>
         public bool IsInitialized => _isInitialized;
 
+        /// <summary>
+        /// 获取输入法服务
+        /// </summary>
+        public InputMethodService InputMethodService => _inputMethodService;
 
         /// <summary>
         /// 获取或设置按键间隔

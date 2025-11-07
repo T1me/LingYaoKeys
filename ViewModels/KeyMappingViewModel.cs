@@ -4,6 +4,8 @@ using WpfApp.Services.Utils;
 using WpfApp.Services.Core;
 using System.Collections.ObjectModel;
 using System.Windows;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
 
@@ -13,7 +15,7 @@ namespace WpfApp.ViewModels
     /// 按键映射视图模型 - 多配置架构
     /// 职责: 管理多个按键配置，协调配置服务和UI交互
     /// </summary>
-    public class KeyMappingViewModel : ViewModelBase
+    public partial class KeyMappingViewModel : ObservableObject
     {
         // 服务依赖
         private readonly LyKeysService _lyKeysService;
@@ -23,60 +25,59 @@ namespace WpfApp.ViewModels
         private readonly KeyConfigurationService _configService;
         private readonly FloatingWindowService _floatingService;
 
+        /// <summary>
+        /// 日志记录器
+        /// </summary>
+        protected static SerilogManager Logger => SerilogManager.Instance;
+
+        /// <summary>
+        /// 异常处理器
+        /// </summary>
+        protected readonly ExceptionHandler ExceptionHandler = new();
+
         // UI 绑定属性
+        /// <summary>
+        /// 配置列表
+        /// </summary>
+        [ObservableProperty]
         private ObservableCollection<KeyConfigurationItemViewModel> _configurations;
+
+        /// <summary>
+        /// 当前选中的配置
+        /// </summary>
+        [ObservableProperty]
         private KeyConfigurationItemViewModel? _selectedConfiguration;
+
+        /// <summary>
+        /// 是否正在执行
+        /// </summary>
+        [ObservableProperty]
         private bool _isExecuting = false;
+
+        /// <summary>
+        /// 是否启用热键控制
+        /// </summary>
+        [ObservableProperty]
         private bool _isHotkeyControlEnabled = true;
+
+        /// <summary>
+        /// 是否启用硬件加速
+        /// </summary>
+        [ObservableProperty]
         private bool _enableHardwareAcceleration = true;
+
+        /// <summary>
+        /// 是否正在加载配置（内部使用）
+        /// </summary>
+        [ObservableProperty]
         private bool _isLoadingConfig = false;
 
         #region 属性
 
         /// <summary>
-        /// 配置列表
-        /// </summary>
-        public ObservableCollection<KeyConfigurationItemViewModel> Configurations
-        {
-            get => _configurations;
-            set => SetProperty(ref _configurations, value);
-        }
-
-        /// <summary>
-        /// 当前选中的配置
-        /// </summary>
-        public KeyConfigurationItemViewModel? SelectedConfiguration
-        {
-            get => _selectedConfiguration;
-            set
-            {
-                if (SetProperty(ref _selectedConfiguration, value))
-                {
-                    OnPropertyChanged(nameof(HasSelectedConfiguration));
-                }
-            }
-        }
-
-        /// <summary>
         /// 是否有选中的配置
         /// </summary>
         public bool HasSelectedConfiguration => SelectedConfiguration != null;
-
-        /// <summary>
-        /// 是否正在执行
-        /// </summary>
-        public bool IsExecuting
-        {
-            get => _isExecuting;
-            private set
-            {
-                if (SetProperty(ref _isExecuting, value))
-                {
-                    OnPropertyChanged(nameof(IsNotExecuting));
-                    _floatingService.IsExecuting = value;
-                }
-            }
-        }
 
         /// <summary>
         /// 是否未执行
@@ -117,39 +118,6 @@ namespace WpfApp.ViewModels
             }
         }
 
-        /// <summary>
-        /// 是否启用热键控制
-        /// </summary>
-        public bool IsHotkeyControlEnabled
-        {
-            get => _isHotkeyControlEnabled;
-            set
-            {
-                if (SetProperty(ref _isHotkeyControlEnabled, value))
-                {
-                    _hotkeyService.IsHotkeyControlEnabled = value;
-                    _floatingService.IsHotkeyControlEnabled = value;
-                    if (!value && IsExecuting) StopKeyMapping();
-                    SaveGlobalConfig();
-                }
-            }
-        }
-
-        /// <summary>
-        /// 是否启用硬件加速
-        /// </summary>
-        public bool EnableHardwareAcceleration
-        {
-            get => _enableHardwareAcceleration;
-            set
-            {
-                if (SetProperty(ref _enableHardwareAcceleration, value))
-                {
-                    SaveGlobalConfig();
-                    Logger.Info($"硬件加速已{(value ? "启用" : "禁用")}，重启应用后生效");
-                }
-            }
-        }
 
         /// <summary>
         /// 是否处于坐标编辑模式（兼容性属性）
@@ -159,14 +127,54 @@ namespace WpfApp.ViewModels
 
         #endregion
 
-        #region 命令
+        #region 属性变更处理
 
-        public ICommand AddConfigurationCommand { get; }
-        public ICommand DeleteConfigurationCommand { get; }
-        public ICommand CloneConfigurationCommand { get; }
-        public ICommand EditConfigurationCommand { get; }
-        public ICommand SetActiveConfigurationCommand { get; }
+        /// <summary>
+        /// SelectedConfiguration 属性变更时触发
+        /// </summary>
+        partial void OnSelectedConfigurationChanged(KeyConfigurationItemViewModel? value)
+        {
+            OnPropertyChanged(nameof(HasSelectedConfiguration));
+        }
 
+        /// <summary>
+        /// IsExecuting 属性变更时触发
+        /// </summary>
+        partial void OnIsExecutingChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsNotExecuting));
+            _floatingService.IsExecuting = value;
+        }
+
+        /// <summary>
+        /// IsHotkeyControlEnabled 属性变更时触发
+        /// </summary>
+        partial void OnIsHotkeyControlEnabledChanged(bool value)
+        {
+            _hotkeyService.IsHotkeyControlEnabled = value;
+            _floatingService.IsHotkeyControlEnabled = value;
+            if (!value && IsExecuting) StopKeyMapping();
+            SaveGlobalConfig();
+        }
+
+        /// <summary>
+        /// EnableHardwareAcceleration 属性变更时触发
+        /// </summary>
+        partial void OnEnableHardwareAccelerationChanged(bool value)
+        {
+            SaveGlobalConfig();
+            Logger.Info($"硬件加速已{(value ? "启用" : "禁用")}，重启应用后生效");
+        }
+
+        #endregion
+
+        #region 命令（已使用 MVVM Toolkit 自动生成）
+        // 命令通过 [RelayCommand] 特性自动生成
+        // AddConfigurationCommand
+        // DeleteConfigurationCommand
+        // CloneConfigurationCommand
+        // EditConfigurationCommand
+        // SetActiveConfigurationCommand
         #endregion
 
         public KeyMappingViewModel(
@@ -187,12 +195,7 @@ namespace WpfApp.ViewModels
             // 初始化
             _configurations = new ObservableCollection<KeyConfigurationItemViewModel>();
 
-            // 初始化命令
-            AddConfigurationCommand = CreateCommand(AddConfiguration);
-            DeleteConfigurationCommand = CreateCommand<Guid>(DeleteConfiguration, CanDeleteConfiguration);
-            CloneConfigurationCommand = CreateCommand<Guid>(CloneConfiguration, CanCloneConfiguration);
-            EditConfigurationCommand = CreateCommand<Guid>(EditConfiguration, CanEditConfiguration);
-            SetActiveConfigurationCommand = CreateCommand<Guid>(SetActiveConfiguration);
+            // 命令通过 [RelayCommand] 特性自动生成，无需手动初始化
 
             // 订阅事件
             SubscribeToEvents();
@@ -230,7 +233,7 @@ namespace WpfApp.ViewModels
         {
             ExceptionHandler.Execute(() =>
             {
-                _isLoadingConfig = true;
+                IsLoadingConfig = true;
                 try
                 {
                     // 加载全局配置
@@ -248,7 +251,7 @@ namespace WpfApp.ViewModels
                 }
                 finally
                 {
-                    _isLoadingConfig = false;
+                    IsLoadingConfig = false;
                 }
             }, "加载配置", showMessageBox: false);
         }
@@ -257,18 +260,16 @@ namespace WpfApp.ViewModels
         {
             _floatingService.IsEnabled = globalConfig.UI.FloatingWindow.IsEnabled;
             _floatingService.Opacity = globalConfig.UI.FloatingWindow.Opacity;
-            _isHotkeyControlEnabled = globalConfig.isHotkeyControlEnabled ?? true;
-            _enableHardwareAcceleration = globalConfig.EnableHardwareAcceleration ?? true;
+            IsHotkeyControlEnabled = globalConfig.isHotkeyControlEnabled ?? true;
+            EnableHardwareAcceleration = globalConfig.EnableHardwareAcceleration ?? true;
 
             // 通知UI更新
             OnPropertyChanged(nameof(IsFloatingWindowEnabled));
             OnPropertyChanged(nameof(FloatingWindowOpacity));
-            OnPropertyChanged(nameof(IsHotkeyControlEnabled));
-            OnPropertyChanged(nameof(EnableHardwareAcceleration));
 
             // 同步到服务
-            _hotkeyService.IsHotkeyControlEnabled = _isHotkeyControlEnabled;
-            _floatingService.IsHotkeyControlEnabled = _isHotkeyControlEnabled;
+            _hotkeyService.IsHotkeyControlEnabled = IsHotkeyControlEnabled;
+            _floatingService.IsHotkeyControlEnabled = IsHotkeyControlEnabled;
 
             Logger.Debug("已加载全局配置");
         }
@@ -338,6 +339,10 @@ namespace WpfApp.ViewModels
 
         #region 配置管理
 
+        /// <summary>
+        /// 添加新配置
+        /// </summary>
+        [RelayCommand]
         private void AddConfiguration()
         {
             try
@@ -439,11 +444,10 @@ namespace WpfApp.ViewModels
             }
         }
 
-        private bool CanDeleteConfiguration(Guid configId)
-        {
-            return Configurations.Count > 1; // 至少保留一个配置
-        }
-
+        /// <summary>
+        /// 删除配置
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanDeleteConfiguration))]
         private void DeleteConfiguration(Guid configId)
         {
             try
@@ -470,11 +474,15 @@ namespace WpfApp.ViewModels
             }
         }
 
-        private bool CanCloneConfiguration(Guid configId)
+        private bool CanDeleteConfiguration(Guid configId)
         {
-            return Configurations.Any(c => c.Id == configId);
+            return Configurations.Count > 1; // 至少保留一个配置
         }
 
+        /// <summary>
+        /// 克隆配置
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanCloneConfiguration))]
         private void CloneConfiguration(Guid configId)
         {
             try
@@ -493,11 +501,15 @@ namespace WpfApp.ViewModels
             }
         }
 
-        private bool CanEditConfiguration(Guid configId)
+        private bool CanCloneConfiguration(Guid configId)
         {
             return Configurations.Any(c => c.Id == configId);
         }
 
+        /// <summary>
+        /// 编辑配置
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanEditConfiguration))]
         private void EditConfiguration(Guid configId)
         {
             try
@@ -517,6 +529,11 @@ namespace WpfApp.ViewModels
                 Logger.Error("编辑配置失败", ex);
                 ShowMessage($"编辑配置失败: {ex.Message}", true);
             }
+        }
+
+        private bool CanEditConfiguration(Guid configId)
+        {
+            return Configurations.Any(c => c.Id == configId);
         }
 
         /// <summary>
@@ -575,6 +592,10 @@ namespace WpfApp.ViewModels
             }
         }
 
+        /// <summary>
+        /// 设置激活配置
+        /// </summary>
+        [RelayCommand]
         private void SetActiveConfiguration(Guid configId)
         {
             try
@@ -655,7 +676,7 @@ namespace WpfApp.ViewModels
 
         private void SaveMultiKeyConfig()
         {
-            if (_isLoadingConfig) return;
+            if (IsLoadingConfig) return;
 
             try
             {
@@ -676,7 +697,7 @@ namespace WpfApp.ViewModels
 
         private void SaveGlobalConfig()
         {
-            if (_isLoadingConfig) return;
+            if (IsLoadingConfig) return;
 
             WpfApp.Services.Core.ConfigManager.Instance.UpdateGlobalConfig(config =>
             {

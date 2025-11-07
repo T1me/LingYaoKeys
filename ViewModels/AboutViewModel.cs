@@ -1,55 +1,76 @@
-using System.Windows;
-using System.Windows.Input;
 using System.Diagnostics;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using WpfApp.Services.Core;
+using WpfApp.Services.Utils;
 
 namespace WpfApp.ViewModels;
 
-public class AboutViewModel : ViewModelBase
+/// <summary>
+/// 关于页面视图模型
+/// </summary>
+public partial class AboutViewModel : ObservableObject
 {
-    private readonly string _githubUrl;
-    private readonly string _websiteUrl = "https://zyphrZero.github.io/LingYaoKeys/";
+    private readonly IConfigManager _configManager;
+    private readonly ISerilogManager _logger;
+    private readonly ExceptionHandler _exceptionHandler;
 
-    public ICommand OpenGitHubCommand { get; }
-    public ICommand OpenWebsiteCommand { get; }
-
-    public AboutViewModel()
+    public AboutViewModel(
+        IConfigManager configManager,
+        ISerilogManager logger)
     {
-        _githubUrl = ConfigManager.GlobalConfig.AppInfo.GitHubUrl;
-
-        // 使用统一的命令初始化模式
-        OpenGitHubCommand = CreateCommand(OpenGitHub);
-        OpenWebsiteCommand = CreateCommand(OpenWebsite);
+        _configManager = configManager;
+        _logger = logger;
+        _exceptionHandler = new ExceptionHandler();
     }
 
-    private void OpenWebsite()
-    {
-        ExceptionHandler.Execute(
-            () =>
-            {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = _websiteUrl,
-                    UseShellExecute = true
-                };
-                Process.Start(psi);
-                Logger.Debug("成功打开官网链接");
-            },
-            "打开官网链接");
-    }
+    /// <summary>
+    /// GitHub 仓库链接
+    /// </summary>
+    public string GitHubUrl => _configManager.GlobalConfig.AppInfo.GitHubUrl;
 
+    /// <summary>
+    /// 官网链接
+    /// </summary>
+    public string WebsiteUrl => "https://zyphrZero.github.io/LingYaoKeys/";
+
+    /// <summary>
+    /// 打开 GitHub 仓库
+    /// </summary>
+    [RelayCommand]
     private void OpenGitHub()
     {
-        ExceptionHandler.Execute(
+        _exceptionHandler.Execute(
             () =>
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = _githubUrl,
+                    FileName = GitHubUrl,
                     UseShellExecute = true
                 };
                 Process.Start(psi);
-                Logger.Debug("成功打开GitHub仓库链接");
+                _logger.Debug("成功打开GitHub仓库链接");
             },
             "打开GitHub仓库链接");
+    }
+
+    /// <summary>
+    /// 打开官网
+    /// </summary>
+    [RelayCommand]
+    private void OpenWebsite()
+    {
+        _exceptionHandler.Execute(
+            () =>
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = WebsiteUrl,
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
+                _logger.Debug("成功打开官网链接");
+            },
+            "打开官网链接");
     }
 }
