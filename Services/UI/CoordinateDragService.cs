@@ -20,7 +20,7 @@ namespace WpfApp.Services.UI;
 /// </summary>
 public class CoordinateDragService : IDisposable
 {
-    private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
     private const double DRAG_THRESHOLD = 5.0;
 
     private bool _isDragging;

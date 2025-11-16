@@ -11,7 +11,14 @@ namespace WpfApp.Services.Core
     /// </summary>
     public class CoordinateManagementService
     {
+        private readonly ISerilogManager _logger;
+
         public event EventHandler? CoordinateIndicesUpdated;
+
+        public CoordinateManagementService(ISerilogManager logger)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
 
         /// <summary>
         /// 验证坐标是否有效
@@ -50,7 +57,7 @@ namespace WpfApp.Services.Core
                 KeyInterval = defaultInterval
             };
 
-            SerilogManager.Instance.Debug($"创建坐标项: ({x}, {y}), 间隔: {defaultInterval}ms");
+            _logger.Debug($"创建坐标项: ({x}, {y}), 间隔: {defaultInterval}ms");
             return coordinateItem;
         }
 
@@ -66,15 +73,15 @@ namespace WpfApp.Services.Core
                 for (int i = 0; i < coordinateItems.Count; i++)
                 {
                     coordinateItems[i].CoordinateIndex = i;
-                    SerilogManager.Instance.Debug($"设置坐标索引: 项目={i}, 坐标=({coordinateItems[i].X},{coordinateItems[i].Y})");
+                    _logger.Debug($"设置坐标索引: 项目={i}, 坐标=({coordinateItems[i].X},{coordinateItems[i].Y})");
                 }
 
                 CoordinateIndicesUpdated?.Invoke(this, EventArgs.Empty);
-                SerilogManager.Instance.Debug($"坐标索引更新完成，共 {coordinateItems.Count} 个坐标项");
+                _logger.Debug($"坐标索引更新完成，共 {coordinateItems.Count} 个坐标项");
             }
             catch (Exception ex)
             {
-                SerilogManager.Instance.Error("更新坐标索引时发生异常", ex);
+                _logger.Error("更新坐标索引时发生异常", ex);
                 throw;
             }
         }

@@ -16,7 +16,7 @@ namespace WpfApp.Services.Models;
 /// </summary>
 public class CoordinateMarker
 {
-    private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
 
     public Window MarkerWindow { get; private set; }
     public Window LabelWindow { get; private set; }

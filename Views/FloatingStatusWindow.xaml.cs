@@ -30,12 +30,15 @@ public partial class FloatingStatusWindow : Window
     private MainWindow _mainWindow;
     private DateTime _lastClickTime;
     private const double DOUBLE_CLICK_THRESHOLD = 300;
-    private readonly SerilogManager _logger = SerilogManager.Instance;
-    private readonly IConfigManager _configManager = ConfigManager.Instance;
+    private readonly ISerilogManager _logger;
+    private readonly IConfigManager _configManager;
     private string _currentStatus;
 
-    public FloatingStatusWindow(MainWindow mainWindow)
+    public FloatingStatusWindow(ISerilogManager logger, IConfigManager configManager, MainWindow mainWindow)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
+
         InitializeComponent();
         _config = _configManager.GlobalConfig;
         _mainWindow = mainWindow;
@@ -97,7 +100,7 @@ public partial class FloatingStatusWindow : Window
         try
         {
             // 检查配置是否启用硬件加速
-            bool enableHardwareAcceleration = ConfigManager.Instance?.GlobalConfig?.EnableHardwareAcceleration ?? true;
+            bool enableHardwareAcceleration = _configManager?.GlobalConfig?.EnableHardwareAcceleration ?? true;
             if (enableHardwareAcceleration)
             {
                 // 启用硬件加速和优化渲染设置

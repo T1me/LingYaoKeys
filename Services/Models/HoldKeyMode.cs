@@ -1,4 +1,5 @@
 using WpfApp.Services.Core;
+using WpfApp.Services.Utils;
 
 // 按键按压模式
 namespace WpfApp.Services.Models;
@@ -15,7 +16,7 @@ public class HoldKeyMode : KeyModeBase
 
     public event Action<string, bool>? OnStatusMessageUpdated;
 
-    public HoldKeyMode(LyKeysService driverService) : base(driverService)
+    public HoldKeyMode(ISerilogManager logger, LyKeysService driverService) : base(logger, driverService)
     {
     }
 

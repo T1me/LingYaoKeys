@@ -7,7 +7,7 @@ namespace WpfApp.Services.Models;
 public abstract class KeyModeBase
 {
     protected readonly LyKeysService _driverService;
-    protected readonly SerilogManager _logger;
+    protected readonly ISerilogManager _logger;
     protected List<KeyItemSettings> _operationList;
     protected bool _isRunning;
     protected CancellationTokenSource? _cts;
@@ -15,10 +15,10 @@ public abstract class KeyModeBase
 
     protected Action? _onCompleted;
 
-    protected KeyModeBase(LyKeysService driverService)
+    protected KeyModeBase(ISerilogManager logger, LyKeysService driverService)
     {
-        _driverService = driverService;
-        _logger = SerilogManager.Instance;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _driverService = driverService ?? throw new ArgumentNullException(nameof(driverService));
         _operationList = new List<KeyItemSettings>();
     }
 

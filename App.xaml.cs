@@ -97,15 +97,17 @@ public partial class App : Application
             // 注册 Views（MainWindow 需要特殊处理，因为 MainViewModel 需要 Window 参数）
             services.AddSingleton<MainWindow>(sp =>
             {
+                var logger = sp.GetRequiredService<ISerilogManager>();
+                var configManager = sp.GetRequiredService<IConfigManager>();
+
                 // 先创建 MainWindow 实例
-                var mainWindow = new MainWindow();
+                var mainWindow = new MainWindow(logger, configManager);
 
                 // 然后创建 MainViewModel，传入 MainWindow
-                var configManager = sp.GetRequiredService<IConfigManager>();
-                var logger = sp.GetRequiredService<ISerilogManager>();
+                var pathService = sp.GetRequiredService<IPathService>();
                 var lyKeysService = sp.GetRequiredService<ILyKeysService>();
 
-                var mainViewModel = new MainViewModel(configManager, logger, lyKeysService, mainWindow);
+                var mainViewModel = new MainViewModel(configManager, logger, pathService, lyKeysService, mainWindow);
 
                 // 设置 ViewModel 和 DataContext
                 mainWindow.SetViewModel(mainViewModel);
@@ -401,7 +403,7 @@ public partial class App : Application
             var selectedDriver = ConfigService.GlobalConfig.SelectedDriver ?? "LyKeys";
             _logger.Debug($"选择的驱动: {selectedDriver}");
 
-            var driverFile = DriverFactory.PrepareDriverFiles(selectedDriver, _pathService, ExtractEmbeddedResource);
+            var driverFile = DriverFactory.PrepareDriverFiles(_logger, selectedDriver, _pathService, ExtractEmbeddedResource);
 
             if (selectedDriver.Equals("LyKeys", StringComparison.OrdinalIgnoreCase))
             {
@@ -411,8 +413,8 @@ public partial class App : Application
                 }
             }
 
-            var driver = DriverFactory.CreateDriver(selectedDriver, driverFile);
-            LyKeysDriver = new LyKeysService(driver);
+            var driver = DriverFactory.CreateDriver(_logger, selectedDriver, driverFile);
+            LyKeysDriver = new LyKeysService(_logger, ConfigService, driver);
 
             if (!LyKeysDriver.Initialize(driverFile))
             {
@@ -422,7 +424,7 @@ public partial class App : Application
                 return;
             }
 
-            AudioService = new AudioService();
+            AudioService = new AudioService(_logger, _pathService);
 
             // 从 DI 容器获取 MainWindow
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();

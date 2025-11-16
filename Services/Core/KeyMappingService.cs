@@ -8,7 +8,7 @@ namespace WpfApp.Services.Core;
 
 public class KeyMappingService
 {
-    private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
     private readonly LyKeysService _lyKeysService;
     private readonly HotkeyService _hotkeyService;
     private ObservableCollection<KeyItem> _keyList;

@@ -14,8 +14,7 @@ namespace WpfApp.ViewModels;
 /// </summary>
 public partial class KeyConfigurationDialogViewModel : ObservableObject
 {
-    private static readonly ISerilogManager Logger = SerilogManager.Instance;
-
+    private readonly ISerilogManager _logger;
     private readonly LyKeysService _lyKeysService;
     private readonly KeyConfiguration _configuration;
     private readonly CoordinateManagementService _coordinateService;
@@ -127,14 +126,15 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
 
     #endregion
 
-    public KeyConfigurationDialogViewModel(KeyConfiguration configuration, LyKeysService lyKeysService)
+    public KeyConfigurationDialogViewModel(KeyConfiguration configuration, LyKeysService lyKeysService, ISerilogManager logger)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // 创建服务
-        _coordinateService = new CoordinateManagementService();
-        _keyListService = new KeyListManagementService(_lyKeysService, null, _coordinateService);
+        _coordinateService = new CoordinateManagementService(_logger);
+        _keyListService = new KeyListManagementService(_logger, _lyKeysService, null, _coordinateService);
 
         // 初始化命令
         SaveCommand = new RelayCommand(Save, CanSave);
@@ -178,7 +178,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         KeyItems = new ObservableCollection<KeyItem>();
         _keyListService.LoadFromConfig(_configuration.Keys, KeyItems);
 
-        Logger.Debug($"已加载配置: {ConfigurationName}, 按键数: {KeyItems.Count}");
+        _logger.Debug($"已加载配置: {ConfigurationName}, 按键数: {KeyItems.Count}");
     }
 
     #endregion
@@ -190,7 +190,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         _startKey = keyCode;
         _startMods = modifiers;
         UpdateHotkeyText();
-        Logger.Debug($"设置激活热键: {StartHotkeyText}");
+        _logger.Debug($"设置激活热键: {StartHotkeyText}");
     }
 
     public void SetStopHotkey(VirtualKeyCode keyCode, ModifierKeys modifiers)
@@ -198,7 +198,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         _stopKey = keyCode;
         _stopMods = modifiers;
         UpdateHotkeyText();
-        Logger.Debug($"设置停止热键: {StopHotkeyText}");
+        _logger.Debug($"设置停止热键: {StopHotkeyText}");
     }
 
     public void ClearStartHotkey()
@@ -243,7 +243,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
     {
         _currentKey = keyCode;
         CurrentKeyText = _lyKeysService.GetKeyDescription(keyCode);
-        Logger.Debug($"设置当前按键: {keyCode}");
+        _logger.Debug($"设置当前按键: {keyCode}");
     }
 
     private bool CanAddKey()
@@ -258,7 +258,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         try
         {
             _keyListService.AddKeyboardKey(_currentKey.Value, _currentKeyInterval, KeyItems, _startKey);
-            Logger.Info($"已添加按键: {CurrentKeyText}");
+            _logger.Info($"已添加按键: {CurrentKeyText}");
 
             // 清空输入
             _currentKey = null;
@@ -266,7 +266,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Logger.Error("添加按键失败", ex);
+            _logger.Error("添加按键失败", ex);
         }
     }
 
@@ -278,11 +278,11 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         try
         {
             _keyListService.AddCoordinate(x, y, _currentKeyInterval, KeyItems);
-            Logger.Info($"已添加坐标: ({x}, {y})");
+            _logger.Info($"已添加坐标: ({x}, {y})");
         }
         catch (Exception ex)
         {
-            Logger.Error("添加坐标失败", ex);
+            _logger.Error("添加坐标失败", ex);
             HandyControl.Controls.MessageBox.Error($"添加坐标失败: {ex.Message}", "错误");
         }
     }
@@ -306,16 +306,16 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
                 CurrentKeyText = keyItem.DisplayName;
                 CurrentKeyInterval = keyItem.KeyInterval;
 
-                Logger.Info($"正在编辑按键: {keyItem.DisplayName}");
+                _logger.Info($"正在编辑按键: {keyItem.DisplayName}");
             }
             else
             {
-                Logger.Warning("坐标类型的按键项不支持编辑");
+                _logger.Warning("坐标类型的按键项不支持编辑");
             }
         }
         catch (Exception ex)
         {
-            Logger.Error("编辑按键失败", ex);
+            _logger.Error("编辑按键失败", ex);
         }
     }
 
@@ -324,11 +324,11 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         try
         {
             _keyListService.DeleteKey(keyItem, KeyItems);
-            Logger.Info($"已删除按键: {keyItem.DisplayName}");
+            _logger.Info($"已删除按键: {keyItem.DisplayName}");
         }
         catch (Exception ex)
         {
-            Logger.Error("删除按键失败", ex);
+            _logger.Error("删除按键失败", ex);
         }
     }
 
@@ -373,14 +373,14 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
             // 更新按键列表
             _configuration.Keys = _keyListService.ToConfigFormat(KeyItems);
 
-            Logger.Info($"配置已保存: {ConfigurationName}");
+            _logger.Info($"配置已保存: {ConfigurationName}");
 
             // 触发保存成功事件（会在 KeyMappingViewModel 中处理保存和关闭对话框）
             SaveCompleted?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
-            Logger.Error("保存配置失败", ex);
+            _logger.Error("保存配置失败", ex);
             HandyControl.Controls.MessageBox.Error($"保存配置失败: {ex.Message}", "错误");
         }
     }

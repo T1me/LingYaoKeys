@@ -9,7 +9,7 @@ namespace WpfApp.Services.Utils
     /// </summary>
     public class ExceptionHandler
     {
-        private readonly SerilogManager _logger = SerilogManager.Instance;
+        private readonly ISerilogManager _logger;
 
         /// <summary>
         /// 执行同步操作并处理异常

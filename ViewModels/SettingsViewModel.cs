@@ -20,6 +20,7 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly IConfigManager _configManager;
     private readonly ISerilogManager _logger;
+    private readonly IPathService _pathService;
     private readonly UpdateService _updateService;
     private readonly ExceptionHandler _exceptionHandler;
 
@@ -45,10 +46,12 @@ public partial class SettingsViewModel : ObservableObject
 
     public SettingsViewModel(
         IConfigManager configManager,
-        ISerilogManager logger)
+        ISerilogManager logger,
+        IPathService pathService)
     {
-        _configManager = configManager;
-        _logger = logger;
+        _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
         _updateService = new UpdateService();
         _exceptionHandler = new ExceptionHandler();
 
@@ -74,9 +77,8 @@ public partial class SettingsViewModel : ObservableObject
         {
             SetDriverStatus("🟠 加载中...", Brushes.Orange);
 
-            var pathService = PathService.Instance;
-            var driverFile = DriverFactory.PrepareDriverFiles(driverType, pathService, App.ExtractEmbeddedResource);
-            var driver = DriverFactory.CreateDriver(driverType, driverFile);
+            var driverFile = DriverFactory.PrepareDriverFiles(_logger, driverType, _pathService, App.ExtractEmbeddedResource);
+            var driver = DriverFactory.CreateDriver(_logger, driverType, driverFile);
 
             if (!App.LyKeysDriver.ReloadDriver(driver, driverFile))
             {
@@ -164,7 +166,7 @@ public partial class SettingsViewModel : ObservableObject
                 });
 
                 UpdateDebugModeStatus();
-                SerilogManager.Instance.Initialize(_configManager.GlobalConfig.Debug);
+                _logger.Initialize(_configManager.GlobalConfig.Debug);
             },
             "切换调试模式");
     }

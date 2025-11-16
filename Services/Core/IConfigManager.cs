@@ -24,6 +24,11 @@ namespace WpfApp.Services.Core
         KeyConfigData CurrentKeyConfig { get; }
 
         /// <summary>
+        /// 获取多配置数据
+        /// </summary>
+        MultiKeyConfigData MultiKeyConfigData { get; }
+
+        /// <summary>
         /// 初始化配置管理器
         /// </summary>
         void Initialize();
@@ -37,6 +42,11 @@ namespace WpfApp.Services.Core
         /// 更新当前按键配置
         /// </summary>
         void UpdateKeyConfig(Action<KeyConfigData> updateAction);
+
+        /// <summary>
+        /// 更新多配置数据
+        /// </summary>
+        void UpdateMultiKeyConfig(Action<MultiKeyConfigData> updateAction);
 
         /// <summary>
         /// 资源清理

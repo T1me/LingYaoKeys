@@ -14,7 +14,7 @@ public sealed class LyKeys : IDriver
 {
     #region 字段和属性
 
-    private static readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
     private bool _isDisposed;
     private bool _isInitialized;
     private const string DriverName = "lykeys";
@@ -127,8 +127,9 @@ public sealed class LyKeys : IDriver
 
     #region 构造函数和初始化
 
-    public LyKeys(string driverPath)
+    public LyKeys(ISerilogManager logger, string driverPath)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _driverPath = driverPath ?? throw new ArgumentNullException(nameof(driverPath));
     }
 

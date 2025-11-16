@@ -12,6 +12,7 @@ namespace WpfApp.Services.Core
     /// </summary>
     public class KeyListManagementService
     {
+        private readonly ISerilogManager _logger;
         private readonly LyKeysService _lyKeysService;
         private readonly HotkeyService? _hotkeyService;
         private readonly CoordinateManagementService _coordinateService;
@@ -19,10 +20,12 @@ namespace WpfApp.Services.Core
         public event EventHandler? KeyListChanged;
 
         public KeyListManagementService(
+            ISerilogManager logger,
             LyKeysService lyKeysService,
             HotkeyService? hotkeyService,
             CoordinateManagementService coordinateService)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
             _hotkeyService = hotkeyService; // 可选参数，允许为 null
             _coordinateService = coordinateService ?? throw new ArgumentNullException(nameof(coordinateService));
@@ -60,7 +63,7 @@ namespace WpfApp.Services.Core
             // 同步到热键服务
             SyncToHotkeyService(keyList);
 
-            SerilogManager.Instance.Debug($"已添加按键: {keyCode}");
+            _logger.Debug($"已添加按键: {keyCode}");
             KeyListChanged?.Invoke(this, EventArgs.Empty);
 
             return keyItem;
@@ -86,7 +89,7 @@ namespace WpfApp.Services.Core
             // 同步到热键服务
             SyncToHotkeyService(keyList);
 
-            SerilogManager.Instance.Debug($"已添加坐标: ({x}, {y})");
+            _logger.Debug($"已添加坐标: ({x}, {y})");
             KeyListChanged?.Invoke(this, EventArgs.Empty);
 
             return coordinateItem;
@@ -112,7 +115,7 @@ namespace WpfApp.Services.Core
             // 同步到热键服务
             SyncToHotkeyService(keyList);
 
-            SerilogManager.Instance.Debug($"已删除按键: {(keyItem.Type == KeyItemType.Keyboard ? keyItem.KeyCode.ToString() : $"坐标({keyItem.X},{keyItem.Y})")}");
+            _logger.Debug($"已删除按键: {(keyItem.Type == KeyItemType.Keyboard ? keyItem.KeyCode.ToString() : $"坐标({keyItem.X},{keyItem.Y})")}");
             KeyListChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -126,7 +129,7 @@ namespace WpfApp.Services.Core
                 // 如果没有热键服务（例如在配置对话框中），跳过同步
                 if (_hotkeyService == null)
                 {
-                    SerilogManager.Instance.Debug("热键服务未初始化，跳过同步");
+                    _logger.Debug("热键服务未初始化，跳过同步");
                     return;
                 }
 
@@ -134,7 +137,7 @@ namespace WpfApp.Services.Core
 
                 if (!selectedItems.Any())
                 {
-                    SerilogManager.Instance.Debug("没有选中的按键，跳过同步");
+                    _logger.Debug("没有选中的按键，跳过同步");
                     return;
                 }
 
@@ -154,11 +157,11 @@ namespace WpfApp.Services.Core
 
                 _hotkeyService.SetKeySequence(operations);
 
-                SerilogManager.Instance.Debug($"已同步操作列表 - 总数: {operations.Count}, 键盘: {operations.Count(o => o.Type == KeyItemType.Keyboard)}, 坐标: {operations.Count(o => o.Type == KeyItemType.Coordinates)}");
+                _logger.Debug($"已同步操作列表 - 总数: {operations.Count}, 键盘: {operations.Count(o => o.Type == KeyItemType.Keyboard)}, 坐标: {operations.Count(o => o.Type == KeyItemType.Coordinates)}");
             }
             catch (Exception ex)
             {
-                SerilogManager.Instance.Error("同步按键列表到热键服务失败", ex);
+                _logger.Error("同步按键列表到热键服务失败", ex);
                 throw;
             }
         }
@@ -188,7 +191,7 @@ namespace WpfApp.Services.Core
 
             if (keyConfigs == null || keyConfigs.Count == 0)
             {
-                SerilogManager.Instance.Debug("没有按键配置需要加载");
+                _logger.Debug("没有按键配置需要加载");
                 return;
             }
 
@@ -223,7 +226,7 @@ namespace WpfApp.Services.Core
             // 更新坐标索引
             _coordinateService.UpdateCoordinateIndices(keyList);
 
-            SerilogManager.Instance.Debug($"已加载按键列表，总数: {keyList.Count}");
+            _logger.Debug($"已加载按键列表，总数: {keyList.Count}");
         }
 
         /// <summary>
@@ -254,7 +257,7 @@ namespace WpfApp.Services.Core
 
                     if ((x ?? 0) == 0 && (y ?? 0) == 0)
                     {
-                        SerilogManager.Instance.Warning($"修正无效的坐标配置: ({x}, {y}) => (1, 1)");
+                        _logger.Warning($"修正无效的坐标配置: ({x}, {y}) => (1, 1)");
                         x = 1;
                         y = 1;
                     }

@@ -1,4 +1,5 @@
 using WpfApp.Services.Core;
+using WpfApp.Services.Utils;
 
 namespace WpfApp.Services.Models;
 
@@ -10,7 +11,7 @@ public class SequenceKeyMode : KeyModeBase
     private int _currentIndex;
     private bool _emergencyStop;
 
-    public SequenceKeyMode(LyKeysService driverService) : base(driverService)
+    public SequenceKeyMode(ISerilogManager logger, LyKeysService driverService) : base(logger, driverService)
     {
     }
 

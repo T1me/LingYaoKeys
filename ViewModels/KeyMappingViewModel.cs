@@ -22,13 +22,10 @@ namespace WpfApp.ViewModels
         private readonly HotkeyService _hotkeyService;
         private readonly AudioService _audioService;
         private readonly MainViewModel _mainViewModel;
+        private readonly IConfigManager _configManager;
+        private readonly ISerilogManager _logger;
         private readonly KeyConfigurationService _configService;
         private readonly FloatingWindowService _floatingService;
-
-        /// <summary>
-        /// 日志记录器
-        /// </summary>
-        protected static SerilogManager Logger => SerilogManager.Instance;
 
         /// <summary>
         /// 异常处理器
@@ -163,7 +160,7 @@ namespace WpfApp.ViewModels
         partial void OnEnableHardwareAccelerationChanged(bool value)
         {
             SaveGlobalConfig();
-            Logger.Info($"硬件加速已{(value ? "启用" : "禁用")}，重启应用后生效");
+            _logger.Info($"硬件加速已{(value ? "启用" : "禁用")}，重启应用后生效");
         }
 
         #endregion
@@ -181,16 +178,20 @@ namespace WpfApp.ViewModels
             LyKeysService lyKeysService,
             HotkeyService hotkeyService,
             MainViewModel mainViewModel,
-            AudioService audioService)
+            AudioService audioService,
+            IConfigManager configManager,
+            ISerilogManager logger)
         {
             _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
             _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
             _mainViewModel = mainViewModel ?? throw new ArgumentNullException(nameof(mainViewModel));
             _audioService = audioService ?? throw new ArgumentNullException(nameof(audioService));
+            _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             // 创建服务实例
-            _configService = new KeyConfigurationService(_hotkeyService);
-            _floatingService = new FloatingWindowService();
+            _configService = new KeyConfigurationService(_logger, _hotkeyService);
+            _floatingService = new FloatingWindowService(_logger, _configManager);
 
             // 初始化
             _configurations = new ObservableCollection<KeyConfigurationItemViewModel>();
@@ -226,7 +227,7 @@ namespace WpfApp.ViewModels
             _configService.ActiveConfigurationChanged += OnActiveConfigurationChanged;
 
             // 配置变更事件
-            WpfApp.Services.Core.ConfigManager.Instance.ConfigChanged += OnConfigChanged;
+            _configManager.ConfigChanged += OnConfigChanged;
         }
 
         private void LoadConfiguration()
@@ -237,17 +238,17 @@ namespace WpfApp.ViewModels
                 try
                 {
                     // 加载全局配置
-                    LoadGlobalConfig(WpfApp.Services.Core.ConfigManager.Instance.GlobalConfig);
+                    LoadGlobalConfig(_configManager.GlobalConfig);
 
                     // 加载多配置数据
-                    var multiConfig = WpfApp.Services.Core.ConfigManager.Instance.MultiKeyConfigData;
+                    var multiConfig = _configManager.MultiKeyConfigData;
                     if (multiConfig != null)
                     {
                         _configService.LoadConfigurations(multiConfig);
                         LoadConfigurationsToUI();
                     }
 
-                    Logger.Debug("配置加载完成");
+                    _logger.Debug("配置加载完成");
                 }
                 finally
                 {
@@ -271,7 +272,7 @@ namespace WpfApp.ViewModels
             _hotkeyService.IsHotkeyControlEnabled = IsHotkeyControlEnabled;
             _floatingService.IsHotkeyControlEnabled = IsHotkeyControlEnabled;
 
-            Logger.Debug("已加载全局配置");
+            _logger.Debug("已加载全局配置");
         }
 
         private void LoadConfigurationsToUI()
@@ -292,7 +293,7 @@ namespace WpfApp.ViewModels
                 Configurations.Add(viewModel);
             }
 
-            Logger.Debug($"已加载 {Configurations.Count} 个配置到UI");
+            _logger.Debug($"已加载 {Configurations.Count} 个配置到UI");
         }
 
         private void OnConfigChanged(object sender, ConfigEventArgs e)
@@ -311,7 +312,7 @@ namespace WpfApp.ViewModels
             }
             catch (Exception ex)
             {
-                Logger.Error("处理配置变更事件失败", ex);
+                _logger.Error("处理配置变更事件失败", ex);
             }
         }
 
@@ -332,7 +333,7 @@ namespace WpfApp.ViewModels
             // 保存激活配置ID
             SaveMultiKeyConfig();
 
-            Logger.Info($"激活配置已切换: {config?.Name ?? "无"}");
+            _logger.Info($"激活配置已切换: {config?.Name ?? "无"}");
         }
 
         #endregion
@@ -364,7 +365,7 @@ namespace WpfApp.ViewModels
                 };
 
                 // 创建对话框 ViewModel
-                var dialogViewModel = new KeyConfigurationDialogViewModel(newConfig, _lyKeysService);
+                var dialogViewModel = new KeyConfigurationDialogViewModel(newConfig, _lyKeysService, _logger);
 
                 // 创建配置窗口
                 var dialogView = new Views.KeyConfigurationWindow
@@ -414,7 +415,7 @@ namespace WpfApp.ViewModels
                         _configService.UpdateConfiguration(addedConfig);
 
                         // 通过 ConfigManager 保存配置
-                        WpfApp.Services.Core.ConfigManager.Instance.UpdateMultiKeyConfig(multiConfig =>
+                        _configManager.UpdateMultiKeyConfig(multiConfig =>
                         {
                             // 配置已经在 UpdateConfiguration 中更新，这里只是触发保存
                         });
@@ -423,11 +424,11 @@ namespace WpfApp.ViewModels
                         LoadConfiguration();
 
                         ShowMessage($"已添加配置: {addedConfig.Name}");
-                        Logger.Info($"已添加配置: {addedConfig.Name}");
+                        _logger.Info($"已添加配置: {addedConfig.Name}");
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error("保存新配置失败", ex);
+                        _logger.Error("保存新配置失败", ex);
                         ShowMessage($"保存新配置失败: {ex.Message}", true);
                     }
                 };
@@ -435,11 +436,11 @@ namespace WpfApp.ViewModels
                 // 显示模态对话框
                 var result = dialogView.ShowDialog();
 
-                Logger.Debug($"添加配置对话框关闭, 结果: {result}");
+                _logger.Debug($"添加配置对话框关闭, 结果: {result}");
             }
             catch (Exception ex)
             {
-                Logger.Error("添加配置失败", ex);
+                _logger.Error("添加配置失败", ex);
                 ShowMessage($"添加配置失败: {ex.Message}", true);
             }
         }
@@ -464,12 +465,12 @@ namespace WpfApp.ViewModels
                 {
                     Configurations.Remove(config);
                     ShowMessage($"已删除配置: {config.Name}");
-                    Logger.Info($"已删除配置: {config.Name}");
+                    _logger.Info($"已删除配置: {config.Name}");
                 }
             }
             catch (Exception ex)
             {
-                Logger.Error("删除配置失败", ex);
+                _logger.Error("删除配置失败", ex);
                 ShowMessage($"删除配置失败: {ex.Message}", true);
             }
         }
@@ -492,11 +493,11 @@ namespace WpfApp.ViewModels
                 Configurations.Add(viewModel);
 
                 ShowMessage($"已克隆配置: {clonedConfig.Name}");
-                Logger.Info($"已克隆配置: {clonedConfig.Name}");
+                _logger.Info($"已克隆配置: {clonedConfig.Name}");
             }
             catch (Exception ex)
             {
-                Logger.Error("克隆配置失败", ex);
+                _logger.Error("克隆配置失败", ex);
                 ShowMessage($"克隆配置失败: {ex.Message}", true);
             }
         }
@@ -526,7 +527,7 @@ namespace WpfApp.ViewModels
             }
             catch (Exception ex)
             {
-                Logger.Error("编辑配置失败", ex);
+                _logger.Error("编辑配置失败", ex);
                 ShowMessage($"编辑配置失败: {ex.Message}", true);
             }
         }
@@ -544,7 +545,7 @@ namespace WpfApp.ViewModels
             try
             {
                 // 创建对话框 ViewModel
-                var dialogViewModel = new KeyConfigurationDialogViewModel(config, _lyKeysService);
+                var dialogViewModel = new KeyConfigurationDialogViewModel(config, _lyKeysService, _logger);
 
                 // 创建配置窗口
                 var dialogView = new Views.KeyConfigurationWindow
@@ -562,7 +563,7 @@ namespace WpfApp.ViewModels
                         _configService.UpdateConfiguration(config);
 
                         // 通过 ConfigManager 保存配置
-                        WpfApp.Services.Core.ConfigManager.Instance.UpdateMultiKeyConfig(multiConfig =>
+                        _configManager.UpdateMultiKeyConfig(multiConfig =>
                         {
                             // 配置已经在 UpdateConfiguration 中更新，这里只是触发保存
                         });
@@ -571,11 +572,11 @@ namespace WpfApp.ViewModels
                         LoadConfiguration();
 
                         ShowMessage("配置已保存");
-                        Logger.Info($"配置已保存: {config.Name}");
+                        _logger.Info($"配置已保存: {config.Name}");
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error("保存配置后处理失败", ex);
+                        _logger.Error("保存配置后处理失败", ex);
                         ShowMessage($"保存配置后处理失败: {ex.Message}", true);
                     }
                 };
@@ -583,11 +584,11 @@ namespace WpfApp.ViewModels
                 // 显示模态对话框
                 var result = dialogView.ShowDialog();
 
-                Logger.Debug($"配置对话框关闭, 结果: {result}");
+                _logger.Debug($"配置对话框关闭, 结果: {result}");
             }
             catch (Exception ex)
             {
-                Logger.Error("打开配置对话框失败", ex);
+                _logger.Error("打开配置对话框失败", ex);
                 ShowMessage($"打开配置对话框失败: {ex.Message}", true);
             }
         }
@@ -605,7 +606,7 @@ namespace WpfApp.ViewModels
             }
             catch (Exception ex)
             {
-                Logger.Error("切换激活配置失败", ex);
+                _logger.Error("切换激活配置失败", ex);
                 ShowMessage($"切换激活配置失败: {ex.Message}", true);
             }
         }
@@ -622,11 +623,11 @@ namespace WpfApp.ViewModels
             {
                 _hotkeyService.StartSequence();
                 IsExecuting = true;
-                Logger.Debug("按键映射已启动");
+                _logger.Debug("按键映射已启动");
             }
             catch (Exception ex)
             {
-                Logger.Error("启动按键映射失败", ex);
+                _logger.Error("启动按键映射失败", ex);
                 StopKeyMapping();
                 ShowMessage("启动失败", true);
             }
@@ -638,11 +639,11 @@ namespace WpfApp.ViewModels
             {
                 _hotkeyService?.StopSequence();
                 IsExecuting = false;
-                Logger.Debug("按键映射已停止");
+                _logger.Debug("按键映射已停止");
             }
             catch (Exception ex)
             {
-                Logger.Error("停止按键映射失败", ex);
+                _logger.Error("停止按键映射失败", ex);
             }
         }
 
@@ -664,7 +665,7 @@ namespace WpfApp.ViewModels
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error("初始化浮窗失败", ex);
+                        _logger.Error("初始化浮窗失败", ex);
                     }
                 }));
             });
@@ -681,17 +682,17 @@ namespace WpfApp.ViewModels
             try
             {
                 var configData = _configService.GetConfigData();
-                WpfApp.Services.Core.ConfigManager.Instance.UpdateMultiKeyConfig(data =>
+                _configManager.UpdateMultiKeyConfig(data =>
                 {
                     data.Configurations = configData.Configurations;
                     data.ActiveConfigurationId = configData.ActiveConfigurationId;
                 });
 
-                Logger.Debug("多配置数据已保存");
+                _logger.Debug("多配置数据已保存");
             }
             catch (Exception ex)
             {
-                Logger.Error("保存多配置数据失败", ex);
+                _logger.Error("保存多配置数据失败", ex);
             }
         }
 
@@ -699,7 +700,7 @@ namespace WpfApp.ViewModels
         {
             if (IsLoadingConfig) return;
 
-            WpfApp.Services.Core.ConfigManager.Instance.UpdateGlobalConfig(config =>
+            _configManager.UpdateGlobalConfig(config =>
             {
                 config.UI.FloatingWindow.IsEnabled = IsFloatingWindowEnabled;
                 config.UI.FloatingWindow.Opacity = FloatingWindowOpacity;
@@ -742,7 +743,7 @@ namespace WpfApp.ViewModels
         {
             _configService?.Dispose();
             _floatingService?.Dispose();
-            WpfApp.Services.Core.ConfigManager.Instance.ConfigChanged -= OnConfigChanged;
+            _configManager.ConfigChanged -= OnConfigChanged;
         }
 
         #endregion

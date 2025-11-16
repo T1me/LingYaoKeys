@@ -64,7 +64,7 @@ public class HotkeyService : IHotkeyService, IDisposable
     // 核心字段
     private readonly KeySequenceExecutor _executor;
     private readonly LyKeysService _lyKeysService;
-    private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
     private readonly IConfigManager _configManager;
     private readonly MainViewModel _mainViewModel;
     private readonly Window _mainWindow;
@@ -98,8 +98,9 @@ public class HotkeyService : IHotkeyService, IDisposable
     }
 
     // 构造函数
-    public HotkeyService(Window mainWindow, KeySequenceExecutor executor, LyKeysService lyKeysService, IConfigManager configManager)
+    public HotkeyService(ISerilogManager logger, Window mainWindow, KeySequenceExecutor executor, LyKeysService lyKeysService, IConfigManager configManager)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
         _executor = executor ?? throw new ArgumentNullException(nameof(executor));
         _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
@@ -635,7 +636,7 @@ public class HotkeyService : IHotkeyService, IDisposable
 
             switch (e.ChangeType)
             {
-                case ConfigChangeType.Key:
+                case ConfigChangeType.MultiKey:
                     // 按键配置变更 - 重新加载热键和按键序列
                     if (e.KeyConfigData != null)
                     {

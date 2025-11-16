@@ -13,9 +13,9 @@ namespace WpfApp.Services.Core;
 public class KeyConfigurationService : IDisposable
 {
     private readonly HotkeyService _hotkeyService;
+    private readonly ISerilogManager _logger;
     private MultiKeyConfigData _multiConfigData;
     private KeyConfiguration? _activeConfiguration;
-    private readonly SerilogManager Logger = SerilogManager.Instance;
 
     /// <summary>
     /// 配置列表变更事件
@@ -48,8 +48,9 @@ public class KeyConfigurationService : IDisposable
         }
     }
 
-    public KeyConfigurationService(HotkeyService hotkeyService)
+    public KeyConfigurationService(ISerilogManager logger, HotkeyService hotkeyService)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
         _multiConfigData = new MultiKeyConfigData();
         Configurations = new ObservableCollection<KeyConfiguration>();
@@ -62,7 +63,7 @@ public class KeyConfigurationService : IDisposable
     {
         if (multiConfigData == null)
         {
-            Logger.Warning("加载的配置数据为空，使用默认配置");
+            _logger.Warning("加载的配置数据为空，使用默认配置");
             multiConfigData = new MultiKeyConfigData();
 
             // 创建默认配置
@@ -85,7 +86,7 @@ public class KeyConfigurationService : IDisposable
             SetActiveConfiguration(activeConfig.Id);
         }
 
-        Logger.Info($"已加载 {Configurations.Count} 个配置");
+        _logger.Info($"已加载 {Configurations.Count} 个配置");
     }
 
     /// <summary>
@@ -93,12 +94,12 @@ public class KeyConfigurationService : IDisposable
     /// </summary>
     public void MigrateFromLegacyConfig(KeyConfigData legacyConfig, GlobalConfig? globalConfig = null)
     {
-        Logger.Info("检测到旧版本配置，开始迁移...");
+        _logger.Info("检测到旧版本配置，开始迁移...");
 
         var multiConfig = MultiKeyConfigData.FromLegacyConfig(legacyConfig, globalConfig);
         LoadConfigurations(multiConfig);
 
-        Logger.Info("配置迁移完成");
+        _logger.Info("配置迁移完成");
     }
 
     /// <summary>
@@ -127,7 +128,7 @@ public class KeyConfigurationService : IDisposable
         }
 
         ConfigurationsChanged?.Invoke(this, EventArgs.Empty);
-        Logger.Info($"已添加配置: {name}");
+        _logger.Info($"已添加配置: {name}");
 
         return config;
     }
@@ -140,14 +141,14 @@ public class KeyConfigurationService : IDisposable
         var config = Configurations.FirstOrDefault(c => c.Id == configId);
         if (config == null)
         {
-            Logger.Warning($"未找到要删除的配置: {configId}");
+            _logger.Warning($"未找到要删除的配置: {configId}");
             return false;
         }
 
         // 不允许删除最后一个配置
         if (Configurations.Count == 1)
         {
-            Logger.Warning("不能删除最后一个配置");
+            _logger.Warning("不能删除最后一个配置");
             return false;
         }
 
@@ -170,7 +171,7 @@ public class KeyConfigurationService : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.Error($"注销热键失败: {ex.Message}", ex);
+                _logger.Error($"注销热键失败: {ex.Message}", ex);
             }
         }
 
@@ -178,7 +179,7 @@ public class KeyConfigurationService : IDisposable
         _multiConfigData.RemoveConfiguration(configId);
 
         ConfigurationsChanged?.Invoke(this, EventArgs.Empty);
-        Logger.Info($"已删除配置: {config.Name}");
+        _logger.Info($"已删除配置: {config.Name}");
 
         return true;
     }
@@ -191,7 +192,7 @@ public class KeyConfigurationService : IDisposable
         var existingConfig = Configurations.FirstOrDefault(c => c.Id == config.Id);
         if (existingConfig == null)
         {
-            Logger.Warning($"未找到要更新的配置: {config.Id}");
+            _logger.Warning($"未找到要更新的配置: {config.Id}");
             return;
         }
 
@@ -206,7 +207,7 @@ public class KeyConfigurationService : IDisposable
         }
 
         ConfigurationsChanged?.Invoke(this, EventArgs.Empty);
-        Logger.Info($"已更新配置: {config.Name}");
+        _logger.Info($"已更新配置: {config.Name}");
     }
 
     /// <summary>
@@ -225,7 +226,7 @@ public class KeyConfigurationService : IDisposable
         _multiConfigData.AddConfiguration(clonedConfig);
 
         ConfigurationsChanged?.Invoke(this, EventArgs.Empty);
-        Logger.Info($"已克隆配置: {config.Name} -> {clonedConfig.Name}");
+        _logger.Info($"已克隆配置: {config.Name} -> {clonedConfig.Name}");
 
         return clonedConfig;
     }
@@ -238,7 +239,7 @@ public class KeyConfigurationService : IDisposable
         var config = Configurations.FirstOrDefault(c => c.Id == configId);
         if (config == null)
         {
-            Logger.Warning($"未找到要激活的配置: {configId}");
+            _logger.Warning($"未找到要激活的配置: {configId}");
             return;
         }
 
@@ -251,7 +252,7 @@ public class KeyConfigurationService : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.Error($"注销旧热键失败: {ex.Message}", ex);
+                _logger.Error($"注销旧热键失败: {ex.Message}", ex);
             }
         }
 
@@ -265,7 +266,7 @@ public class KeyConfigurationService : IDisposable
             RegisterHotkeyForConfiguration(config);
         }
 
-        Logger.Info($"已激活配置: {config.Name}");
+        _logger.Info($"已激活配置: {config.Name}");
     }
 
     /// <summary>
@@ -276,7 +277,7 @@ public class KeyConfigurationService : IDisposable
         var config = Configurations.FirstOrDefault(c => c.Id == configId);
         if (config == null)
         {
-            Logger.Warning($"未找到配置: {configId}");
+            _logger.Warning($"未找到配置: {configId}");
             return;
         }
 
@@ -299,13 +300,13 @@ public class KeyConfigurationService : IDisposable
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error($"注销热键失败: {ex.Message}", ex);
+                        _logger.Error($"注销热键失败: {ex.Message}", ex);
                     }
                 }
             }
         }
 
-        Logger.Info($"配置 {config.Name} 已{(isEnabled ? "启用" : "禁用")}");
+        _logger.Info($"配置 {config.Name} 已{(isEnabled ? "启用" : "禁用")}");
     }
 
     /// <summary>
@@ -315,7 +316,7 @@ public class KeyConfigurationService : IDisposable
     {
         if (!config.StartKey.HasValue)
         {
-            Logger.Warning($"配置 {config.Name} 没有设置热键");
+            _logger.Warning($"配置 {config.Name} 没有设置热键");
             return;
         }
 
@@ -344,11 +345,11 @@ public class KeyConfigurationService : IDisposable
             // 设置按键序列
             _hotkeyService.SetKeySequence(operations);
 
-            Logger.Info($"已为配置 {config.Name} 注册热键: {config.GetStartHotkeyText()}");
+            _logger.Info($"已为配置 {config.Name} 注册热键: {config.GetStartHotkeyText()}");
         }
         catch (Exception ex)
         {
-            Logger.Error($"注册热键失败: {ex.Message}", ex);
+            _logger.Error($"注册热键失败: {ex.Message}", ex);
             throw;
         }
     }
@@ -401,12 +402,12 @@ public class KeyConfigurationService : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"注销热键失败: {ex.Message}", ex);
+                    _logger.Error($"注销热键失败: {ex.Message}", ex);
                 }
             }
         }
 
         Configurations.Clear();
-        Logger.Info("KeyConfigurationService 已释放");
+        _logger.Info("KeyConfigurationService 已释放");
     }
 }

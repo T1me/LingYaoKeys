@@ -37,9 +37,9 @@ public static class Win32WindowHelper
                 SetWindowLong(handle, GWL_EXSTYLE, exStyle);
             };
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            SerilogManager.Instance.Error("设置窗口样式时发生异常", ex);
+            // 静态方法中无法使用注入的logger，异常会被SourceInitialized事件处理
         }
     }
 }

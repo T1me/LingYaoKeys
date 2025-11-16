@@ -7,7 +7,12 @@ namespace WpfApp.Services.Core;
 /// </summary>
 public class AhkDriver : IDriver
 {
-    private static readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
+
+    public AhkDriver(ISerilogManager logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
     public bool Initialize()
     {

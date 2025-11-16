@@ -12,7 +12,7 @@ public class KeySequenceExecutor : IKeySequenceExecutor
     private readonly InputMethodService _inputMethodService;
     private readonly AudioService _audioService;
     private readonly IConfigManager _configManager;
-    private readonly SerilogManager _logger;
+    private readonly ISerilogManager _logger;
 
     private KeyModeBase? _currentMode;
     private bool _isRunning;
@@ -21,16 +21,17 @@ public class KeySequenceExecutor : IKeySequenceExecutor
     private KeyConfiguration? _currentConfig;
 
     public KeySequenceExecutor(
+        ISerilogManager logger,
         LyKeysService driverService,
         InputMethodService inputMethodService,
         AudioService audioService,
         IConfigManager configManager)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _driverService = driverService;
         _inputMethodService = inputMethodService;
         _audioService = audioService;
         _configManager = configManager;
-        _logger = SerilogManager.Instance;
     }
 
     /// <summary>
@@ -64,8 +65,8 @@ public class KeySequenceExecutor : IKeySequenceExecutor
 
         // 创建并启动模式
         _currentMode = isHoldMode
-            ? new HoldKeyMode(_driverService)
-            : new SequenceKeyMode(_driverService);
+            ? new HoldKeyMode(_logger, _driverService)
+            : new SequenceKeyMode(_logger, _driverService);
 
         _currentMode.SetOperationList(operations);
         _currentMode.Start(() => OnExecutionCompleted());

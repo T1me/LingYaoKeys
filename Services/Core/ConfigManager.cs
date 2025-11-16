@@ -17,12 +17,6 @@ namespace WpfApp.Services.Core
     {
         #region 私有字段
 
-        /// <summary>
-        /// 全局实例（用于兼容旧代码，后续应移除）
-        /// </summary>
-        [Obsolete("请使用依赖注入，不要直接访问 Instance")]
-        public static ConfigManager Instance { get; } = new ConfigManager(SerilogManager.Instance, PathService.Instance);
-
         private readonly ISerilogManager _logger;
         private readonly IPathService _pathService;
 
@@ -492,10 +486,6 @@ namespace WpfApp.Services.Core
     {
         /// <summary>全局配置变更</summary>
         Global,
-
-        /// <summary>按键配置变更（已废弃）</summary>
-        [Obsolete]
-        Key,
 
         /// <summary>多配置数据变更</summary>
         MultiKey,

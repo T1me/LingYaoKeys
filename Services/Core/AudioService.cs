@@ -7,8 +7,8 @@ namespace WpfApp.Services.Core;
 
 public class AudioService : IAudioService, IDisposable
 {
-    private readonly SerilogManager _logger = SerilogManager.Instance;
-    private readonly PathService _pathService = PathService.Instance;
+    private readonly ISerilogManager _logger;
+    private readonly IPathService _pathService;
     private readonly string _startSoundPath;
     private readonly string _stopSoundPath;
     private WaveOutEvent _outputDevice;
@@ -54,8 +54,11 @@ public class AudioService : IAudioService, IDisposable
         }
     }
 
-    public AudioService()
+    public AudioService(ISerilogManager logger, IPathService pathService)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
+
         try
         {
             _startSoundPath = _pathService.GetSoundFilePath("start.mp3");

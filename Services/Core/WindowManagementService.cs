@@ -16,6 +16,7 @@ namespace WpfApp.Services.Core
     /// </summary>
     public class WindowManagementService : IDisposable
     {
+        private readonly ISerilogManager _logger;
         private readonly HotkeyService _hotkeyService;
         private readonly object _windowCheckLock = new();
         private System.Timers.Timer? _windowCheckTimer;
@@ -47,8 +48,9 @@ namespace WpfApp.Services.Core
             }
         }
 
-        public WindowManagementService(HotkeyService hotkeyService)
+        public WindowManagementService(ISerilogManager logger, HotkeyService hotkeyService)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
             InitializeTimers();
         }
@@ -93,7 +95,7 @@ namespace WpfApp.Services.Core
             }
 
             SyncToHotkeyService();
-            SerilogManager.Instance.Info($"已添加窗口: {title}, 进程名: {processName}");
+            _logger.Info($"已添加窗口: {title}, 进程名: {processName}");
         }
 
         /// <summary>
@@ -112,7 +114,7 @@ namespace WpfApp.Services.Core
             }
 
             SyncToHotkeyService();
-            SerilogManager.Instance.Info($"已删除窗口: {windowId}");
+            _logger.Info($"已删除窗口: {windowId}");
         }
 
         /// <summary>
@@ -125,7 +127,7 @@ namespace WpfApp.Services.Core
             StopWindowCheck();
             WindowListChanged?.Invoke();
             SyncToHotkeyService();
-            SerilogManager.Instance.Info("已清除所有窗口");
+            _logger.Info("已清除所有窗口");
         }
 
         /// <summary>
@@ -213,7 +215,7 @@ namespace WpfApp.Services.Core
             }
             catch (Exception ex)
             {
-                SerilogManager.Instance.Error($"查找窗口时发生异常: {ex.Message}");
+                _logger.Error($"查找窗口时发生异常: {ex.Message}");
             }
 
             return result;
@@ -222,13 +224,13 @@ namespace WpfApp.Services.Core
         private void StartWindowCheck()
         {
             _windowCheckTimer?.Start();
-            SerilogManager.Instance.Debug("开始定时检查窗口状态");
+            _logger.Debug("开始定时检查窗口状态");
         }
 
         private void StopWindowCheck()
         {
             _windowCheckTimer?.Stop();
-            SerilogManager.Instance.Debug("停止定时检查窗口状态");
+            _logger.Debug("停止定时检查窗口状态");
         }
 
         private void WindowCheckTimer_Elapsed(object? sender, ElapsedEventArgs e)
@@ -247,7 +249,7 @@ namespace WpfApp.Services.Core
                             if (!_windowHandles.ContainsKey(window.Id) || _windowHandles[window.Id] != handle)
                             {
                                 _windowHandles[window.Id] = handle;
-                                SerilogManager.Instance.Info($"窗口句柄已更新: {window.ProcessName}");
+                                _logger.Info($"窗口句柄已更新: {window.ProcessName}");
                             }
                         }
                         else
@@ -261,7 +263,7 @@ namespace WpfApp.Services.Core
             }
             catch (Exception ex)
             {
-                SerilogManager.Instance.Error("检查窗口状态时发生异常", ex);
+                _logger.Error("检查窗口状态时发生异常", ex);
             }
         }
 
@@ -279,7 +281,7 @@ namespace WpfApp.Services.Core
             }
             catch (Exception ex)
             {
-                SerilogManager.Instance.Error("检查活动窗口状态时发生异常", ex);
+                _logger.Error("检查活动窗口状态时发生异常", ex);
             }
         }
 

@@ -24,7 +24,7 @@ public class InputMethodService : IInputMethodService
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
 
-    private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
     private IntPtr _previousLayout;
     private bool _hasStoredLayout;
 

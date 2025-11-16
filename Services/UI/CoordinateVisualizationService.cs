@@ -16,7 +16,7 @@ namespace WpfApp.Services.UI;
 /// </summary>
 public class CoordinateVisualizationService : IDisposable
 {
-    private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
     private readonly Dictionary<KeyItem, CoordinateMarker> _markers = new();
     private CoordinateMarker _draggingMarker;
 

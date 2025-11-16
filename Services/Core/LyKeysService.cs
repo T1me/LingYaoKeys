@@ -16,7 +16,7 @@ namespace WpfApp.Services.Core
     {
         #region 私有字段
         private IDriver _driver;
-        private readonly SerilogManager _logger;
+        private readonly ISerilogManager _logger;
         private readonly IConfigManager _configManager;
         private bool _isInitialized;
         private bool _isHoldMode;
@@ -128,11 +128,11 @@ namespace WpfApp.Services.Core
         /// <summary>
         /// 初始化LyKeys服务
         /// </summary>
-        public LyKeysService(IDriver driver)
+        public LyKeysService(ISerilogManager logger, IConfigManager configManager, IDriver driver)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
             _driver = driver ?? throw new ArgumentNullException(nameof(driver));
-            _logger = SerilogManager.Instance;
-            _configManager = ConfigManager.Instance;
             _isInitialized = false;
             _isHoldMode = false;
             _virtualKeyMap = InitializeVirtualKeyMap();

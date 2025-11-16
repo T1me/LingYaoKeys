@@ -20,7 +20,7 @@ namespace WpfApp.Views;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
     private readonly IConfigManager _configManager;
     private MainViewModel _viewModel;
     private bool _isClosing;
@@ -103,14 +103,16 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 无参构造函数（用于 DI 容器工厂方法）
+    /// 构造函数（用于 DI 容器工厂方法）
     /// </summary>
-    public MainWindow()
+    public MainWindow(ISerilogManager logger, IConfigManager configManager)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
+
         try
         {
             InitializeComponent();
-            _configManager = App.ConfigService ?? ConfigManager.Instance;
 
             try
             {

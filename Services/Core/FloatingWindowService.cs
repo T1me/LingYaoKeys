@@ -12,6 +12,8 @@ namespace WpfApp.Services.Core
     /// </summary>
     public class FloatingWindowService : IDisposable
     {
+        private readonly ISerilogManager _logger;
+        private readonly IConfigManager _configManager;
         private FloatingStatusWindow? _floatingWindow;
         private FloatingStatusViewModel? _floatingViewModel;
 
@@ -20,6 +22,12 @@ namespace WpfApp.Services.Core
         private bool _isExecuting;
         private bool _isHotkeyControlEnabled = true;
         private double _opacity = 0.8;
+
+        public FloatingWindowService(ISerilogManager logger, IConfigManager configManager)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
+        }
 
         public bool IsEnabled
         {
@@ -95,7 +103,7 @@ namespace WpfApp.Services.Core
                     Opacity = _opacity
                 };
 
-                _floatingWindow = new FloatingStatusWindow(ownerWindow)
+                _floatingWindow = new FloatingStatusWindow(_logger, _configManager, ownerWindow)
                 {
                     DataContext = _floatingViewModel
                 };
@@ -108,7 +116,7 @@ namespace WpfApp.Services.Core
             }
             catch (Exception ex)
             {
-                SerilogManager.Instance.Error("初始化浮窗失败", ex);
+                _logger.Error("初始化浮窗失败", ex);
             }
         }
 
@@ -123,17 +131,17 @@ namespace WpfApp.Services.Core
                 {
                     if (_floatingWindow == null)
                     {
-                        SerilogManager.Instance.Warning("浮窗未初始化，无法显示");
+                        _logger.Warning("浮窗未初始化，无法显示");
                         return;
                     }
 
                     _floatingWindow.Show();
                     UpdateStatus();
-                    SerilogManager.Instance.Debug("浮窗已显示");
+                    _logger.Debug("浮窗已显示");
                 }
                 catch (Exception ex)
                 {
-                    SerilogManager.Instance.Error("显示浮窗失败", ex);
+                    _logger.Error("显示浮窗失败", ex);
                 }
             }));
         }
@@ -148,11 +156,11 @@ namespace WpfApp.Services.Core
                 try
                 {
                     _floatingWindow?.Hide();
-                    SerilogManager.Instance.Debug("浮窗已隐藏");
+                    _logger.Debug("浮窗已隐藏");
                 }
                 catch (Exception ex)
                 {
-                    SerilogManager.Instance.Error("隐藏浮窗失败", ex);
+                    _logger.Error("隐藏浮窗失败", ex);
                 }
             }));
         }
@@ -174,7 +182,7 @@ namespace WpfApp.Services.Core
                 }
                 catch (Exception ex)
                 {
-                    SerilogManager.Instance.Error("更新浮窗状态失败", ex);
+                    _logger.Error("更新浮窗状态失败", ex);
                 }
             });
         }
@@ -186,11 +194,11 @@ namespace WpfApp.Services.Core
                 _floatingWindow?.Close();
                 _floatingWindow = null;
                 _floatingViewModel = null;
-                SerilogManager.Instance.Debug("浮窗服务已释放");
+                _logger.Debug("浮窗服务已释放");
             }
             catch (Exception ex)
             {
-                SerilogManager.Instance.Error("释放浮窗服务失败", ex);
+                _logger.Error("释放浮窗服务失败", ex);
             }
         }
     }

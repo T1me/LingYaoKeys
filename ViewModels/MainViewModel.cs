@@ -22,6 +22,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly IConfigManager _configManager;
     private readonly ISerilogManager _logger;
+    private readonly IPathService _pathService;
     private readonly ILyKeysService _lyKeysService;
     private readonly Window _mainWindow;
     private readonly KeyMappingViewModel _keyMappingViewModel;
@@ -71,12 +72,14 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(
         IConfigManager configManager,
         ISerilogManager logger,
+        IPathService pathService,
         ILyKeysService lyKeysService,
         Window mainWindow)
     {
         _isInitializing = true;
         _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
         _lyKeysService = lyKeysService ?? throw new ArgumentNullException(nameof(lyKeysService));
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
 
@@ -100,14 +103,14 @@ public partial class MainViewModel : ObservableObject
 
         // 创建服务（临时转换为具体类型，待后续重构）
         var lyKeysServiceConcrete = (LyKeysService)lyKeysService;
-        var executor = new KeySequenceExecutor(lyKeysServiceConcrete, lyKeysService.InputMethodService, App.AudioService, _configManager);
-        _hotkeyService = new HotkeyService(mainWindow, executor, lyKeysServiceConcrete, _configManager);
+        var executor = new KeySequenceExecutor(_logger, lyKeysServiceConcrete, lyKeysService.InputMethodService, App.AudioService, _configManager);
+        _hotkeyService = new HotkeyService(_logger, mainWindow, executor, lyKeysServiceConcrete, _configManager);
 
         _isInitializing = false;
 
         // 初始化 ViewModels
-        _keyMappingViewModel = new KeyMappingViewModel(lyKeysServiceConcrete, _hotkeyService, this, App.AudioService);
-        _aboutViewModel = new AboutViewModel(_configManager, SerilogManager.Instance);
+        _keyMappingViewModel = new KeyMappingViewModel(lyKeysServiceConcrete, _hotkeyService, this, App.AudioService, _configManager, _logger);
+        _aboutViewModel = new AboutViewModel(_configManager, _logger);
 
         _lyKeysService.StatusMessageChanged += OnDriverStatusMessageChanged;
 
@@ -128,7 +131,7 @@ public partial class MainViewModel : ObservableObject
             ["Settings"] = new PageConfig
             {
                 UseCaching = true,
-                CreatePageFunc = () => new SettingsView(new SettingsViewModel(_configManager, SerilogManager.Instance))
+                CreatePageFunc = () => new SettingsView(new SettingsViewModel(_configManager, _logger, _pathService))
             }
         };
 

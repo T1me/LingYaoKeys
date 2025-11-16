@@ -9,7 +9,7 @@ namespace WpfApp.Services.Core;
 
 public class UpdateService : IDisposable
 {
-    private readonly SerilogManager _logger = SerilogManager.Instance;
+    private readonly ISerilogManager _logger;
     private readonly HttpClient _httpClient;
     private const string VERSION_FILE_URL = "https://lykeys-remote.oss-cn-shanghai.aliyuncs.com/version.json";
 

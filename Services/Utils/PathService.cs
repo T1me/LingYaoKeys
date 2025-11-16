@@ -9,12 +9,6 @@ namespace WpfApp.Services.Utils;
 /// </summary>
 public class PathService : IPathService
 {
-    /// <summary>
-    /// 全局实例（用于兼容旧代码，后续应移除）
-    /// </summary>
-    [Obsolete("请使用依赖注入，不要直接访问 Instance")]
-    public static PathService Instance { get; } = new PathService(SerilogManager.Instance);
-
     private readonly ISerilogManager _logger;
     
     // 默认应用数据目录名称
