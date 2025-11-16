@@ -27,11 +27,11 @@ namespace WpfApp;
 public partial class App : Application
 {
     private IHost? _host;
-    private readonly SerilogManager _logger = SerilogManager.Instance;
-    private readonly PathService _pathService = PathService.Instance;
+    private ISerilogManager _logger;
+    private IPathService _pathService;
 
     public static LyKeysService LyKeysDriver { get; set; }
-    public static ConfigManager ConfigService { get; private set; }
+    public static IConfigManager ConfigService { get; private set; }
     public static AudioService AudioService { get; private set; }
 
     private bool _isShuttingDown;
@@ -81,11 +81,11 @@ public partial class App : Application
         builder.ConfigureServices((context, services) =>
         {
             // 注册工具服务（Singleton）
-            services.AddSingleton<IPathService>(PathService.Instance);
-            services.AddSingleton<ISerilogManager>(SerilogManager.Instance);
+            services.AddSingleton<ISerilogManager, SerilogManager>();
+            services.AddSingleton<IPathService, PathService>();
 
             // 注册核心服务（Singleton）
-            services.AddSingleton<IConfigManager>(ConfigManager.Instance);
+            services.AddSingleton<IConfigManager, ConfigManager>();
             services.AddSingleton<ILyKeysService>(sp => LyKeysDriver);
             services.AddSingleton<IAudioService>(sp => AudioService);
             services.AddSingleton<IInputMethodService, InputMethodService>();
@@ -377,18 +377,22 @@ public partial class App : Application
             // 启动 Host
             await _host.StartAsync();
 
+            // 从 DI 容器获取服务实例
+            _logger = _host.Services.GetRequiredService<ISerilogManager>();
+            _pathService = _host.Services.GetRequiredService<IPathService>();
+            ConfigService = _host.Services.GetRequiredService<IConfigManager>();
+
             Directory.CreateDirectory(_pathService.AppDataPath);
-            ConfigManager.Instance.Initialize();
-            ConfigService = ConfigManager.Instance;
+            ConfigService.Initialize();
 
             ConfigureHardwareAcceleration();
 
             _logger.SetBaseDirectory(_pathService.LogPath);
-            _logger.Initialize(ConfigManager.Instance.GlobalConfig.Debug);
+            _logger.Initialize(ConfigService.GlobalConfig.Debug);
 
             RegisterGlobalExceptionHandlers();
 
-            ConfigManager.Instance.ConfigChanged += (sender, args) =>
+            ConfigService.ConfigChanged += (sender, args) =>
             {
                 if (args.ChangeType == ConfigChangeType.Global)
                     _logger.UpdateLoggerConfig(args.GlobalConfigData.Debug);

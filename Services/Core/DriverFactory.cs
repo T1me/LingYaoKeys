@@ -35,7 +35,7 @@ public static class DriverFactory
     /// <param name="pathService">路径服务</param>
     /// <param name="extractResource">资源提取委托</param>
     /// <returns>驱动文件路径</returns>
-    public static string PrepareDriverFiles(string driverType, PathService pathService, Action<string, string> extractResource)
+    public static string PrepareDriverFiles(string driverType, IPathService pathService, Action<string, string> extractResource)
     {
         _logger.Debug($"准备驱动文件: {driverType}");
 
@@ -52,7 +52,7 @@ public static class DriverFactory
         }
     }
 
-    private static string PrepareLyKeysDriver(PathService pathService, Action<string, string> extractResource)
+    private static string PrepareLyKeysDriver(IPathService pathService, Action<string, string> extractResource)
     {
         var driverFile = pathService.GetDriverFilePath("lykeys.sys");
         var dllFile = pathService.GetDriverFilePath("lykeysdll.dll");

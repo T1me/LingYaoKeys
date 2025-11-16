@@ -1,9 +1,22 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace WpfApp.ViewModels;
 
-public class FloatingStatusViewModel : ViewModelBase
+/// <summary>
+/// 浮窗状态视图模型
+/// 简单的状态展示，不需要 Logger 或 ConfigManager
+/// </summary>
+public partial class FloatingStatusViewModel : ObservableObject
 {
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
     private bool _isExecuting = false;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
     private bool _isHotkeyControlEnabled = true;
+
+    [ObservableProperty]
     private double _opacity = 1.0;
 
     // 当前状态文本（只读计算属性）
@@ -11,45 +24,8 @@ public class FloatingStatusViewModel : ViewModelBase
     {
         get
         {
-            if (!_isHotkeyControlEnabled) return "已禁用";
-            return _isExecuting ? "运行中" : "已停止";
+            if (!IsHotkeyControlEnabled) return "已禁用";
+            return IsExecuting ? "运行中" : "已停止";
         }
-    }
-
-    // 是否正在执行
-    public bool IsExecuting
-    {
-        get => _isExecuting;
-        set
-        {
-            if (_isExecuting != value)
-            {
-                _isExecuting = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(StatusText));
-            }
-        }
-    }
-
-    // 热键总开关状态
-    public bool IsHotkeyControlEnabled
-    {
-        get => _isHotkeyControlEnabled;
-        set
-        {
-            if (_isHotkeyControlEnabled != value)
-            {
-                _isHotkeyControlEnabled = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(StatusText));
-            }
-        }
-    }
-
-    // 浮窗透明度
-    public double Opacity
-    {
-        get => _opacity;
-        set => SetProperty(ref _opacity, value);
     }
 }

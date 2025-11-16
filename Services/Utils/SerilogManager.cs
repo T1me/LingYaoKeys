@@ -9,14 +9,16 @@ namespace WpfApp.Services.Utils;
 
 public class SerilogManager : ISerilogManager, ILogger, IDisposable
 {
-    private static readonly Lazy<SerilogManager> _instance = new(() => new SerilogManager());
+    /// <summary>
+    /// 全局实例（用于兼容旧代码，后续应移除）
+    /// </summary>
+    [Obsolete("请使用依赖注入，不要直接访问 Instance")]
+    public static SerilogManager Instance { get; } = new SerilogManager();
+
     private ILogger? _logger;
     private string _baseDirectory = string.Empty;
     private bool _disposed;
-    private readonly object _lock = new();
     private bool _initialized;
-
-    public static SerilogManager Instance => _instance.Value;
 
     public void Initialize(DebugConfig debugConfig)
     {
@@ -87,11 +89,8 @@ public class SerilogManager : ISerilogManager, ILogger, IDisposable
 
     public void UpdateLoggerConfig(DebugConfig debugConfig)
     {
-        lock (_lock)
-        {
-            if (_disposed) return;
-            Initialize(debugConfig);
-        }
+        if (_disposed) return;
+        Initialize(debugConfig);
     }
 
     #region ILogger Implementation
@@ -234,11 +233,10 @@ public class SerilogManager : ISerilogManager, ILogger, IDisposable
         if (_disposed) return;
 
         if (disposing)
-            lock (_lock)
-            {
-                if (_logger is IDisposable disposableLogger) disposableLogger.Dispose();
-                _logger = null;
-            }
+        {
+            if (_logger is IDisposable disposableLogger) disposableLogger.Dispose();
+            _logger = null;
+        }
 
         _disposed = true;
     }

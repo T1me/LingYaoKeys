@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using System.Runtime.CompilerServices;
+using CommunityToolkit.Mvvm.ComponentModel;
 using WpfApp.Services.Models;
 
 namespace WpfApp.ViewModels;
@@ -8,12 +8,12 @@ namespace WpfApp.ViewModels;
 /// 按键配置项视图模型
 /// 用于在配置列表中显示单个配置
 /// </summary>
-public class KeyConfigurationItemViewModel : INotifyPropertyChanged
+public partial class KeyConfigurationItemViewModel : ObservableObject
 {
     private readonly KeyConfiguration _configuration;
-    private bool _isActive;
 
-    public event PropertyChangedEventHandler? PropertyChanged;
+    [ObservableProperty]
+    private bool _isActive;
 
     /// <summary>
     /// 配置ID
@@ -53,21 +53,6 @@ public class KeyConfigurationItemViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// 是否为激活配置
-    /// </summary>
-    public bool IsActive
-    {
-        get => _isActive;
-        set
-        {
-            if (_isActive != value)
-            {
-                _isActive = value;
-                OnPropertyChanged();
-            }
-        }
-    }
 
     /// <summary>
     /// 执行模式文本
@@ -136,8 +121,5 @@ public class KeyConfigurationItemViewModel : INotifyPropertyChanged
         }
     }
 
-    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
 }
+

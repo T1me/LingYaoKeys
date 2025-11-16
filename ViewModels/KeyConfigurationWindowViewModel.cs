@@ -1,17 +1,21 @@
 using System.Collections.ObjectModel;
 using System.Text;
 using System.Windows.Input;
+using CommunityToolkit.Mvvm.ComponentModel;
 using WpfApp.Services.Core;
 using WpfApp.Services.Models;
 using WpfApp.Services.Utils;
+using RelayCommand = CommunityToolkit.Mvvm.Input.RelayCommand;
 
 namespace WpfApp.ViewModels;
 
 /// <summary>
 /// 按键配置编辑对话框视图模型
 /// </summary>
-public class KeyConfigurationDialogViewModel : ViewModelBase
+public partial class KeyConfigurationDialogViewModel : ObservableObject
 {
+    private static readonly ISerilogManager Logger = SerilogManager.Instance;
+
     private readonly LyKeysService _lyKeysService;
     private readonly KeyConfiguration _configuration;
     private readonly CoordinateManagementService _coordinateService;
@@ -133,10 +137,10 @@ public class KeyConfigurationDialogViewModel : ViewModelBase
         _keyListService = new KeyListManagementService(_lyKeysService, null, _coordinateService);
 
         // 初始化命令
-        SaveCommand = CreateCommand(Save, CanSave);
-        AddKeyCommand = CreateCommand(AddKey, CanAddKey);
-        EditKeyCommand = CreateCommand<KeyItem>(EditKey, CanEditKey);
-        DeleteKeyCommand = CreateCommand<KeyItem>(DeleteKey);
+        SaveCommand = new RelayCommand(Save, CanSave);
+        AddKeyCommand = new RelayCommand(AddKey, CanAddKey);
+        EditKeyCommand = new CommunityToolkit.Mvvm.Input.RelayCommand<KeyItem>(EditKey, CanEditKey);
+        DeleteKeyCommand = new CommunityToolkit.Mvvm.Input.RelayCommand<KeyItem>(DeleteKey);
 
         // 加载配置数据
         LoadConfiguration();

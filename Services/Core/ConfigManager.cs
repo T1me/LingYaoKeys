@@ -17,17 +17,14 @@ namespace WpfApp.Services.Core
     {
         #region 私有字段
 
-        private static ConfigManager _instance;
-        private static readonly object _instanceLock = new object();
-
         /// <summary>
-        /// 配置锁：保护共享状态的访问，确保线程安全
-        /// 注意：I/O 操作应在锁外执行，避免长时间持有锁
+        /// 全局实例（用于兼容旧代码，后续应移除）
         /// </summary>
-        private readonly object _configLock = new object();
+        [Obsolete("请使用依赖注入，不要直接访问 Instance")]
+        public static ConfigManager Instance { get; } = new ConfigManager(SerilogManager.Instance, PathService.Instance);
 
-        private readonly SerilogManager _logger = SerilogManager.Instance;
-        private readonly PathService _pathService = PathService.Instance;
+        private readonly ISerilogManager _logger;
+        private readonly IPathService _pathService;
 
         private string _configDir;
         private string _globalConfigPath;
@@ -74,39 +71,18 @@ namespace WpfApp.Services.Core
 
         #endregion
 
-        #region 单例模式
-
         /// <summary>
-        /// 获取 ConfigManager 的单例实例
-        /// 使用双重检查锁定模式确保线程安全
+        /// 构造函数：初始化配置管理器
         /// </summary>
-        public static ConfigManager Instance
+        public ConfigManager(ISerilogManager logger, IPathService pathService)
         {
-            get
-            {
-                if (_instance == null)
-                {
-                    lock (_instanceLock)
-                    {
-                        _instance ??= new ConfigManager();
-                    }
-                }
-                return _instance;
-            }
-        }
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
 
-        /// <summary>
-        /// 私有构造函数，确保单例模式
-        /// 初始化配置路径信息
-        /// </summary>
-        private ConfigManager()
-        {
             _configDir = _pathService.ConfigPath;
             _globalConfigPath = _pathService.GetGlobalConfigPath();
             _multiKeyConfigPath = Path.Combine(_configDir, "multi_key_config.json");
         }
-
-        #endregion
 
         #region 初始化方法
 
@@ -188,10 +164,7 @@ namespace WpfApp.Services.Core
                     _logger.Debug("全局配置不存在，已创建默认配置");
                 }
 
-                lock (_configLock)
-                {
-                    _globalConfig = loadedConfig;
-                }
+                _globalConfig = loadedConfig;
 
                 if (!File.Exists(_globalConfigPath))
                 {
@@ -203,10 +176,7 @@ namespace WpfApp.Services.Core
                 _logger.Error($"加载全局配置失败: {ex.Message}", ex);
                 _logger.Warning("将使用默认全局配置");
 
-                lock (_configLock)
-                {
-                    _globalConfig = CreateDefaultGlobalConfig();
-                }
+                _globalConfig = CreateDefaultGlobalConfig();
 
                 SaveGlobalConfig();
             }
@@ -266,10 +236,7 @@ namespace WpfApp.Services.Core
                     needsSave = true;
                 }
 
-                lock (_configLock)
-                {
-                    _multiKeyConfigData = loadedConfig;
-                }
+                _multiKeyConfigData = loadedConfig;
 
                 if (needsSave)
                 {
@@ -281,10 +248,7 @@ namespace WpfApp.Services.Core
                 _logger.Error($"加载多配置数据失败: {ex.Message}", ex);
                 _logger.Warning("将使用默认多配置数据");
 
-                lock (_configLock)
-                {
-                    _multiKeyConfigData = CreateDefaultMultiKeyConfig();
-                }
+                _multiKeyConfigData = CreateDefaultMultiKeyConfig();
 
                 try
                 {
@@ -299,31 +263,17 @@ namespace WpfApp.Services.Core
 
         private void SaveGlobalConfig()
         {
-            GlobalConfig configSnapshot;
-
-            lock (_configLock)
-            {
-                configSnapshot = _globalConfig;
-            }
-
-            var json = JsonConvert.SerializeObject(configSnapshot, Formatting.Indented);
+            var json = JsonConvert.SerializeObject(_globalConfig, Formatting.Indented);
             File.WriteAllText(_globalConfigPath, json);
             _logger.Debug("全局配置已保存");
         }
 
         private void SaveMultiKeyConfig()
         {
-            MultiKeyConfigData configSnapshot;
-
-            lock (_configLock)
+            if (_multiKeyConfigData == null)
             {
-                if (_multiKeyConfigData == null)
-                {
-                    _logger.Warning("多配置数据为空，无法保存");
-                    return;
-                }
-
-                configSnapshot = _multiKeyConfigData;
+                _logger.Warning("多配置数据为空，无法保存");
+                return;
             }
 
             try
@@ -336,10 +286,10 @@ namespace WpfApp.Services.Core
                     _logger.Debug($"创建配置目录: {directory}");
                 }
 
-                var json = JsonConvert.SerializeObject(configSnapshot, Formatting.Indented);
+                var json = JsonConvert.SerializeObject(_multiKeyConfigData, Formatting.Indented);
                 File.WriteAllText(_multiKeyConfigPath, json);
 
-                _logger.Debug($"多配置数据已保存，配置数量: {configSnapshot.Configurations.Count}");
+                _logger.Debug($"多配置数据已保存，配置数量: {_multiKeyConfigData.Configurations.Count}");
             }
             catch (Exception ex)
             {
@@ -464,21 +414,16 @@ namespace WpfApp.Services.Core
             if (updateAction == null)
                 throw new ArgumentNullException(nameof(updateAction));
 
-            GlobalConfig configSnapshot;
-
-            lock (_configLock)
+            if (_globalConfig == null)
             {
-                if (_globalConfig == null)
-                {
-                    _logger.Warning("Global配置为空，无法更新");
-                    return;
-                }
-                updateAction(_globalConfig);
-                configSnapshot = _globalConfig;
+                _logger.Warning("Global配置为空，无法更新");
+                return;
             }
 
+            updateAction(_globalConfig);
+
             SaveGlobalConfig();
-            RaiseConfigChanged(ConfigChangeType.Global, configSnapshot, null);
+            RaiseConfigChanged(ConfigChangeType.Global, _globalConfig, null);
             _logger.Debug("Global配置已更新并保存");
         }
 
@@ -491,21 +436,16 @@ namespace WpfApp.Services.Core
             if (updateAction == null)
                 throw new ArgumentNullException(nameof(updateAction));
 
-            MultiKeyConfigData configSnapshot;
-
-            lock (_configLock)
+            if (_multiKeyConfigData == null)
             {
-                if (_multiKeyConfigData == null)
-                {
-                    _logger.Warning("多配置数据为空，无法更新");
-                    return;
-                }
-                updateAction(_multiKeyConfigData);
-                configSnapshot = _multiKeyConfigData;
+                _logger.Warning("多配置数据为空，无法更新");
+                return;
             }
 
+            updateAction(_multiKeyConfigData);
+
             SaveMultiKeyConfig();
-            RaiseConfigChanged(ConfigChangeType.MultiKey, null, configSnapshot);
+            RaiseConfigChanged(ConfigChangeType.MultiKey, null, _multiKeyConfigData);
             _logger.Debug("多配置数据已更新并保存");
         }
 
@@ -531,13 +471,10 @@ namespace WpfApp.Services.Core
         {
             try
             {
-                lock (_configLock)
-                {
-                    // 清理事件订阅
-                    ConfigChanged = null;
+                // 清理事件订阅
+                ConfigChanged = null;
 
-                    _logger.Debug("配置管理器资源已清理");
-                }
+                _logger.Debug("配置管理器资源已清理");
             }
             catch (Exception ex)
             {

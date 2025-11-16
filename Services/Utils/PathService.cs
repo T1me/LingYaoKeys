@@ -9,8 +9,13 @@ namespace WpfApp.Services.Utils;
 /// </summary>
 public class PathService : IPathService
 {
-    private static readonly Lazy<PathService> _instance = new(() => new PathService());
-    private readonly SerilogManager _logger = SerilogManager.Instance;
+    /// <summary>
+    /// 全局实例（用于兼容旧代码，后续应移除）
+    /// </summary>
+    [Obsolete("请使用依赖注入，不要直接访问 Instance")]
+    public static PathService Instance { get; } = new PathService(SerilogManager.Instance);
+
+    private readonly ISerilogManager _logger;
     
     // 默认应用数据目录名称
     private const string APP_DATA_FOLDER_NAME = ".lykeys";
@@ -33,10 +38,6 @@ public class PathService : IPathService
     // 驱动文件目录
     private string _driverPath;
     
-    /// <summary>
-    /// 获取单例实例
-    /// </summary>
-    public static PathService Instance => _instance.Value;
     
     /// <summary>
     /// 应用数据根目录
@@ -68,8 +69,9 @@ public class PathService : IPathService
     /// </summary>
     public string DriverPath => _driverPath;
     
-    private PathService()
+    public PathService(ISerilogManager logger)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         // 在构造函数中初始化基本路径
         InitializePaths();
     }
