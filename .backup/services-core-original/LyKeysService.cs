@@ -9,50 +9,6 @@ using System.Runtime.InteropServices; // 添加此命名空间
 
 namespace WpfApp.Services.Core
 {
-    #region 接口定义
-
-    /// <summary>
-    /// LyKeys驱动服务接口
-    /// </summary>
-    public interface ILyKeysService : IDisposable
-    {
-        // 初始化与重载
-        bool Initialize(string driverPath);
-        bool ReloadDriver(IDriver newDriver, string driverPath);
-
-        // 状态属性
-        bool IsInitialized { get; }
-        int KeyInterval { get; set; }
-        int KeyPressInterval { get; set; }
-        bool IsHoldMode { get; set; }
-        bool IsReduceKeyStuck { get; set; }
-
-        // 按键操作
-        bool SendKeyDown(VirtualKeyCode keyCode);
-        bool SendKeyUp(VirtualKeyCode keyCode);
-        bool SendKeyPress(VirtualKeyCode keyCode, int duration = 100);
-        void SimulateKeyCombo(params VirtualKeyCode[] keyCodes);
-
-        // 鼠标操作
-        bool MoveMouseToPosition(int? x, int? y);
-
-        // 工具方法
-        bool IsValidVirtualKeyCode(VirtualKeyCode code);
-        string GetKeyDescription(VirtualKeyCode keyCode);
-        void UpdateKeyPressIntervalByReduceKeyStuck();
-
-        // 事件
-        event EventHandler<bool> InitializationStatusChanged;
-        event EventHandler<int> KeyIntervalChanged;
-        event EventHandler<StatusMessageEventArgs> StatusMessageChanged;
-        event EventHandler<int> KeyPressIntervalChanged;
-
-        // 输入法服务
-        InputMethodService InputMethodService { get; }
-    }
-
-    #endregion
-
     /// <summary>
     /// LyKeys服务类 - 提供键盘模拟和按键序列管理功能
     /// </summary>

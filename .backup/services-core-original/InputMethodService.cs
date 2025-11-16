@@ -1,21 +1,8 @@
 using System.Runtime.InteropServices;
 using WpfApp.Services.Utils;
 
+// 输入法服务
 namespace WpfApp.Services.Core;
-
-#region 接口定义
-
-/// <summary>
-/// 输入法管理服务接口
-/// </summary>
-public interface IInputMethodService
-{
-    void StoreCurrentLayout();      // 保存当前输入法
-    void SwitchToEnglish();         // 切换到英文
-    void RestorePreviousLayout();   // 恢复之前的输入法
-}
-
-#endregion
 
 public class InputMethodService : IInputMethodService
 {

@@ -8,26 +8,6 @@ using WpfApp.Services.Utils;
 
 namespace WpfApp.Services.Core
 {
-    #region 接口定义
-
-    /// <summary>
-    /// 统一配置管理接口
-    /// </summary>
-    public interface IConfigManager
-    {
-        event EventHandler<ConfigEventArgs> ConfigChanged;
-        GlobalConfig GlobalConfig { get; }
-        KeyConfigData CurrentKeyConfig { get; }
-        MultiKeyConfigData MultiKeyConfigData { get; }
-        void Initialize();
-        void UpdateGlobalConfig(Action<GlobalConfig> updateAction);
-        void UpdateKeyConfig(Action<KeyConfigData> updateAction);
-        void UpdateMultiKeyConfig(Action<MultiKeyConfigData> updateAction);
-        void Cleanup();
-    }
-
-    #endregion
-
     /// <summary>
     /// 统一配置管理服务
     /// 负责管理全局配置、多按键配置和配置文件的加载、保存等操作

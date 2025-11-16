@@ -5,27 +5,6 @@ using WpfApp.Services.Utils;
 
 namespace WpfApp.Services.Core;
 
-#region 接口定义
-
-/// <summary>
-/// 音频服务接口
-/// </summary>
-public interface IAudioService : IDisposable
-{
-    // 播放音效
-    void PlayStartSound();
-    void PlayStopSound();
-
-    // 音量控制（0.0-1.0）
-    double Volume { get; set; }
-
-    // 状态查询
-    bool IsDisposed { get; }
-    bool AudioDeviceAvailable { get; }
-}
-
-#endregion
-
 public class AudioService : IAudioService, IDisposable
 {
     private readonly ISerilogManager _logger;

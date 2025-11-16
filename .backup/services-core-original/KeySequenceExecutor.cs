@@ -3,22 +3,6 @@ using WpfApp.Services.Utils;
 
 namespace WpfApp.Services.Core;
 
-#region 接口定义
-
-/// <summary>
-/// 按键序列执行器接口
-/// </summary>
-public interface IKeySequenceExecutor
-{
-    void Start(List<KeyItemSettings> operations, bool isHoldMode, KeyConfiguration config, Action? onCompleted = null);
-    void Stop();
-    void EmergencyStop();
-    bool IsRunning { get; }
-    bool IsHoldMode { get; }
-}
-
-#endregion
-
 /// <summary>
 /// 按键序列执行器 - 统一管理按键执行的状态和副作用
 /// </summary>
