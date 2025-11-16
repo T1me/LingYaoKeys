@@ -24,15 +24,8 @@
 </div>
 <br>
 
-简体中文 | [English](./README_EN.md)
-
-<br>
-
 ❤ 如果喜欢本项目可以右上角送作者一个 `Star` 🌟 ❤
 
-<br>
-
-加入🐧群聊：<a target="_blank" href="https://qm.qq.com/cgi-bin/qm/qr?k=Iv4RluZN1ceLX_iV5j6oNITElvUP5sFo&jump_from=webapi&authKey=xUof/EqyhLD6KNkVaL2vf1wqx14Gz5OTKHtGLiZN7igbtZLn1/l1DeOAtAkOTOUd"><img border="0" src="https://pub.idqqimg.com/wpa/images/group.png" alt="灵曜按键" title="灵曜按键"></a>
 </div>
 
 <!-- markdownlint-restore -->
@@ -41,7 +34,6 @@
 
 - [✨ 主要功能](#-主要功能)
 - [🌏 快速下载](#-快速下载)
-- [📖 使用教程](#-使用教程)
 - [🖼️ 项目展示](#️-项目展示)
 - [📃 常见问题](#-常见问题)
 - [🍒 关于与建议](#-关于与建议)
@@ -73,11 +65,6 @@
   - 浮窗置顶显示按键状态
   - 输入法切换支持
 
-- [x] **配置管理**
-  - 配置导出/导入
-  - 联网更新
-  - 调试模式支持
-
 ### 🚀 驱动特性
 
 - [x] **核心技术**
@@ -102,14 +89,6 @@
 </div>
 
 > **注意**：请始终从 GitHub Releases 页面下载最新版本，以确保获得最新的功能和安全更新。
-
-## 📖 使用教程
-
-<div align="center">
-
-**[进入教程文档](https://zyphrZero.github.io/LingYaoKeys/guide/tutorial)**
-
-</div>
 
 ## 🖼️ 项目展示
 
