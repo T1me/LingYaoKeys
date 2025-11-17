@@ -508,12 +508,16 @@ public class HotkeyService : IHotkeyService, IDisposable
     {
         try
         {
-            _configManager.UpdateKeyConfig(keyConfig =>
+            _configManager.UpdateMultiKeyConfig(multiConfig =>
             {
-                keyConfig.startKey = keyCode;
-                keyConfig.startMods = modifiers;
-                keyConfig.stopKey = keyCode;
-                keyConfig.stopMods = modifiers;
+                var activeConfig = multiConfig.GetActiveConfiguration();
+                if (activeConfig != null)
+                {
+                    activeConfig.StartKey = keyCode;
+                    activeConfig.StartMods = modifiers;
+                    activeConfig.StopKey = keyCode;
+                    activeConfig.StopMods = modifiers;
+                }
             });
         }
         catch (Exception ex)
@@ -524,7 +528,7 @@ public class HotkeyService : IHotkeyService, IDisposable
     }
 
     /// <summary>
-    /// 重新加载按键配置（新版本 - 使用 KeyConfiguration）
+    /// 重新加载按键配置
     /// </summary>
     private void ReloadKeyConfiguration(KeyConfiguration keyConfig)
     {
@@ -576,68 +580,6 @@ public class HotkeyService : IHotkeyService, IDisposable
             }
 
             _lyKeysService.IsHoldMode = keyConfig.ExecutionMode == KeyExecutionMode.Hold;
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("重新加载热键配置失败", ex);
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// 重新加载按键配置（旧版本 - 已废弃，保留用于兼容性）
-    /// </summary>
-    [Obsolete("请使用接受 KeyConfiguration 参数的重载方法")]
-    private void ReloadKeyConfiguration(KeyConfigData keyConfig)
-    {
-        if (keyConfig == null)
-        {
-            _logger.Warning("按键配置为空，无法重新加载");
-            return;
-        }
-
-        try
-        {
-            if (keyConfig.startKey.HasValue)
-            {
-                RegisterHotkey(keyConfig.startKey.Value, keyConfig.startMods, saveToConfig: false);
-            }
-            else
-            {
-                _pendingHotkey = null;
-                _hotkeyVirtualKey = 0;
-            }
-
-            if (keyConfig.keys?.Count > 0)
-            {
-                var selectedItems = keyConfig.keys.Where(k => k.IsSelected).ToList();
-                if (selectedItems.Count > 0)
-                {
-                    var operations = new List<KeyItemSettings>();
-                    foreach (var item in selectedItems)
-                    {
-                        if (item.Type == KeyItemType.Keyboard && item.Code.HasValue)
-                        {
-                            operations.Add(KeyItemSettings.CreateKeyboard(item.Code.Value, item.KeyInterval));
-                        }
-                        else if (item.Type == KeyItemType.Coordinates)
-                        {
-                            operations.Add(KeyItemSettings.CreateCoordinates(item.X.Value, item.Y.Value, item.KeyInterval));
-                        }
-                    }
-                    SetKeySequence(operations);
-                }
-                else
-                {
-                    SetKeySequence(new List<KeyItemSettings>());
-                }
-            }
-            else
-            {
-                SetKeySequence(new List<KeyItemSettings>());
-            }
-
-            _lyKeysService.IsHoldMode = keyConfig.keyMode != 0;
         }
         catch (Exception ex)
         {

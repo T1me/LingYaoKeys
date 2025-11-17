@@ -247,7 +247,6 @@ public partial class SettingsViewModel : ObservableObject
                     {
                         GlobalConfig = _configManager.GlobalConfig,
                         MultiKeyConfig = _configManager.MultiKeyConfigData,
-                        Version = 2  // 配置文件版本号
                     };
 
                     var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
@@ -277,70 +276,31 @@ public partial class SettingsViewModel : ObservableObject
                 if (dialog.ShowDialog() == true)
                 {
                     var json = System.IO.File.ReadAllText(dialog.FileName);
-
-                    // 尝试检测配置版本
-                    var versionCheck = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(json, new { Version = 0 });
-
-                    if (versionCheck?.Version >= 2)
+                    var config = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(json, new
                     {
-                        // 新版本配置（V2）- 包含 MultiKeyConfig
-                        var config = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(json, new
+                        GlobalConfig = (GlobalConfig)null,
+                        MultiKeyConfig = (MultiKeyConfigData)null,
+                        Version = 2
+                    });
+
+                    if (config?.GlobalConfig != null)
+                    {
+                        _configManager.UpdateGlobalConfig(gc =>
                         {
-                            GlobalConfig = (GlobalConfig)null,
-                            MultiKeyConfig = (MultiKeyConfigData)null,
-                            Version = 2
+                            gc.UI = config.GlobalConfig.UI;
+                            gc.Debug = config.GlobalConfig.Debug;
+                            gc.SelectedDriver = config.GlobalConfig.SelectedDriver;
                         });
-
-                        if (config?.GlobalConfig != null)
-                        {
-                            _configManager.UpdateGlobalConfig(gc =>
-                            {
-                                gc.UI = config.GlobalConfig.UI;
-                                gc.Debug = config.GlobalConfig.Debug;
-                                gc.SelectedDriver = config.GlobalConfig.SelectedDriver;
-                            });
-                        }
-
-                        if (config?.MultiKeyConfig != null)
-                        {
-                            _configManager.UpdateMultiKeyConfig(mkc =>
-                            {
-                                mkc.Configurations = config.MultiKeyConfig.Configurations;
-                                mkc.ActiveConfigurationId = config.MultiKeyConfig.ActiveConfigurationId;
-                                mkc.Version = config.MultiKeyConfig.Version;
-                            });
-                        }
                     }
-                    else
+
+                    if (config?.MultiKeyConfig != null)
                     {
-                        // 旧版本配置（V1）- 包含 KeyConfig，自动迁移
-                        var config = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(json, new
+                        _configManager.UpdateMultiKeyConfig(mkc =>
                         {
-                            GlobalConfig = (GlobalConfig)null,
-                            KeyConfig = (KeyConfigData)null
+                            mkc.Configurations = config.MultiKeyConfig.Configurations;
+                            mkc.ActiveConfigurationId = config.MultiKeyConfig.ActiveConfigurationId;
+                            mkc.Version = config.MultiKeyConfig.Version;
                         });
-
-                        if (config?.GlobalConfig != null)
-                        {
-                            _configManager.UpdateGlobalConfig(gc =>
-                            {
-                                gc.UI = config.GlobalConfig.UI;
-                                gc.Debug = config.GlobalConfig.Debug;
-                                gc.SelectedDriver = config.GlobalConfig.SelectedDriver;
-                            });
-                        }
-
-                        // 将旧配置迁移到新格式
-                        if (config?.KeyConfig != null)
-                        {
-                            var multiConfig = MultiKeyConfigData.FromLegacyConfig(config.KeyConfig, config.GlobalConfig);
-                            _configManager.UpdateMultiKeyConfig(mkc =>
-                            {
-                                mkc.Configurations = multiConfig.Configurations;
-                                mkc.ActiveConfigurationId = multiConfig.ActiveConfigurationId;
-                                mkc.Version = 2;
-                            });
-                        }
                     }
 
                     HandyControl.Controls.MessageBox.Success("配置导入成功！部分设置可能需要重启应用生效。", "导入配置");

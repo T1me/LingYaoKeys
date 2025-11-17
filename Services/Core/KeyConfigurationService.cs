@@ -90,19 +90,6 @@ public class KeyConfigurationService : IDisposable
     }
 
     /// <summary>
-    /// 从旧版本配置迁移
-    /// </summary>
-    public void MigrateFromLegacyConfig(KeyConfigData legacyConfig, GlobalConfig? globalConfig = null)
-    {
-        _logger.Info("检测到旧版本配置，开始迁移...");
-
-        var multiConfig = MultiKeyConfigData.FromLegacyConfig(legacyConfig, globalConfig);
-        LoadConfigurations(multiConfig);
-
-        _logger.Info("配置迁移完成");
-    }
-
-    /// <summary>
     /// 获取配置数据用于保存
     /// </summary>
     public MultiKeyConfigData GetConfigData()

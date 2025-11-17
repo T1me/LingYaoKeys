@@ -147,50 +147,6 @@ public class TargetWindow
 }
 
 /// <summary>
-/// 按键配置类，包含按键相关的所有配置
-/// 注意：此类保留用于向后兼容，新功能请使用 KeyConfiguration
-/// </summary>
-public class KeyConfigData
-{
-    // 按键配置相关属性
-    public VirtualKeyCode? startKey { get; set; }
-    public ModifierKeys startMods { get; set; }
-    public VirtualKeyCode? stopKey { get; set; }
-    public ModifierKeys stopMods { get; set; }
-    public List<KeyConfig> keys { get; set; } = new();
-    public int keyMode { get; set; }
-    public int interval { get; set; } = 10;
-    public int? KeyPressInterval { get; set; }
-
-    // 多窗口支持
-    public List<TargetWindow> TargetWindows { get; set; } = new();
-
-    public KeyConfigData()
-    {
-        keys = new List<KeyConfig>();
-    }
-
-    /// <summary>
-    /// 转换为新的 KeyConfiguration 格式
-    /// </summary>
-    public KeyConfiguration ToKeyConfiguration(string name = "默认配置", GlobalConfig? globalConfig = null)
-    {
-        return new KeyConfiguration(name)
-        {
-            StartKey = startKey,
-            StartMods = startMods,
-            StopKey = stopKey,
-            StopMods = stopMods,
-            Keys = new List<KeyConfig>(keys),
-            ExecutionMode = keyMode == 0 ? KeyExecutionMode.Sequence : KeyExecutionMode.Hold,
-            Interval = interval,
-            KeyPressInterval = KeyPressInterval ?? 5,
-            TargetWindows = new List<TargetWindow>(TargetWindows),
-        };
-    }
-}
-
-/// <summary>
 /// 多配置数据类 - 支持多个按键配置方案
 /// </summary>
 public class MultiKeyConfigData
@@ -270,17 +226,6 @@ public class MultiKeyConfigData
         }
 
         return true;
-    }
-
-    /// <summary>
-    /// 从旧版本配置迁移
-    /// </summary>
-    public static MultiKeyConfigData FromLegacyConfig(KeyConfigData legacyConfig, GlobalConfig? globalConfig = null)
-    {
-        var multiConfig = new MultiKeyConfigData();
-        var config = legacyConfig.ToKeyConfiguration("默认配置", globalConfig);
-        multiConfig.AddConfiguration(config);
-        return multiConfig;
     }
 }
 

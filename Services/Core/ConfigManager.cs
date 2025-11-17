@@ -17,11 +17,11 @@ namespace WpfApp.Services.Core
     {
         event EventHandler<ConfigEventArgs> ConfigChanged;
         GlobalConfig GlobalConfig { get; }
-        KeyConfigData CurrentKeyConfig { get; }
         MultiKeyConfigData MultiKeyConfigData { get; }
+        KeyConfiguration ActiveConfiguration { get; }
+
         void Initialize();
         void UpdateGlobalConfig(Action<GlobalConfig> updateAction);
-        void UpdateKeyConfig(Action<KeyConfigData> updateAction);
         void UpdateMultiKeyConfig(Action<MultiKeyConfigData> updateAction);
         void Cleanup();
     }
@@ -77,12 +77,6 @@ namespace WpfApp.Services.Core
         /// </summary>
         public KeyConfiguration ActiveConfiguration => _multiKeyConfigData?.GetActiveConfiguration();
 
-        /// <summary>
-        /// 获取当前按键配置（兼容性属性，已废弃）
-        /// </summary>
-        [Obsolete("请使用 ActiveConfiguration 或 MultiKeyConfigData")]
-        public KeyConfigData CurrentKeyConfig => null;
-
         #endregion
 
         /// <summary>
@@ -95,7 +89,7 @@ namespace WpfApp.Services.Core
 
             _configDir = _pathService.ConfigPath;
             _globalConfigPath = _pathService.GetGlobalConfigPath();
-            _multiKeyConfigPath = Path.Combine(_configDir, "multi_key_config.json");
+            _multiKeyConfigPath = Path.Combine(_configDir, "key_config.json");
         }
 
         #region 初始化方法
@@ -461,15 +455,6 @@ namespace WpfApp.Services.Core
             SaveMultiKeyConfig();
             RaiseConfigChanged(ConfigChangeType.MultiKey, null, _multiKeyConfigData);
             _logger.Debug("多配置数据已更新并保存");
-        }
-
-        /// <summary>
-        /// 更新当前按键配置（已废弃，保留用于兼容性）
-        /// </summary>
-        [Obsolete("请使用 UpdateMultiKeyConfig")]
-        public void UpdateKeyConfig(Action<KeyConfigData> updateAction)
-        {
-            _logger.Warning("UpdateKeyConfig 已废弃，请使用 UpdateMultiKeyConfig");
         }
 
         #endregion
