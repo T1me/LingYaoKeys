@@ -84,6 +84,7 @@ public class KeySequenceExecutor : IKeySequenceExecutor
             ? new HoldKeyMode(_logger, _driverService)
             : new SequenceKeyMode(_logger, _driverService);
 
+        _currentMode.SetConfiguration(config);
         _currentMode.SetOperationList(operations);
         _currentMode.Start(() => OnExecutionCompleted());
     }

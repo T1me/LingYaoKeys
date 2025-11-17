@@ -460,12 +460,16 @@ namespace WpfApp.ViewModels
                     return;
                 }
 
+                var configName = config.Name;
+
                 // 删除配置（DeleteConfirmationBehavior 已经提供了二次确认）
                 if (_configService.RemoveConfiguration(configId))
                 {
-                    Configurations.Remove(config);
-                    ShowMessage($"已删除配置: {config.Name}");
-                    _logger.Info($"已删除配置: {config.Name}");
+                    // 注意：不要手动从 Configurations 列表移除
+                    // ConfigurationsChanged 事件 -> SaveMultiKeyConfig() -> ConfigChanged 事件 -> LoadConfigurationsToUI()
+                    // 通过事件机制自动刷新 UI 列表
+                    ShowMessage($"已删除配置: {configName}");
+                    _logger.Info($"已删除配置: {configName}");
                 }
             }
             catch (Exception ex)
@@ -489,8 +493,9 @@ namespace WpfApp.ViewModels
             try
             {
                 var clonedConfig = _configService.CloneConfiguration(configId);
-                var viewModel = new KeyConfigurationItemViewModel(clonedConfig);
-                Configurations.Add(viewModel);
+                // 注意：不要手动添加到 Configurations 列表
+                // ConfigurationsChanged 事件 -> SaveMultiKeyConfig() -> ConfigChanged 事件 -> LoadConfigurationsToUI()
+                // 通过事件机制自动刷新 UI 列表
 
                 ShowMessage($"已克隆配置: {clonedConfig.Name}");
                 _logger.Info($"已克隆配置: {clonedConfig.Name}");

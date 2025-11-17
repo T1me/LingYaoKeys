@@ -34,7 +34,7 @@ namespace WpfApp.Services.Core
         /// <summary>
         /// 添加键盘按键
         /// </summary>
-        public KeyItem AddKeyboardKey(VirtualKeyCode keyCode, int interval, ObservableCollection<KeyItem> keyList, VirtualKeyCode? hotkey)
+        public KeyItem AddKeyboardKey(VirtualKeyCode keyCode, int interval, int holdDuration, ObservableCollection<KeyItem> keyList, VirtualKeyCode? hotkey)
         {
             // 验证按键
             if (!_lyKeysService.IsValidVirtualKeyCode(keyCode))
@@ -51,7 +51,8 @@ namespace WpfApp.Services.Core
             // 创建按键项
             var keyItem = new KeyItem(keyCode, _lyKeysService)
             {
-                KeyInterval = interval
+                KeyInterval = interval,
+                HoldDuration = holdDuration
             };
 
             // 添加到列表
@@ -72,10 +73,12 @@ namespace WpfApp.Services.Core
         /// <summary>
         /// 添加坐标项
         /// </summary>
-        public KeyItem AddCoordinate(int x, int y, int interval, ObservableCollection<KeyItem> keyList)
+        public KeyItem AddCoordinate(int x, int y, int interval, int holdDuration, ObservableCollection<KeyItem> keyList)
         {
             // 创建坐标项
             var coordinateItem = _coordinateService.CreateCoordinateItem(x, y, _lyKeysService, interval);
+            // 坐标移动不支持按压时长，始终设置为 0
+            coordinateItem.HoldDuration = 0;
 
             // 添加到列表
             keyList.Add(coordinateItem);
@@ -147,11 +150,12 @@ namespace WpfApp.Services.Core
                 {
                     if (item.Type == KeyItemType.Keyboard)
                     {
-                        operations.Add(KeyItemSettings.CreateKeyboard(item.KeyCode, item.KeyInterval));
+                        operations.Add(KeyItemSettings.CreateKeyboard(item.KeyCode, item.KeyInterval, item.HoldDuration));
                     }
                     else if (item.Type == KeyItemType.Coordinates)
                     {
-                        operations.Add(KeyItemSettings.CreateCoordinates(item.X, item.Y, item.KeyInterval));
+                        // 坐标移动不支持按压时长，强制设置为 0
+                        operations.Add(KeyItemSettings.CreateCoordinates(item.X, item.Y, item.KeyInterval, 0));
                     }
                 }
 
@@ -204,7 +208,8 @@ namespace WpfApp.Services.Core
                     item = new KeyItem(key.Code.Value, _lyKeysService)
                     {
                         IsSelected = key.IsSelected,
-                        KeyInterval = key.KeyInterval
+                        KeyInterval = key.KeyInterval,
+                        HoldDuration = key.HoldDuration
                     };
                 }
                 else if (key.Type == KeyItemType.Coordinates && key.X.HasValue && key.Y.HasValue)
@@ -212,7 +217,8 @@ namespace WpfApp.Services.Core
                     item = new KeyItem(key.X.Value, key.Y.Value, _lyKeysService)
                     {
                         IsSelected = key.IsSelected,
-                        KeyInterval = key.KeyInterval
+                        KeyInterval = key.KeyInterval,
+                        HoldDuration = 0 // 坐标移动不支持按压时长
                     };
                 }
 
@@ -245,6 +251,7 @@ namespace WpfApp.Services.Core
                     itemConfig = new KeyConfig(item.KeyCode, item.IsSelected)
                     {
                         KeyInterval = item.KeyInterval,
+                        HoldDuration = item.HoldDuration,
                         Type = KeyItemType.Keyboard,
                         X = null,
                         Y = null
@@ -265,6 +272,7 @@ namespace WpfApp.Services.Core
                     itemConfig = new KeyConfig(x ?? 1, y ?? 1, item.IsSelected)
                     {
                         KeyInterval = item.KeyInterval,
+                        HoldDuration = 0, // 坐标移动不支持按压时长
                         Type = KeyItemType.Coordinates,
                         Code = null
                     };

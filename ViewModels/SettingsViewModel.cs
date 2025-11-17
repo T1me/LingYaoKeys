@@ -40,7 +40,7 @@ public partial class SettingsViewModel : ObservableObject
     private Brush _driverStatusColor = Brushes.Green;
 
     [ObservableProperty]
-    private string _selectedDriver = "AHK";
+    private string _selectedDriver = "INPUTSIMULATOR";
 
     private bool _isCheckingUpdate;
 
@@ -114,12 +114,12 @@ public partial class SettingsViewModel : ObservableObject
         var globalConfig = _configManager.GlobalConfig;
         if (globalConfig.Debug.IsDebugMode)
         {
-            DebugModeStatus = "🟢 调试模式：已开启";
+            DebugModeStatus = "调试模式：已开启";
             DebugModeStatusColor = Brushes.Green;
         }
         else
         {
-            DebugModeStatus = "⭕ 调试模式：已关闭";
+            DebugModeStatus = "调试模式：已关闭";
             DebugModeStatusColor = Brushes.Gray;
         }
     }
@@ -130,7 +130,7 @@ public partial class SettingsViewModel : ObservableObject
     private void UpdateDriverStatus()
     {
         var globalConfig = _configManager.GlobalConfig;
-        SelectedDriver = globalConfig.SelectedDriver ?? "AHK";
+        SelectedDriver = globalConfig.SelectedDriver ?? "INPUTSIMULATOR";
 
         try
         {

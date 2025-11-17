@@ -318,7 +318,9 @@ public class KeyConfigurationService : IDisposable
                     KeyCode = k.Code,
                     X = k.X,
                     Y = k.Y,
-                    Interval = k.KeyInterval
+                    Interval = k.KeyInterval,
+                    // 坐标移动不支持按压时长，强制设置为 0
+                    HoldDuration = k.Type == KeyItemType.Coordinates ? 0 : k.HoldDuration
                 })
                 .ToList();
 

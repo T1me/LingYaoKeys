@@ -513,11 +513,12 @@ public class HotkeyService : IHotkeyService
                     {
                         if (item.Type == KeyItemType.Keyboard && item.Code.HasValue)
                         {
-                            operations.Add(KeyItemSettings.CreateKeyboard(item.Code.Value, item.KeyInterval));
+                            operations.Add(KeyItemSettings.CreateKeyboard(item.Code.Value, item.KeyInterval, item.HoldDuration));
                         }
                         else if (item.Type == KeyItemType.Coordinates)
                         {
-                            operations.Add(KeyItemSettings.CreateCoordinates(item.X.Value, item.Y.Value, item.KeyInterval));
+                            // 坐标移动不支持按压时长，强制设置为 0
+                            operations.Add(KeyItemSettings.CreateCoordinates(item.X.Value, item.Y.Value, item.KeyInterval, 0));
                         }
                     }
                     SetKeySequence(operations);

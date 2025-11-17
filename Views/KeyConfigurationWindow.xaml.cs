@@ -236,6 +236,14 @@ public partial class KeyConfigurationWindow : Window
     }
 
     /// <summary>
+    /// 防止手动文本输入（仅允许通过按键捕获设置）
+    /// </summary>
+    private void PreventTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+    {
+        e.Handled = true;
+    }
+
+    /// <summary>
     /// 清除热键
     /// </summary>
     private void ClearHotkey_Click(object sender, RoutedEventArgs e)

@@ -30,13 +30,13 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
     private ModifierKeys _stopMods;
     private string _selectedExecutionMode;
     private int _defaultInterval = 10;
+    private int _defaultHoldDuration = 0;
     private bool _isReduceKeyStuck = true;
     private bool _soundEnabled = true;
     private double _soundVolume = 0.8;
     private bool _autoSwitchIME = true;
     private VirtualKeyCode? _currentKey;
     private string _currentKeyText = string.Empty;
-    private int _currentKeyInterval = 10;
     private ObservableCollection<KeyItem> _keyItems;
 
     #region 属性
@@ -44,7 +44,13 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
     public string ConfigurationName
     {
         get => _configurationName;
-        set => SetProperty(ref _configurationName, value);
+        set
+        {
+            if (SetProperty(ref _configurationName, value))
+            {
+                SaveCommand.NotifyCanExecuteChanged();
+            }
+        }
     }
 
     public string StartHotkeyText
@@ -71,6 +77,12 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
     {
         get => _defaultInterval;
         set => SetProperty(ref _defaultInterval, value);
+    }
+
+    public int DefaultHoldDuration
+    {
+        get => _defaultHoldDuration;
+        set => SetProperty(ref _defaultHoldDuration, value);
     }
 
     public bool IsReduceKeyStuck
@@ -103,12 +115,6 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         set => SetProperty(ref _currentKeyText, value);
     }
 
-    public int CurrentKeyInterval
-    {
-        get => _currentKeyInterval;
-        set => SetProperty(ref _currentKeyInterval, value);
-    }
-
     public ObservableCollection<KeyItem> KeyItems
     {
         get => _keyItems;
@@ -119,8 +125,8 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
 
     #region 命令
 
-    public ICommand SaveCommand { get; }
-    public ICommand AddKeyCommand { get; }
+    public RelayCommand SaveCommand { get; }
+    public RelayCommand AddKeyCommand { get; }
     public ICommand EditKeyCommand { get; }
     public ICommand DeleteKeyCommand { get; }
 
@@ -190,6 +196,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         _startKey = keyCode;
         _startMods = modifiers;
         UpdateHotkeyText();
+        SaveCommand.NotifyCanExecuteChanged();
         _logger.Debug($"设置激活热键: {StartHotkeyText}");
     }
 
@@ -206,6 +213,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         _startKey = null;
         _startMods = ModifierKeys.None;
         UpdateHotkeyText();
+        SaveCommand.NotifyCanExecuteChanged();
     }
 
     public void ClearStopHotkey()
@@ -243,6 +251,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
     {
         _currentKey = keyCode;
         CurrentKeyText = _lyKeysService.GetKeyDescription(keyCode);
+        AddKeyCommand.NotifyCanExecuteChanged();
         _logger.Debug($"设置当前按键: {keyCode}");
     }
 
@@ -257,12 +266,14 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
 
         try
         {
-            _keyListService.AddKeyboardKey(_currentKey.Value, _currentKeyInterval, KeyItems, _startKey);
+            _keyListService.AddKeyboardKey(_currentKey.Value, _defaultInterval, _defaultHoldDuration, KeyItems, _startKey);
             _logger.Info($"已添加按键: {CurrentKeyText}");
 
             // 清空输入
             _currentKey = null;
             CurrentKeyText = string.Empty;
+            AddKeyCommand.NotifyCanExecuteChanged();
+            SaveCommand.NotifyCanExecuteChanged();
         }
         catch (Exception ex)
         {
@@ -277,8 +288,9 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
     {
         try
         {
-            _keyListService.AddCoordinate(x, y, _currentKeyInterval, KeyItems);
+            _keyListService.AddCoordinate(x, y, _defaultInterval, _defaultHoldDuration, KeyItems);
             _logger.Info($"已添加坐标: ({x}, {y})");
+            SaveCommand.NotifyCanExecuteChanged();
         }
         catch (Exception ex)
         {
@@ -304,7 +316,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
                 // 将选中的按键信息加载到输入框
                 _currentKey = keyItem.KeyCode;
                 CurrentKeyText = keyItem.DisplayName;
-                CurrentKeyInterval = keyItem.KeyInterval;
+                AddKeyCommand.NotifyCanExecuteChanged();
 
                 _logger.Info($"正在编辑按键: {keyItem.DisplayName}");
             }
@@ -325,6 +337,7 @@ public partial class KeyConfigurationDialogViewModel : ObservableObject
         {
             _keyListService.DeleteKey(keyItem, KeyItems);
             _logger.Info($"已删除按键: {keyItem.DisplayName}");
+            SaveCommand.NotifyCanExecuteChanged();
         }
         catch (Exception ex)
         {

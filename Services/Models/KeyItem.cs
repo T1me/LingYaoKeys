@@ -38,6 +38,9 @@ public partial class KeyItem : ObservableObject
     private int _keyInterval;
 
     [ObservableProperty]
+    private int _holdDuration = 0;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayName))]
     private int? _x;
 

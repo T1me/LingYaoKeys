@@ -343,7 +343,7 @@ namespace WpfApp.Services.Core
                 },
                 isHotkeyControlEnabled = true,
                 EnableHardwareAcceleration = true,
-                SelectedDriver = "AHK"
+                SelectedDriver = "INPUTSIMULATOR"
             };
         }
 

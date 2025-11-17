@@ -10,123 +10,293 @@
       Title="设置">
 
     <Page.Resources>
+        <!-- 设置项标题样式 -->
+        <Style x:Key="SettingHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <!-- 设置项描述样式 -->
+        <Style x:Key="SettingDescriptionStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#666666"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="LineHeight" Value="18"/>
+        </Style>
+
+        <!-- 图标样式 -->
+        <Style x:Key="IconTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
     </Page.Resources>
 
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  Padding="16">
+        <StackPanel MaxWidth="900">
+            <!-- 页面标题 -->
+            <TextBlock Text="应用设置"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="#212121"
+                       Margin="0,0,0,24"/>
 
-        <!-- 配置文件管理 -->
-        <hc:Card Header="配置文件管理" Margin="0,0,0,20">
-            <StackPanel Margin="10">
-                <StackPanel Orientation="Horizontal"
-                            Margin="0,10,0,0">
-                    <Button Style="{StaticResource ButtonPrimary}"
-                            Width="120"
-                            Height="35"
-                            Margin="0,0,15,0"
-                            Command="{Binding ImportConfigCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8E5;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="16"
-                                       Margin="0,0,8,0"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Text="导入配置"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Style="{StaticResource ButtonPrimary}"
-                            Width="120"
-                            Height="35"
-                            Command="{Binding ExportConfigCommand}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE74E;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="16"
-                                       Margin="0,0,8,0"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Text="导出配置"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+            <!-- 配置文件管理 -->
+            <Border Background="White"
+                    BorderBrush="#E0E0E0"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,0,16"
+                    Padding="20">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,16">
+                        <TextBlock Text="&#xE8B7;"
+                                   Style="{StaticResource IconTextStyle}"
+                                   Foreground="#2196F3"/>
+                        <TextBlock Text="配置文件管理"
+                                   Style="{StaticResource SettingHeaderStyle}"/>
+                    </DockPanel>
+
+                    <TextBlock Style="{StaticResource SettingDescriptionStyle}"
+                               Margin="0,0,0,16">
+                        <Run Text="导入或导出您的按键配置文件，方便在不同设备间同步配置或备份重要设置。"/>
+                    </TextBlock>
+
+                    <WrapPanel>
+                        <Button Style="{StaticResource ButtonPrimary}"
+                                Width="140"
+                                Height="38"
+                                Margin="0,0,12,0"
+                                Command="{Binding ImportConfigCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8E5;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="16"
+                                           Margin="0,0,8,0"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="导入配置"
+                                           FontSize="14"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource ButtonSuccess}"
+                                Width="140"
+                                Height="38"
+                                Command="{Binding ExportConfigCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE74E;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="16"
+                                           Margin="0,0,8,0"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="导出配置"
+                                           FontSize="14"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
                 </StackPanel>
-            </StackPanel>
-        </hc:Card>
+            </Border>
 
-        <!-- 更新管理 -->
-        <hc:Card Grid.Row="1" Header="更新管理" Margin="0,0,0,20">
-            <StackPanel Margin="10">
-                <StackPanel Orientation="Horizontal"
-                            Margin="0,10,0,0">
+            <!-- 驱动选择 -->
+            <Border Background="White"
+                    BorderBrush="#E0E0E0"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,0,16"
+                    Padding="20">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,16">
+                        <TextBlock Text="&#xE950;"
+                                   Style="{StaticResource IconTextStyle}"
+                                   Foreground="#9C27B0"/>
+                        <TextBlock Text="驱动选择"
+                                   Style="{StaticResource SettingHeaderStyle}"/>
+                    </DockPanel>
+
+                    <TextBlock Style="{StaticResource SettingDescriptionStyle}"
+                               Margin="0,0,0,16">
+                        <Run Text="选择按键发送驱动。LyKeys 提供内核级驱动支持（需管理员权限），InputSimulator 为用户态基于 Win32 SendInput API。"/>
+                    </TextBlock>
+
+                    <StackPanel Orientation="Horizontal">
+                        <hc:ComboBox SelectedValuePath="Tag"
+                                     SelectedValue="{Binding SelectedDriver}"
+                                     Width="220"
+                                     Height="36"
+                                     FontSize="14"
+                                     Style="{StaticResource ComboBoxExtend}">
+                            <ComboBoxItem Content="InputSimulator (用户态)" Tag="INPUTSIMULATOR"/>
+                            <ComboBoxItem Content="LyKeys (内核驱动)" Tag="LYKEYS"/>
+                        </hc:ComboBox>
+
+                        <Border Background="#F5F5F5"
+                                CornerRadius="4"
+                                Padding="12,8"
+                                Margin="16,0,0,0">
+                            <TextBlock Text="{Binding DriverStatus}"
+                                       Foreground="{Binding DriverStatusColor}"
+                                       FontFamily="{StaticResource EmojiFont}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 更新管理 -->
+            <Border Background="White"
+                    BorderBrush="#E0E0E0"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,0,16"
+                    Padding="20">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,16">
+                        <TextBlock Text="&#xE895;"
+                                   Style="{StaticResource IconTextStyle}"
+                                   Foreground="#4CAF50"/>
+                        <TextBlock Text="更新管理"
+                                   Style="{StaticResource SettingHeaderStyle}"/>
+                    </DockPanel>
+
+                    <TextBlock Style="{StaticResource SettingDescriptionStyle}"
+                               Margin="0,0,0,16">
+                        <Run Text="检查应用程序更新，获取最新功能和安全修复。"/>
+                    </TextBlock>
+
                     <Button Style="{StaticResource ButtonPrimary}"
-                            Width="120"
-                            Height="35"
+                            Width="140"
+                            Height="38"
+                            HorizontalAlignment="Left"
                             Command="{Binding CheckUpdateCommand}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE777;"
                                        FontFamily="Segoe MDL2 Assets"
                                        FontSize="16"
                                        Margin="0,0,8,0"
-                                       VerticalAlignment="Center" />
+                                       VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding UpdateStatus}"
-                                       VerticalAlignment="Center" />
+                                       FontSize="14"
+                                       VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
-            </StackPanel>
-        </hc:Card>
+            </Border>
 
-        <!-- 驱动选择 -->
-        <hc:Card Grid.Row="2" Header="驱动选择" Margin="0,0,0,20">
-            <StackPanel Margin="10">
-                <StackPanel Orientation="Horizontal">
-                    <hc:ComboBox SelectedValuePath="Tag"
-                                 SelectedValue="{Binding SelectedDriver}"
-                                 Width="120"
-                                 Margin="0,10,0,0">
-                        <ComboBoxItem Content="AHK" Tag="AHK" />
-                        <ComboBoxItem Content="LyKeys" Tag="LyKeys" />
-                    </hc:ComboBox>
-                    <TextBlock Text="{Binding DriverStatus}"
-                               Foreground="{Binding DriverStatusColor}"
-                               FontFamily="{StaticResource EmojiFont}"
-                               FontWeight="Bold"
-                               VerticalAlignment="Center"
-                               Margin="10,10,0,0" />
-                </StackPanel>
-            </StackPanel>
-        </hc:Card>
+            <!-- 调试模式 -->
+            <Border Background="White"
+                    BorderBrush="#E0E0E0"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,0,16"
+                    Padding="20">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,16">
+                        <TextBlock Text="&#xE7BA;"
+                                   Style="{StaticResource IconTextStyle}"
+                                   Foreground="#FF9800"/>
+                        <TextBlock Text="调试模式"
+                                   Style="{StaticResource SettingHeaderStyle}"/>
+                    </DockPanel>
 
-        <!-- 调试模式 -->
-        <hc:Card Grid.Row="3" Header="调试模式" Margin="0,0,0,20">
-            <StackPanel Margin="10">
-                <StackPanel Orientation="Horizontal"
-                            Margin="0,10,0,0">
-                    <Button Style="{StaticResource ButtonPrimary}"
-                            Width="180"
-                            Height="35"
-                            Command="{Binding ToggleDebugModeCommand}">
-                        <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource SettingDescriptionStyle}"
+                               Margin="0,0,0,16">
+                        <Run Text="启用调试模式会记录详细的运行日志，帮助诊断问题。"/>
+                        <LineBreak/>
+                        <Run Text="注意：可能会影响性能并增加日志文件大小。" Foreground="#FF9800" FontWeight="SemiBold"/>
+                    </TextBlock>
 
+                    <StackPanel Orientation="Horizontal">
+                        <Button Width="180"
+                                Height="38"
+                                Command="{Binding ToggleDebugModeCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource ButtonWarning}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding DebugModeStatus}" Value="🟢 调试模式已开启">
+                                            <Setter Property="Background" Value="#FF9800"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                             <TextBlock Text="{Binding DebugModeStatus}"
-                                       Foreground="{Binding DebugModeStatusColor}"
                                        FontFamily="{StaticResource EmojiFont}"
-                                       FontWeight="Bold"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
-                <TextBlock Text="注意：开启调试模式会记录更多日志信息，可能会影响性能"
-                           Margin="0,10,0,0"
-                           Foreground="#666666"
-                           FontSize="12" />
-            </StackPanel>
-        </hc:Card>
-    </Grid>
+            </Border>
+
+            <!-- 关于信息 -->
+            <Border Background="#F9F9F9"
+                    BorderBrush="#E0E0E0"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,0,16"
+                    Padding="20">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,12">
+                        <TextBlock Text="&#xE946;"
+                                   Style="{StaticResource IconTextStyle}"
+                                   Foreground="#607D8B"/>
+                        <TextBlock Text="关于"
+                                   Style="{StaticResource SettingHeaderStyle}"/>
+                    </DockPanel>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="应用名称："
+                                   FontSize="13"
+                                   Foreground="#666666"
+                                   Margin="0,0,12,8"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                   Text="LingYaoKeys（灵曜按键）"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                   Text="版本："
+                                   FontSize="13"
+                                   Foreground="#666666"
+                                   Margin="0,0,12,8"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                   Text="v1.0.0"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0"
+                                   Text="技术栈："
+                                   FontSize="13"
+                                   Foreground="#666666"
+                                   Margin="0,0,12,0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1"
+                                   Text=".NET 8.0 + WPF + HandyControl"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </Page>

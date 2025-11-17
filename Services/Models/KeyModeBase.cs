@@ -12,6 +12,7 @@ public abstract class KeyModeBase
     protected bool _isRunning;
     protected CancellationTokenSource? _cts;
     protected int KeyPressInterval => _driverService.KeyPressInterval;
+    protected KeyConfiguration? _config;
 
     protected Action? _onCompleted;
 
@@ -20,6 +21,11 @@ public abstract class KeyModeBase
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _driverService = driverService ?? throw new ArgumentNullException(nameof(driverService));
         _operationList = new List<KeyItemSettings>();
+    }
+
+    public void SetConfiguration(KeyConfiguration? config)
+    {
+        _config = config;
     }
 
     public virtual void SetOperationList(List<KeyItemSettings> operations)
@@ -76,7 +82,7 @@ public abstract class KeyModeBase
             return ExecuteSingleKey(operation);
 
         if (operation.Type == KeyItemType.Coordinates)
-            return ExecuteCoordinate(operation.X, operation.Y, operation.Interval);
+            return ExecuteCoordinate(operation);
 
         return true;
     }
@@ -86,13 +92,21 @@ public abstract class KeyModeBase
         var key = operation.KeyCode.Value;
         int keyInterval = operation.Interval;
 
+        // 计算实际按压时长：基础HoldDuration + 降低卡位的5ms
+        int actualHoldDuration = operation.HoldDuration;
+        if (_config?.IsReduceKeyStuck == true)
+        {
+            actualHoldDuration += 5;
+        }
+
         try
         {
             _driverService.SendKeyDown(key);
 
-            if (KeyPressInterval > 0)
+            // 使用实际按压时长
+            if (actualHoldDuration > 0)
             {
-                Thread.Sleep(KeyPressInterval);
+                Thread.Sleep(actualHoldDuration);
                 if (ShouldStop())
                 {
                     _driverService.SendKeyUp(key);
@@ -117,12 +131,18 @@ public abstract class KeyModeBase
         }
     }
 
-    private bool ExecuteCoordinate(int? x, int? y, int interval)
+    private bool ExecuteCoordinate(KeyItemSettings operation)
     {
+        int? x = operation.X;
+        int? y = operation.Y;
+        int interval = operation.Interval;
+
         try
         {
+            // 移动鼠标到目标位置（仅移动，不点击）
             _driverService.MoveMouseToPosition(x, y);
 
+            // 等待延迟时间
             if (interval > 0)
             {
                 Thread.Sleep(interval);

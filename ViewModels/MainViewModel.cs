@@ -323,6 +323,20 @@ public partial class MainViewModel : ObservableObject
         );
 
         _logger.Debug("MainViewModel: HotkeyService 已注入并初始化 KeyMappingViewModel");
+
+        // 页面可能在 KeyMappingViewModel 初始化之前就被创建和缓存了
+        if (_pageCache.TryGetValue("FrontKeys", out var frontKeysPage))
+        {
+            frontKeysPage.DataContext = _keyMappingViewModel;
+            _logger.Debug("已更新 FrontKeys 页面的 DataContext");
+        }
+
+        // 如果当前正在显示 FrontKeys 页面，也需要更新 CurrentPage 的 DataContext
+        if (CurrentPage != null && CurrentPage == frontKeysPage)
+        {
+            OnPropertyChanged(nameof(CurrentViewModel));
+            _logger.Debug("已通知 UI 刷新 CurrentViewModel");
+        }
     }
 
     /// <summary>

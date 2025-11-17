@@ -5,6 +5,7 @@ using System.Security;
 using System.Security.Principal;
 using System.ComponentModel;
 using WpfApp.Services.Utils;
+using WindowsInput;
 
 namespace WpfApp.Services.Core;
 
@@ -70,7 +71,7 @@ public static class DriverFactory
         return driverType?.ToUpperInvariant() switch
         {
             "LYKEYS" => new LyKeys(logger, driverPath),
-            "AHK" => new AhkDriver(logger),
+            "INPUTSIMULATOR" => new InputSimulatorDriver(logger),
             _ => throw new ArgumentException($"不支持的驱动类型: {driverType}")
         };
     }
@@ -87,7 +88,9 @@ public static class DriverFactory
             case "LYKEYS":
                 return PrepareLyKeysDriver(logger, pathService, extractResource);
 
-            case "AHK":
+            case "INPUTSIMULATOR":
+                // InputSimulator 无需额外文件，直接返回空字符串
+                logger.Debug("InputSimulator 驱动无需额外文件");
                 return string.Empty;
 
             default:
@@ -123,64 +126,179 @@ public static class DriverFactory
 
 #endregion
 
-#region AhkDriver 驱动实现
+#region InputSimulatorDriver 驱动实现
 
 /// <summary>
-/// AHK 驱动空实现（测试阶段）
+/// H.InputSimulator 驱动实现（基于 Win32 SendInput API）
+/// 适用于非内核级应用场景
 /// </summary>
-public class AhkDriver : IDriver
+public class InputSimulatorDriver : IDriver
 {
     private readonly ISerilogManager _logger;
+    private readonly InputSimulator _simulator;
+    private bool _isDisposed;
+    private DeviceStatus _lastStatus = DeviceStatus.Unknown;
 
-    public AhkDriver(ISerilogManager logger)
+    public InputSimulatorDriver(ISerilogManager logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _simulator = new InputSimulator();
     }
 
     public bool Initialize()
     {
-        _logger.Debug("AHK 驱动初始化（测试模式）");
-        return true;
+        try
+        {
+            _logger.Debug("InputSimulator 驱动初始化");
+            _lastStatus = DeviceStatus.Ready;
+            _logger.Debug("InputSimulator 驱动初始化成功");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"InputSimulator 驱动初始化失败: {ex.Message}", ex);
+            _lastStatus = DeviceStatus.InitFailed;
+            return false;
+        }
     }
 
     public bool SendKeyDown(ushort vkCode)
     {
-        _logger.Debug($"AHK SendKeyDown: {vkCode}（测试模式）");
-        return true;
+        if (_isDisposed)
+            return false;
+
+        try
+        {
+            _simulator.Keyboard.KeyDown((WindowsInput.VirtualKeyCode)vkCode);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"SendKeyDown 失败, vkCode: {vkCode}", ex);
+            return false;
+        }
     }
 
     public bool SendKeyUp(ushort vkCode)
     {
-        _logger.Debug($"AHK SendKeyUp: {vkCode}（测试模式）");
-        return true;
+        if (_isDisposed)
+            return false;
+
+        try
+        {
+            _simulator.Keyboard.KeyUp((WindowsInput.VirtualKeyCode)vkCode);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"SendKeyUp 失败, vkCode: {vkCode}", ex);
+            return false;
+        }
     }
 
     public bool SendKeyPress(ushort vkCode, int duration = 100)
     {
-        _logger.Debug($"AHK SendKeyPress: {vkCode}, duration: {duration}（测试模式）");
-        return true;
+        if (_isDisposed)
+            return false;
+
+        try
+        {
+            _simulator.Keyboard.KeyDown((WindowsInput.VirtualKeyCode)vkCode);
+            Thread.Sleep(duration);
+            _simulator.Keyboard.KeyUp((WindowsInput.VirtualKeyCode)vkCode);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"SendKeyPress 失败, vkCode: {vkCode}", ex);
+            return false;
+        }
     }
 
     public bool MoveMouseAbsolute(int x, int y)
     {
-        _logger.Debug($"AHK MoveMouseAbsolute: ({x}, {y})（测试模式）");
-        return true;
+        if (_isDisposed)
+            return false;
+
+        try
+        {
+            // H.InputSimulator 使用虚拟桌面坐标系统 (0-65535)
+            // 需要将屏幕坐标转换为虚拟桌面坐标
+            var screenWidth = System.Windows.Forms.Screen.PrimaryScreen.Bounds.Width;
+            var screenHeight = System.Windows.Forms.Screen.PrimaryScreen.Bounds.Height;
+
+            var virtualX = (double)x * 65535 / screenWidth;
+            var virtualY = (double)y * 65535 / screenHeight;
+
+            _simulator.Mouse.MoveMouseToPositionOnVirtualDesktop(virtualX, virtualY);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"MoveMouseAbsolute 失败, x: {x}, y: {y}", ex);
+            return false;
+        }
     }
 
     public bool SendMouseButton(MouseButtonType button, bool isDown)
     {
-        _logger.Debug($"AHK SendMouseButton: {button}, isDown: {isDown}（测试模式）");
-        return true;
+        if (_isDisposed)
+            return false;
+
+        try
+        {
+            switch (button)
+            {
+                case MouseButtonType.Left:
+                    if (isDown) _simulator.Mouse.LeftButtonDown();
+                    else _simulator.Mouse.LeftButtonUp();
+                    break;
+                case MouseButtonType.Right:
+                    if (isDown) _simulator.Mouse.RightButtonDown();
+                    else _simulator.Mouse.RightButtonUp();
+                    break;
+                case MouseButtonType.Middle:
+                    if (isDown) _simulator.Mouse.MiddleButtonDown();
+                    else _simulator.Mouse.MiddleButtonUp();
+                    break;
+                case MouseButtonType.XButton1:
+                    if (isDown) _simulator.Mouse.XButtonDown(1);
+                    else _simulator.Mouse.XButtonUp(1);
+                    break;
+                case MouseButtonType.XButton2:
+                    if (isDown) _simulator.Mouse.XButtonDown(2);
+                    else _simulator.Mouse.XButtonUp(2);
+                    break;
+                case MouseButtonType.WheelUp:
+                    if (isDown) _simulator.Mouse.VerticalScroll(1);
+                    break;
+                case MouseButtonType.WheelDown:
+                    if (isDown) _simulator.Mouse.VerticalScroll(-1);
+                    break;
+                default:
+                    throw new ArgumentException($"不支持的鼠标按键类型: {button}");
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"SendMouseButton 失败, button: {button}, isDown: {isDown}", ex);
+            return false;
+        }
     }
 
     public DeviceStatus GetLastStatus()
     {
-        return DeviceStatus.Ready;
+        return _lastStatus;
     }
 
     public void Dispose()
     {
-        _logger.Debug("AHK 驱动释放（测试模式）");
+        if (_isDisposed)
+            return;
+
+        _logger.Debug("InputSimulator 驱动释放");
+        _isDisposed = true;
     }
 }
 

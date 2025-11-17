@@ -224,11 +224,12 @@ public class KeyMappingService
         {
             if (k.Type == KeyItemType.Keyboard)
             {
-                return KeyItemSettings.CreateKeyboard(k.KeyCode, k.KeyInterval);
+                return KeyItemSettings.CreateKeyboard(k.KeyCode, k.KeyInterval, k.HoldDuration);
             }
             else // KeyItemType.Coordinates
             {
-                return KeyItemSettings.CreateCoordinates(k.X, k.Y, k.KeyInterval);
+                // 坐标移动不支持按压时长，强制设置为 0
+                return KeyItemSettings.CreateCoordinates(k.X, k.Y, k.KeyInterval, 0);
             }
         }).ToList();
     }

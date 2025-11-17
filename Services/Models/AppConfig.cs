@@ -41,9 +41,10 @@ public class VersionInfo
 
 public class KeyConfig
 {
-    public VirtualKeyCode? Code { get; set; }  // 使用可空类型，坐标类型不需要此属性 
+    public VirtualKeyCode? Code { get; set; }  // 使用可空类型，坐标类型不需要此属性
     public bool IsSelected { get; set; }
     public int KeyInterval { get; set; }
+    public int HoldDuration { get; set; } = 0;  // 按压时长（毫秒）
     public KeyItemType Type { get; set; } = KeyItemType.Keyboard;
     public int? X { get; set; }
     public int? Y { get; set; }
@@ -124,7 +125,7 @@ public class GlobalConfig
     // 全局配置（所有配置共享）
     public bool? isHotkeyControlEnabled { get; set; } = true;
     public bool? EnableHardwareAcceleration { get; set; } = true;
-    public string? SelectedDriver { get; set; } = "AHK";
+    public string? SelectedDriver { get; set; } = "INPUTSIMULATOR";
 
     [JsonIgnore] public string Author { get; set; } = "慕长秋";
 
