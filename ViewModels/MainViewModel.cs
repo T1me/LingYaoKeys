@@ -25,8 +25,8 @@ public partial class MainViewModel : ObservableObject
     private readonly IPathService _pathService;
     private readonly ILyKeysService _lyKeysService;
     private readonly Window _mainWindow;
-    private readonly KeyMappingViewModel _keyMappingViewModel;
-    private readonly HotkeyService _hotkeyService;
+    private KeyMappingViewModel _keyMappingViewModel = null!; // 将在 SetHotkeyService() 中初始化
+    private IHotkeyService _hotkeyService = null!; // 将通过 SetHotkeyService 方法注入
     private readonly AboutViewModel _aboutViewModel;
     private readonly DispatcherTimer _statusMessageTimer;
     private readonly Dictionary<string, Page> _pageCache = new();
@@ -100,15 +100,10 @@ public partial class MainViewModel : ObservableObject
 
         mainWindow.DataContext = this;
 
-        // 创建服务（临时转换为具体类型，待后续重构）
-        var lyKeysServiceConcrete = (LyKeysService)lyKeysService;
-        var executor = new KeySequenceExecutor(_logger, lyKeysServiceConcrete, lyKeysService.InputMethodService, App.AudioService, _configManager);
-        _hotkeyService = new HotkeyService(_logger, mainWindow, executor, lyKeysServiceConcrete, _configManager);
-
         _isInitializing = false;
 
-        // 初始化 ViewModels
-        _keyMappingViewModel = new KeyMappingViewModel(lyKeysServiceConcrete, _hotkeyService, this, App.AudioService, _configManager, _logger);
+        // 注意：HotkeyService 将通过 SetHotkeyService() 方法注入
+        // KeyMappingViewModel 将在 SetHotkeyService() 中初始化
         _aboutViewModel = new AboutViewModel(_configManager, _logger);
 
         _lyKeysService.StatusMessageChanged += OnDriverStatusMessageChanged;
@@ -310,12 +305,33 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 设置 HotkeyService（由 DI 容器调用）
+    /// </summary>
+    public void SetHotkeyService(IHotkeyService hotkeyService)
+    {
+        _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
+
+        // 现在可以初始化 KeyMappingViewModel（需要 HotkeyService）
+        var lyKeysServiceConcrete = (LyKeysService)_lyKeysService;
+        _keyMappingViewModel = new KeyMappingViewModel(
+            lyKeysServiceConcrete,
+            _hotkeyService,
+            this,
+            App.AudioService,
+            _configManager,
+            _logger
+        );
+
+        _logger.Debug("MainViewModel: HotkeyService 已注入并初始化 KeyMappingViewModel");
+    }
+
+    /// <summary>
     /// 清理资源
     /// </summary>
     public void Cleanup()
     {
         // 清理时保存所有配置
-        _keyMappingViewModel.SaveConfig();
+        _keyMappingViewModel?.SaveConfig();
         _hotkeyService?.Dispose();
         _statusMessageTimer.Stop();
         _fadeInCache.Clear();

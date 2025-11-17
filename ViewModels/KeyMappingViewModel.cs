@@ -19,7 +19,7 @@ namespace WpfApp.ViewModels
     {
         // 服务依赖
         private readonly LyKeysService _lyKeysService;
-        private readonly HotkeyService _hotkeyService;
+        private readonly IHotkeyService _hotkeyService;  // 使用接口类型，遵循依赖倒置原则
         private readonly AudioService _audioService;
         private readonly MainViewModel _mainViewModel;
         private readonly IConfigManager _configManager;
@@ -176,7 +176,7 @@ namespace WpfApp.ViewModels
 
         public KeyMappingViewModel(
             LyKeysService lyKeysService,
-            HotkeyService hotkeyService,
+            IHotkeyService hotkeyService,  // 使用接口类型
             MainViewModel mainViewModel,
             AudioService audioService,
             IConfigManager configManager,
@@ -730,7 +730,7 @@ namespace WpfApp.ViewModels
             _mainViewModel.UpdateStatusMessage(message, isError);
         }
 
-        public HotkeyService GetHotkeyService() => _hotkeyService;
+        public IHotkeyService GetHotkeyService() => _hotkeyService;
 
         // 兼容性属性
         public string HotkeyStatus => IsExecuting ? "运行中" : "已停止";

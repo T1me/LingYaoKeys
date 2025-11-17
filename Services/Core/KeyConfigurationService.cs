@@ -12,7 +12,7 @@ namespace WpfApp.Services.Core;
 /// </summary>
 public class KeyConfigurationService : IDisposable
 {
-    private readonly HotkeyService _hotkeyService;
+    private readonly IHotkeyService _hotkeyService;  // 使用接口类型
     private readonly ISerilogManager _logger;
     private MultiKeyConfigData _multiConfigData;
     private KeyConfiguration? _activeConfiguration;
@@ -48,7 +48,7 @@ public class KeyConfigurationService : IDisposable
         }
     }
 
-    public KeyConfigurationService(ISerilogManager logger, HotkeyService hotkeyService)
+    public KeyConfigurationService(ISerilogManager logger, IHotkeyService hotkeyService)  // 使用接口类型
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));

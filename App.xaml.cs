@@ -90,26 +90,68 @@ public partial class App : Application
             services.AddSingleton<IAudioService>(sp => AudioService);
             services.AddSingleton<IInputMethodService, InputMethodService>();
 
+            // 注册重构后的热键相关服务（Singleton）
+            services.AddSingleton<Services.Core.Hooks.IHookManager, Services.Core.Hooks.HookManager>();
+            services.AddSingleton<Services.Core.Window.IWindowValidator, Services.Core.Window.WindowValidator>();
+            // KeySequenceExecutor 将在 MainWindow 工厂中手动创建（需要具体类型 LyKeysService）
+
             // 注册 ViewModels
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<AboutViewModel>();
 
-            // 注册 Views（MainWindow 需要特殊处理，因为 MainViewModel 需要 Window 参数）
+            // 注册 Views（MainWindow 需要特殊处理，使用工厂模式管理复杂依赖）
             services.AddSingleton<MainWindow>(sp =>
             {
                 var logger = sp.GetRequiredService<ISerilogManager>();
                 var configManager = sp.GetRequiredService<IConfigManager>();
+                var pathService = sp.GetRequiredService<IPathService>();
+                var lyKeysService = sp.GetRequiredService<ILyKeysService>();
+
+                // 转换为具体类型（KeySequenceExecutor 需要）
+                var lyKeysServiceConcrete = (LyKeysService)lyKeysService;
+                var inputMethodService = lyKeysService.InputMethodService;
 
                 // 先创建 MainWindow 实例
                 var mainWindow = new MainWindow(logger, configManager);
 
-                // 然后创建 MainViewModel，传入 MainWindow
-                var pathService = sp.GetRequiredService<IPathService>();
-                var lyKeysService = sp.GetRequiredService<ILyKeysService>();
-
+                // 创建 MainViewModel（传入 MainWindow）
                 var mainViewModel = new MainViewModel(configManager, logger, pathService, lyKeysService, mainWindow);
 
-                // 设置 ViewModel 和 DataContext
+                // 创建并注册 StatusMessageService（依赖 MainViewModel）
+                var statusMessageService = new Services.UI.StatusMessageService(mainViewModel);
+
+                // 创建 KeySequenceExecutor（需要具体类型）
+                var keySequenceExecutor = new Services.Core.KeySequenceExecutor(
+                    logger,
+                    lyKeysServiceConcrete,
+                    inputMethodService,
+                    AudioService,
+                    configManager
+                );
+
+                // 创建 HotkeyRegistry（依赖 StatusMessageService）
+                var hotkeyRegistry = new Services.Core.Hotkey.HotkeyRegistry(
+                    logger,
+                    configManager,
+                    statusMessageService
+                );
+
+                // 创建 HotkeyService（组合所有服务）
+                var hotkeyService = new Services.Core.HotkeyService(
+                    logger,
+                    sp.GetRequiredService<Services.Core.Hooks.IHookManager>(),
+                    sp.GetRequiredService<Services.Core.Window.IWindowValidator>(),
+                    hotkeyRegistry,
+                    keySequenceExecutor,  // 使用手动创建的实例
+                    lyKeysService,
+                    configManager,
+                    statusMessageService
+                );
+
+                // 将 HotkeyService 设置到 MainViewModel（通过公开方法）
+                mainViewModel.SetHotkeyService(hotkeyService);
+
+                // 设置 DataContext
                 mainWindow.SetViewModel(mainViewModel);
                 mainWindow.DataContext = mainViewModel;
 
