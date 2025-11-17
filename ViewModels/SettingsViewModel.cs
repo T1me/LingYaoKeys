@@ -246,7 +246,8 @@ public partial class SettingsViewModel : ObservableObject
                     var config = new
                     {
                         GlobalConfig = _configManager.GlobalConfig,
-                        KeyConfig = _configManager.CurrentKeyConfig
+                        MultiKeyConfig = _configManager.MultiKeyConfigData,
+                        Version = 2  // 配置文件版本号
                     };
 
                     var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
@@ -276,36 +277,70 @@ public partial class SettingsViewModel : ObservableObject
                 if (dialog.ShowDialog() == true)
                 {
                     var json = System.IO.File.ReadAllText(dialog.FileName);
-                    var config = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(json, new
-                    {
-                        GlobalConfig = (GlobalConfig)null,
-                        KeyConfig = (KeyConfigData)null
-                    });
 
-                    if (config?.GlobalConfig != null)
+                    // 尝试检测配置版本
+                    var versionCheck = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(json, new { Version = 0 });
+
+                    if (versionCheck?.Version >= 2)
                     {
-                        _configManager.UpdateGlobalConfig(gc =>
+                        // 新版本配置（V2）- 包含 MultiKeyConfig
+                        var config = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(json, new
                         {
-                            gc.UI = config.GlobalConfig.UI;
-                            gc.Debug = config.GlobalConfig.Debug;
-                            gc.SelectedDriver = config.GlobalConfig.SelectedDriver;
+                            GlobalConfig = (GlobalConfig)null,
+                            MultiKeyConfig = (MultiKeyConfigData)null,
+                            Version = 2
                         });
+
+                        if (config?.GlobalConfig != null)
+                        {
+                            _configManager.UpdateGlobalConfig(gc =>
+                            {
+                                gc.UI = config.GlobalConfig.UI;
+                                gc.Debug = config.GlobalConfig.Debug;
+                                gc.SelectedDriver = config.GlobalConfig.SelectedDriver;
+                            });
+                        }
+
+                        if (config?.MultiKeyConfig != null)
+                        {
+                            _configManager.UpdateMultiKeyConfig(mkc =>
+                            {
+                                mkc.Configurations = config.MultiKeyConfig.Configurations;
+                                mkc.ActiveConfigurationId = config.MultiKeyConfig.ActiveConfigurationId;
+                                mkc.Version = config.MultiKeyConfig.Version;
+                            });
+                        }
                     }
-
-                    if (config?.KeyConfig != null)
+                    else
                     {
-                        _configManager.UpdateKeyConfig(kc =>
+                        // 旧版本配置（V1）- 包含 KeyConfig，自动迁移
+                        var config = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(json, new
                         {
-                            kc.startKey = config.KeyConfig.startKey;
-                            kc.startMods = config.KeyConfig.startMods;
-                            kc.stopKey = config.KeyConfig.stopKey;
-                            kc.stopMods = config.KeyConfig.stopMods;
-                            kc.keys = config.KeyConfig.keys;
-                            kc.keyMode = config.KeyConfig.keyMode;
-                            kc.interval = config.KeyConfig.interval;
-                            kc.KeyPressInterval = config.KeyConfig.KeyPressInterval;
-                            kc.TargetWindows = config.KeyConfig.TargetWindows;
+                            GlobalConfig = (GlobalConfig)null,
+                            KeyConfig = (KeyConfigData)null
                         });
+
+                        if (config?.GlobalConfig != null)
+                        {
+                            _configManager.UpdateGlobalConfig(gc =>
+                            {
+                                gc.UI = config.GlobalConfig.UI;
+                                gc.Debug = config.GlobalConfig.Debug;
+                                gc.SelectedDriver = config.GlobalConfig.SelectedDriver;
+                            });
+                        }
+
+                        // 将旧配置迁移到新格式
+                        if (config?.KeyConfig != null)
+                        {
+                            var multiConfig = MultiKeyConfigData.FromLegacyConfig(config.KeyConfig, config.GlobalConfig);
+                            _configManager.UpdateMultiKeyConfig(mkc =>
+                            {
+                                mkc.Configurations = multiConfig.Configurations;
+                                mkc.ActiveConfigurationId = multiConfig.ActiveConfigurationId;
+                                mkc.Version = 2;
+                            });
+                        }
                     }
 
                     HandyControl.Controls.MessageBox.Success("配置导入成功！部分设置可能需要重启应用生效。", "导入配置");

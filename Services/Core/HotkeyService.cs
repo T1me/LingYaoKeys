@@ -465,8 +465,12 @@ public class HotkeyService : IHotkeyService, IDisposable
             switch (e.ChangeType)
             {
                 case ConfigChangeType.MultiKey:
-                    if (e.KeyConfigData != null)
-                        ReloadKeyConfiguration(e.KeyConfigData);
+                    if (e.MultiKeyConfigData != null)
+                    {
+                        var activeConfig = e.MultiKeyConfigData.GetActiveConfiguration();
+                        if (activeConfig != null)
+                            ReloadKeyConfiguration(activeConfig);
+                    }
                     break;
 
                 case ConfigChangeType.Global:
@@ -477,8 +481,12 @@ public class HotkeyService : IHotkeyService, IDisposable
                 case ConfigChangeType.All:
                     if (e.GlobalConfigData != null)
                         UpdateGlobalSettings(e.GlobalConfigData);
-                    if (e.KeyConfigData != null)
-                        ReloadKeyConfiguration(e.KeyConfigData);
+                    if (e.MultiKeyConfigData != null)
+                    {
+                        var activeConfig = e.MultiKeyConfigData.GetActiveConfiguration();
+                        if (activeConfig != null)
+                            ReloadKeyConfiguration(activeConfig);
+                    }
                     break;
 
                 default:
@@ -515,6 +523,71 @@ public class HotkeyService : IHotkeyService, IDisposable
         }
     }
 
+    /// <summary>
+    /// 重新加载按键配置（新版本 - 使用 KeyConfiguration）
+    /// </summary>
+    private void ReloadKeyConfiguration(KeyConfiguration keyConfig)
+    {
+        if (keyConfig == null)
+        {
+            _logger.Warning("按键配置为空，无法重新加载");
+            return;
+        }
+
+        try
+        {
+            if (keyConfig.StartKey.HasValue)
+            {
+                RegisterHotkey(keyConfig.StartKey.Value, keyConfig.StartMods, saveToConfig: false);
+            }
+            else
+            {
+                _pendingHotkey = null;
+                _hotkeyVirtualKey = 0;
+            }
+
+            if (keyConfig.Keys?.Count > 0)
+            {
+                var selectedItems = keyConfig.Keys.Where(k => k.IsSelected).ToList();
+                if (selectedItems.Count > 0)
+                {
+                    var operations = new List<KeyItemSettings>();
+                    foreach (var item in selectedItems)
+                    {
+                        if (item.Type == KeyItemType.Keyboard && item.Code.HasValue)
+                        {
+                            operations.Add(KeyItemSettings.CreateKeyboard(item.Code.Value, item.KeyInterval));
+                        }
+                        else if (item.Type == KeyItemType.Coordinates)
+                        {
+                            operations.Add(KeyItemSettings.CreateCoordinates(item.X.Value, item.Y.Value, item.KeyInterval));
+                        }
+                    }
+                    SetKeySequence(operations);
+                }
+                else
+                {
+                    SetKeySequence(new List<KeyItemSettings>());
+                }
+            }
+            else
+            {
+                SetKeySequence(new List<KeyItemSettings>());
+            }
+
+            _lyKeysService.IsHoldMode = keyConfig.ExecutionMode == KeyExecutionMode.Hold;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("重新加载热键配置失败", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 重新加载按键配置（旧版本 - 已废弃，保留用于兼容性）
+    /// </summary>
+    [Obsolete("请使用接受 KeyConfiguration 参数的重载方法")]
     private void ReloadKeyConfiguration(KeyConfigData keyConfig)
     {
         if (keyConfig == null)

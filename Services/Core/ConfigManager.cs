@@ -405,7 +405,7 @@ namespace WpfApp.Services.Core
         {
             try
             {
-                var args = new ConfigEventArgs(changeType, globalConfig, null);
+                var args = new ConfigEventArgs(changeType, globalConfig, multiKeyConfig);
                 ConfigChanged?.Invoke(this, args);
                 _logger.Debug($"触发配置变更事件: {changeType}");
             }
@@ -521,17 +521,13 @@ namespace WpfApp.Services.Core
     {
         public ConfigChangeType ChangeType { get; }
         public GlobalConfig GlobalConfigData { get; }
-
-        [Obsolete]
-        public KeyConfigData KeyConfigData { get; }
-
         public MultiKeyConfigData MultiKeyConfigData { get; }
 
-        public ConfigEventArgs(ConfigChangeType changeType, GlobalConfig globalConfig, KeyConfigData keyConfig)
+        public ConfigEventArgs(ConfigChangeType changeType, GlobalConfig globalConfig, MultiKeyConfigData multiKeyConfig)
         {
             ChangeType = changeType;
             GlobalConfigData = globalConfig;
-            KeyConfigData = keyConfig;
+            MultiKeyConfigData = multiKeyConfig;
         }
     }
 }

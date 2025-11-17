@@ -36,7 +36,6 @@ public partial class MainViewModel : ObservableObject
     private readonly Storyboard? _fadeOutStoryboard;
     private readonly Dictionary<string, PageConfig> _pageConfigs;
     private GlobalConfig? _globalConfig;
-    private KeyConfigData? _keyConfig;
     private bool _isInitializing = true;
 
     private const int STATUS_MESSAGE_TIMEOUT = 3000;  // 状态栏消息显示时间（毫秒）
@@ -151,18 +150,6 @@ public partial class MainViewModel : ObservableObject
                 OnPropertyChanged();
             }
             return _globalConfig;
-        }
-    }
-
-    /// <summary>
-    /// 按键配置数据
-    /// </summary>
-    public KeyConfigData KeyConfig
-    {
-        get
-        {
-            if (_keyConfig == null) _keyConfig = _configManager.CurrentKeyConfig;
-            return _keyConfig;
         }
     }
 
