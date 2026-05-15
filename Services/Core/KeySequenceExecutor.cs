@@ -79,10 +79,14 @@ public class KeySequenceExecutor : IKeySequenceExecutor
             _audioService.PlayStartSound();
         }
 
-        // 创建并启动模式
-        _currentMode = isHoldMode
-            ? new HoldKeyMode(_logger, _driverService)
-            : new SequenceKeyMode(_logger, _driverService);
+        // 根据执行模式创建对应的模式实例
+        _currentMode = config.ExecutionMode switch
+        {
+            KeyExecutionMode.Hold => new HoldKeyMode(_logger, _driverService),
+            KeyExecutionMode.Loop => new LoopKeyMode(_logger, _driverService),
+            KeyExecutionMode.Sequence => new SequenceKeyMode(_logger, _driverService),
+            _ => new SequenceKeyMode(_logger, _driverService)
+        };
 
         _currentMode.SetConfiguration(config);
         _currentMode.SetOperationList(operations);

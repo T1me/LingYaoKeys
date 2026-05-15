@@ -178,14 +178,16 @@ public class HotkeyService : IHotkeyService
 
             SequenceModeStarted?.Invoke();
 
-            var tempConfig = new KeyConfiguration("临时配置")
+            // 修复：使用活跃配置而非临时配置，确保 ExecutionMode 等属性生效
+            var activeConfig = _configManager.ActiveConfiguration;
+            if (activeConfig == null)
             {
-                SoundEnabled = true,
-                AutoSwitchToEnglishIME = true,
-                IsReduceKeyStuck = true
-            };
+                _logger.Error("无法获取活跃配置，StartSequence 中止");
+                _statusMessageService.UpdateStatusMessage("配置加载失败，无法启动序列", true);
+                return;
+            }
 
-            _executor.Start(_keySettings, _lyKeysService.IsHoldMode, tempConfig, () =>
+            _executor.Start(_keySettings, _lyKeysService.IsHoldMode, activeConfig, () =>
             {
                 SequenceModeStopped?.Invoke();
             });
@@ -241,16 +243,24 @@ public class HotkeyService : IHotkeyService
 
         try
         {
-            var isHotkey = _hotkeyRegistry.IsHotkey(vkCode);
+            var isStartHotkey = _hotkeyRegistry.IsHotkey(vkCode);
+            var isStopHotkey = _hotkeyRegistry.IsStopHotkey(vkCode);
 
             // 热键注册模式
-            if (_hotkeyRegistry.IsRegisteringHotkey && isHotkey)
+            if (_hotkeyRegistry.IsRegisteringHotkey && isStartHotkey)
             {
                 HandleHotkeyRegistration(isDown);
                 return;
             }
 
-            // 窗口状态检查
+            // 优先处理停止热键（不受窗口状态影响，确保用户能随时停止循环执行）
+            if (isStopHotkey && isDown)
+            {
+                HandleStopHotkey();
+                return;
+            }
+
+            // 窗口状态检查（仅影响启动热键）
             if (!ValidateWindowState())
             {
                 EmergencyStop();
@@ -258,7 +268,7 @@ public class HotkeyService : IHotkeyService
             }
 
             // 热键触发逻辑
-            if (isHotkey)
+            if (isStartHotkey)
             {
                 HandleHotkeyTrigger(isDown);
             }
@@ -277,16 +287,24 @@ public class HotkeyService : IHotkeyService
 
         try
         {
-            var isHotkey = _hotkeyRegistry.IsHotkey(button);
+            var isStartHotkey = _hotkeyRegistry.IsHotkey(button);
+            var isStopHotkey = _hotkeyRegistry.IsStopHotkey(button);
 
             // 热键注册模式
-            if (isHotkey && _hotkeyRegistry.IsRegisteringHotkey)
+            if (isStartHotkey && _hotkeyRegistry.IsRegisteringHotkey)
             {
                 HandleHotkeyRegistration(isDown);
                 return;
             }
 
-            // 窗口状态检查
+            // 优先处理停止热键（不受窗口状态影响，确保用户能随时停止循环执行）
+            if (isStopHotkey && isDown)
+            {
+                HandleStopHotkey();
+                return;
+            }
+
+            // 窗口状态检查（仅影响启动热键）
             if (!_windowValidator.IsTargetWindowActive && _executor.IsRunning)
             {
                 EmergencyStop();
@@ -294,7 +312,7 @@ public class HotkeyService : IHotkeyService
             }
 
             // 热键触发逻辑
-            if (isHotkey)
+            if (isStartHotkey)
             {
                 HandleHotkeyTrigger(isDown);
             }
@@ -462,7 +480,7 @@ public class HotkeyService : IHotkeyService
     }
 
     /// <summary>
-    /// 处理切换模式
+    /// 处理切换模式（单次模式和循环模式）
     /// </summary>
     private void HandleToggleMode(bool isDown)
     {
@@ -472,15 +490,40 @@ public class HotkeyService : IHotkeyService
             _isKeyHeld = true;
             StartHotkeyPressed?.Invoke();
 
-            if (_executor.IsRunning)
-                StopSequence();
+            // 循环模式：只启动，不关闭（需要用停止热键关闭）
+            // 单次模式：切换启停
+            var activeConfig = _configManager.ActiveConfiguration;
+            if (activeConfig?.ExecutionMode == KeyExecutionMode.Loop)
+            {
+                // 循环模式：只能启动
+                if (!_executor.IsRunning)
+                    StartSequence();
+            }
             else
-                StartSequence();
+            {
+                // 单次模式：切换启停
+                if (_executor.IsRunning)
+                    StopSequence();
+                else
+                    StartSequence();
+            }
         }
         else if (!isDown && _isKeyHeld)
         {
             _isKeyHeld = false;
             StartHotkeyReleased?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// 处理停止热键（仅用于循环模式）
+    /// </summary>
+    private void HandleStopHotkey()
+    {
+        if (_executor.IsRunning)
+        {
+            _logger.Info("停止热键触发，停止循环执行");
+            StopSequence();
         }
     }
 
@@ -497,11 +540,23 @@ public class HotkeyService : IHotkeyService
 
         try
         {
+            // 注册开始热键
             if (keyConfig.StartKey.HasValue)
             {
                 RegisterHotkey(keyConfig.StartKey.Value, keyConfig.StartMods, saveToConfig: false);
             }
-            // else: 如果没有设置热键,不需要注销（hotkey registry 会处理）
+
+            // 注册停止热键（如果设置了）
+            if (keyConfig.StopKey.HasValue)
+            {
+                _hotkeyRegistry.RegisterStopHotkey(keyConfig.StopKey.Value, keyConfig.StopMods, saveToConfig: false);
+            }
+            else if (keyConfig.ExecutionMode == KeyExecutionMode.Loop)
+            {
+                // 提示：Loop 模式建议设置停止热键
+                _logger.Warning($"Loop 模式未设置停止热键，配置名称：{keyConfig.Name}");
+                _statusMessageService.UpdateStatusMessage("Loop 模式建议设置停止热键以便中止循环执行", false);
+            }
 
             if (keyConfig.Keys?.Count > 0)
             {

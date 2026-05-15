@@ -19,6 +19,16 @@ public interface IHotkeyRegistry
     VirtualKeyCode? PendingHotkey { get; }
 
     /// <summary>
+    /// 当前注册的停止热键虚拟键码
+    /// </summary>
+    int StopHotkeyVirtualKey { get; }
+
+    /// <summary>
+    /// 当前待注册的停止热键
+    /// </summary>
+    VirtualKeyCode? PendingStopHotkey { get; }
+
+    /// <summary>
     /// 是否正在注册热键模式
     /// </summary>
     bool IsRegisteringHotkey { get; set; }
@@ -33,6 +43,15 @@ public interface IHotkeyRegistry
     bool RegisterHotkey(VirtualKeyCode keyCode, ModifierKeys modifiers, bool saveToConfig = true);
 
     /// <summary>
+    /// 注册停止热键
+    /// </summary>
+    /// <param name="keyCode">按键代码</param>
+    /// <param name="modifiers">修饰键</param>
+    /// <param name="saveToConfig">是否保存到配置文件</param>
+    /// <returns>注册是否成功</returns>
+    bool RegisterStopHotkey(VirtualKeyCode keyCode, ModifierKeys modifiers, bool saveToConfig = true);
+
+    /// <summary>
     /// 注销热键
     /// </summary>
     /// <param name="keyCode">按键代码</param>
@@ -45,12 +64,22 @@ public interface IHotkeyRegistry
     bool IsMouseButton(VirtualKeyCode keyCode);
 
     /// <summary>
-    /// 检查指定虚拟键码是否为当前热键
+    /// 检查指定虚拟键码是否为开始热键
     /// </summary>
     bool IsHotkey(int vkCode);
 
     /// <summary>
-    /// 检查指定虚拟键码是否为当前热键
+    /// 检查指定虚拟键码是否为开始热键
     /// </summary>
     bool IsHotkey(VirtualKeyCode keyCode);
+
+    /// <summary>
+    /// 检查指定虚拟键码是否为停止热键
+    /// </summary>
+    bool IsStopHotkey(int vkCode);
+
+    /// <summary>
+    /// 检查指定虚拟键码是否为停止热键
+    /// </summary>
+    bool IsStopHotkey(VirtualKeyCode keyCode);
 }

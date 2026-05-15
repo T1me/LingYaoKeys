@@ -408,3 +408,4 @@ appsettings.Production.json
 
 # 文档文件
 cache/
+.ace-tool/

@@ -102,7 +102,20 @@
                                         PreviewTextInput="PreventTextInput"
                                         Tag="Stop"
                                         Margin="0,0,0,8"
-                                        IsUndoEnabled="False"/>
+                                        IsUndoEnabled="False">
+                                <hc:TextBox.Style>
+                                    <Style TargetType="hc:TextBox" BasedOn="{StaticResource TextBoxExtend}">
+                                        <Style.Triggers>
+                                            <!-- Hold 模式时禁用停止热键输入框 -->
+                                            <DataTrigger Binding="{Binding SelectedExecutionMode}" Value="按压">
+                                                <Setter Property="IsEnabled" Value="False"/>
+                                                <Setter Property="hc:InfoElement.Placeholder" Value="按压模式不需要停止热键"/>
+                                                <Setter Property="ToolTip" Value="按压模式下松开启动热键即停止，无需设置停止热键"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </hc:TextBox.Style>
+                            </hc:TextBox>
 
                             <!-- 默认延迟 -->
                             <TextBlock Grid.Row="2" Grid.Column="0"
