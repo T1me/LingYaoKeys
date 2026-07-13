@@ -109,4 +109,4 @@ jobs:
         if: always()
         with:
           name: v${{ github.event.inputs.version }}
-          path: publish\${{ env.ZIP_FILE }}
+          path: ${{ env.ZIP_FILE }}
