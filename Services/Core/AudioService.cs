@@ -143,7 +143,7 @@ public class AudioService
         }
     }
 
-    public void PlayStartSound()
+    public async Task PlayStartSound()
     {
         // 如果音频设备不可用，直接返回
         if (!_audioDeviceAvailable)
@@ -158,10 +158,10 @@ public class AudioService
             if (_isPlayingStopSound) DisposeCurrentSound();
         }
 
-        PlaySound(_startSoundPath, true);
+        await PlaySound(_startSoundPath, true);
     }
 
-    public void PlayStopSound()
+    public async Task PlayStopSound()
     {
         // 如果音频设备不可用，直接返回
         if (!_audioDeviceAvailable)
@@ -170,10 +170,10 @@ public class AudioService
             return;
         }
 
-        PlaySound(_stopSoundPath, false);
+        await PlaySound(_stopSoundPath, false);
     }
 
-    private void PlaySound(string path, bool isStartSound)
+    private async Task PlaySound(string path, bool isStartSound)
     {
         if (!File.Exists(path))
         {
@@ -234,26 +234,14 @@ public class AudioService
             outputDevice.Init(mediaReader);
             outputDevice.Play();
 
-            // 使用线程等待播放完成，不阻塞调用线程
-            Thread waitThread = new Thread(() =>
+            try
             {
-                try
-                {
-                    // 等待播放完成或取消
-                    while (!cts.IsCancellationRequested && outputDevice.PlaybackState == PlaybackState.Playing)
-                    {
-                        Thread.Sleep(10);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error("等待音频播放完成时出错", ex);
-                }
-            })
+                await tcs.Task.WaitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
             {
-                IsBackground = true
-            };
-            waitThread.Start();
+                _logger.Debug("音频播放被取消");
+            }
         }
         catch (Exception ex)
         {
